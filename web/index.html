@@ -13,15 +13,32 @@
     <header>
       <div class="brand">🔮 Fortune</div>
       <nav>
-        <a href="admin/index.html">หลังบ้าน (Admin)</a>
+        <a href="#" id="menu-help">คู่มือ</a>
       </nav>
     </header>
 
     <div class="hero card">
-      <div class="badge">เริ่มต้นใช้งานใน 5 ขั้นตอน</div>
-      <h2>ใช้งานง่าย ชัดเจน เป็นลำดับ</h2>
-      <p class="muted">1) เข้าสู่ระบบ  2) เลือกแพ็กเกจ  3) ชำระเงิน  4) เสี่ยงทาย  5) ดูประวัติ</p>
+      <div class="badge">บริการทำนายโชคชะตา • เซียมซี • ไพ่ยิปซี</div>
+      <h2>เสี่ยงทายแม่นยำ ใช้งานง่าย ปลอดภัย</h2>
+      <p class="muted">เริ่มต้นด้วยการเข้าสู่ระบบ เลือกแพ็กเกจ สแกนพร้อมเพย์ แล้วเสี่ยงทายได้ทันที</p>
     </div>
+
+    <section class="card">
+      <div class="features-grid">
+        <div class="feature">
+          <h4>พร้อมเพย์ QR</h4>
+          <p class="muted">รองรับ PromptPay QR มาตรฐาน EMVCo สแกนง่าย</p>
+        </div>
+        <div class="feature">
+          <h4>เซียมซี / ไพ่ยิปซี</h4>
+          <p class="muted">เลือกแหล่งทำนายจากวัดชื่อดัง หรือไพ่ยิปซี โดยปรับอัตรา Upright/Reversed ได้</p>
+        </div>
+        <div class="feature">
+          <h4>ปลอดภัย</h4>
+          <p class="muted">ระบบแยกหน้าบ้านกับหลังบ้าน พร้อมการยืนยันสิทธิ์ด้วย Token</p>
+        </div>
+      </div>
+    </section>
 
     <div id="progress" class="stepper">
       <div class="step" data-step="1"><div class="dot">1</div><div class="label">เข้าสู่ระบบ</div></div>
@@ -77,7 +94,6 @@
         <div>
           <div id="qr" class="qr"></div>
           <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <small class="muted">payload: <code id="qr-payload"></code></small>
             <span class="badge" id="tx-status">สถานะ: -</span>
           </div>
         </div>
@@ -228,7 +244,6 @@
       if (!r.ok) return alert(JSON.stringify(data));
       currentTx = data.transaction_id;
       document.getElementById('qr').innerHTML = `<img src="${data.qr_code_url}" width="220" height="220" />`;
-      document.getElementById('qr-payload').textContent = data.qr_payload;
       document.getElementById('tx-status').textContent = 'สถานะ: CREATED';
       setStep(3);
     }

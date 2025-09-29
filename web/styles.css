@@ -39,4 +39,9 @@ nav a.active{color:#fff;font-weight:600}
 .stat{padding:14px;border-radius:12px;border:1px solid var(--border);background:#0b0d1a}
 .stat h4{margin:0 0 4px 0;font-size:14px;color:var(--muted)}
 .stat .num{font-size:22px;font-weight:700}
+
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.feature{padding:12px;border-radius:12px;border:1px dashed var(--border);background:#0b0d1a}
+.feature h4{margin:0 0 6px 0}
+
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(90,89,255,.7)}100%{box-shadow:0 0 0 12px rgba(90,89,255,0)}}
