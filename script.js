@@ -1,5 +1,8 @@
+// --- ค่าเริ่มต้นและการตั้งค่าแชร์ ---
+// หากเว็บไซต์ออนไลน์ ให้ตั้งค่า URL หน้าเว็บจริงไว้ที่นี่ เพื่อให้แชร์ไปยัง Line/Facebook ได้
+const SITE_URL = ""; // ตัวอย่าง: "https://yourbrand.com/fortune"
+
 // --- ฐานข้อมูลคำทำนาย (FORTUNE_DATA) ---
-// นี่คือ "Database" ของเรา โดยจำลองคำทำนาย 28 เบอร์
 const FORTUNE_DATA = [
     { number: 1, headline: "มงคลสูงสุด: โชคใหญ่กำลังมา!", detail: "การงานราบรื่น การเงินโดดเด่น ความรักสมหวังทุกประการ สิ่งที่ตั้งใจจะสำเร็จภายใน 7 วัน ให้ทำบุญด้วยแสงสว่าง", icon: "💰" },
     { number: 2, headline: "ระวังเรื่องปากเสียง: ควรสงบสติอารมณ์", detail: "ช่วงนี้ให้หลีกเลี่ยงการตัดสินใจเรื่องสำคัญ อาจมีเหตุขัดแย้งกับคนใกล้ชิด ให้อุทิศบุญแก่เจ้ากรรมนายเวร", icon: "⚠️" },
@@ -41,9 +44,17 @@ const TEASERS = [
     "สุขภาพดี เริ่มจากใจที่เบิกบาน 🧘"
 ];
 
-// --- Logic การทำงาน (Node C, D, F) ---
+// --- รีวิวลูกค้าจริง (ตัวอย่าง) ---
+const REVIEWS = [
+    { author: "คุณมิ้นท์", comment: "แม่นมากค่ะ คำทำนายตรงกับสิ่งที่กำลังเจอจริง ๆ", stars: 5 },
+    { author: "คุณต้น", comment: "ได้แนวทางแก้ปัญหา ทำให้ตัดสินใจได้ดีขึ้น ขอบคุณครับ", stars: 5 },
+    { author: "คุณพลอย", comment: "เสี่ยงหลายรอบ คำทำนายให้กำลังใจดีมาก", stars: 4 },
+    { author: "คุณบาส", comment: "ชอบระบบเขย่า สนุกและลื่นไหล คำทำนายอ่านแล้วมีกำลังใจ", stars: 4 }
+];
 
-// 1. ฟังก์ชันหลัก: ทำงานเมื่อผู้ใช้คลิกปุ่ม
+// --- Logic การทำงาน ---
+
+// 1) ฟังก์ชันหลัก: เมื่อผู้ใช้คลิกปุ่ม
 function generateFortune() {
     const maxFortune = FORTUNE_DATA.length;
     const randomIndex = Math.floor(Math.random() * maxFortune);
@@ -68,29 +79,97 @@ function generateFortune() {
     }, 1500);
 }
 
-// 2. ฟังก์ชัน Animation เขย่า (Node E)
+// 2) Animation เขย่า
 function animateShaking() {
     const button = document.getElementById('shaking-button');
     button.textContent = "เขย่า... โปรดรอรับคำทำนาย";
     button.classList.add('shaking-effect');
-
     setTimeout(() => {
         button.classList.remove('shaking-effect');
         button.textContent = "👉 เสี่ยงเซียมซีตอนนี้";
     }, 1500);
 }
 
-// 3. ฟังก์ชันรีเซ็ต (Node J)
+// 3) รีเซ็ต
 function resetFortune() {
     localStorage.removeItem('lastFortuneIndex');
     document.getElementById('result-section').classList.add('hidden');
     document.getElementById('shaking-section').classList.remove('hidden');
 }
 
-// 4. การเชื่อมต่อ Event Listener (User Click)
-document.getElementById('shaking-button').addEventListener('click', generateFortune);
+// 4) แชร์คำทำนายไปยัง Line / Twitter / Facebook
+function getCurrentFortune() {
+    const num = document.getElementById('fortune-number').textContent;
+    const headline = document.getElementById('fortune-headline').textContent;
+    const detail = document.getElementById('fortune-detail').textContent;
+    if (!num || !headline) return null;
+    return { num, headline, detail };
+}
 
-// 5. หมุนข้อความ Teaser อัตโนมัติ
+function buildShareText(f) {
+    return `${f.headline}\n${f.detail}\n— เซียมซีจาก อ.โทนี่สะท้อนกรรม`;
+}
+
+function shareFortune(platform) {
+    const f = getCurrentFortune();
+    if (!f) {
+        alert("ยังไม่มีคำทำนายสำหรับแชร์ กรุณาเสี่ยงเซียมซีก่อน");
+        return;
+    }
+    const text = buildShareText(f);
+
+    // ใช้ Web Share API ถ้ามีและแชร์ข้อความได้
+    if (navigator.share) {
+        navigator.share({ title: "คำทำนายเซียมซี", text })
+            .catch(() => {}); // ไม่ต้องจับ error เป็นพิเศษ
+        return;
+    }
+
+    // สร้างลิงก์สำหรับแต่ละแพลตฟอร์ม
+    const encodedText = encodeURIComponent(text);
+    const encodedURL = encodeURIComponent(SITE_URL || "");
+
+    let url = "";
+    if (platform === "twitter") {
+        url = `https://twitter.com/intent/tweet?text=${encodedText}` + (SITE_URL ? `&url=${encodedURL}` : "");
+    } else if (platform === "facebook") {
+        if (!SITE_URL) {
+            alert("การแชร์ไป Facebook ต้องมี URL หน้าเว็บจริง กรุณาตั้งค่า SITE_URL ในไฟล์ script.js");
+            return;
+        }
+        url = `https://www.facebook.com/sharer/sharer.php?u=${encodedURL}`;
+    } else if (platform === "line") {
+        if (!SITE_URL) {
+            // LINE share รองรับเฉพาะ URL เป็นหลัก
+            alert("การแชร์ไป Line ต้องมี URL หน้าเว็บจริง กรุณาตั้งค่า SITE_URL ในไฟล์ script.js");
+            return;
+        }
+        url = `https://social-plugins.line.me/lineit/share?url=${encodedURL}`;
+    }
+
+    if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+    }
+}
+
+// 5) รีวิวลูกค้า: เติมลง DOM
+function renderReviews() {
+    const wrap = document.getElementById('reviews-list');
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    REVIEWS.forEach(r => {
+        const item = document.createElement('div');
+        item.className = "review-item";
+        item.innerHTML = `
+            <div class="author">${r.author}</div>
+            <div class="comment">${r.comment}</div>
+            <div class="stars">${"★".repeat(r.stars)}${"☆".repeat(5 - r.stars)}</div>
+        `;
+        wrap.appendChild(item);
+    });
+}
+
+// 6) หมุนข้อความ Teaser
 function startTeaserRotation() {
     const el = document.getElementById('random-teaser');
     if (!el) return;
@@ -102,7 +181,7 @@ function startTeaserRotation() {
     }, 3000);
 }
 
-// 6. เรียกคืนผลคำทำนายล่าสุด (ถ้ามี)
+// 7) Restore ผลลัพธ์ล่าสุด
 function restoreFortuneIfAny() {
     const idxStr = localStorage.getItem('lastFortuneIndex');
     if (!idxStr) return;
@@ -118,7 +197,7 @@ function restoreFortuneIfAny() {
     document.getElementById('result-section').classList.remove('hidden');
 }
 
-// 7. Smooth Scroll สำหรับเมนู
+// 8) Smooth Scroll สำหรับเมนู
 function attachNavSmoothScroll() {
     const links = document.querySelectorAll('header nav a[href^="#"]');
     links.forEach(link => {
@@ -133,7 +212,7 @@ function attachNavSmoothScroll() {
     });
 }
 
-// 8. รองรับคีย์บอร์ดบนปุ่มหลัก
+// 9) รองรับคีย์บอร์ด
 function attachKeyboardSupport() {
     const button = document.getElementById('shaking-button');
     button.addEventListener('keydown', (e) => {
@@ -144,10 +223,25 @@ function attachKeyboardSupport() {
     });
 }
 
-// 9. เริ่มต้นระบบเมื่อโหลดหน้า
+// 10) ติดตั้ง Event แชร์
+function attachShareButtons() {
+    const lineBtn = document.getElementById('line-share');
+    const twBtn = document.getElementById('twitter-share');
+    const fbBtn = document.getElementById('facebook-share');
+    if (lineBtn) lineBtn.addEventListener('click', () => shareFortune("line"));
+    if (twBtn) twBtn.addEventListener('click', () => shareFortune("twitter"));
+    if (fbBtn) fbBtn.addEventListener('click', () => shareFortune("facebook"));
+}
+
+// 11) เริ่มต้นระบบเมื่อโหลดหน้า
 document.addEventListener('DOMContentLoaded', () => {
     startTeaserRotation();
+    renderReviews();
     restoreFortuneIfAny();
     attachNavSmoothScroll();
     attachKeyboardSupport();
+    attachShareButtons();
 });
+
+// 12) Click หลัก
+document.getElementById('shaking-button').addEventListener('click', generateFortune);

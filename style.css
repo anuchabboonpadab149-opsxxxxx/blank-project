@@ -1,12 +1,15 @@
 /* --- ธีมสีและฟอนต์ --- */
 :root {
-    --color-primary: #000033; /* น้ำเงินกรมท่าเข้ม */
-    --color-secondary: #0A0A57; /* น้ำเงินเข้มกว่า */
-    --color-accent: #FFD700; /* สีทองสว่าง */
-    --color-text-light: #F0F0F0;
-    --color-text-dark: #333333;
+    --color-primary: #0B1A3A; /* น้ำเงินกรมท่ากลาง */
+    --color-secondary: #14244D; /* น้ำเงินเข้ม */
+    --color-accent: #E6C200; /* ทองนวล */
+    --color-text-light: #F5F5F5;
+    --color-text-dark: #2B2B2B;
     --font-mitr: 'Mitr', sans-serif;
     --font-poppins: 'Poppins', sans-serif;
+
+    /* ภาพแบรนด์สำหรับ Hero (แก้ค่านี้เป็นภาพจริงของแบรนด์) */
+    --hero-image-url: 'https://via.placeholder.com/1200x800?text=Brand+Hero';
 }
 
 html { scroll-behavior: smooth; }
@@ -32,7 +35,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
 }
 header a {
     color: var(--color-text-light);
@@ -44,29 +47,37 @@ header a:hover {
 }
 
 /* --- CTA Button (ปุ่มเด่น) --- */
-.cta-button, .secondary-button {
-    padding: 15px 30px;
+.cta-button, .secondary-button, .share-button {
+    padding: 12px 24px;
     border: none;
-    border-radius: 50px;
-    font-size: 1.2em;
+    border-radius: 40px;
+    font-size: 1.05em;
     font-weight: 600;
     cursor: pointer;
-    margin: 20px 0;
-    transition: all 0.3s ease;
+    margin: 16px 8px;
+    transition: all 0.25s ease;
 }
 .cta-button {
     background-color: var(--color-accent);
     color: var(--color-primary);
-    box-shadow: 0 0 20px var(--color-accent); /* แสงทองวิบวับ */
+    box-shadow: 0 0 14px rgba(230, 194, 0, 0.6); /* ลดความวิบวับให้กลาง */
 }
 .cta-button:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 25px var(--color-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(230, 194, 0, 0.7);
 }
 .secondary-button {
     background-color: transparent;
     border: 2px solid var(--color-accent);
     color: var(--color-accent);
+}
+.share-button {
+    background-color: #ffffff10;
+    border: 1px solid var(--color-accent);
+    color: var(--color-text-light);
+}
+.share-button:hover {
+    background-color: #ffffff15;
 }
 
 /* --- Hero Section & Teaser --- */
@@ -77,12 +88,11 @@ header a:hover {
     align-items: center;
     text-align: center;
     padding: 50px 20px;
-    /* จำลองภาพ Hero Background */
-    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 50, 0.8)), url('https://via.placeholder.com/1200x800?text=Tony+Mutelu+Image') no-repeat center center/cover;
+    background: linear-gradient(rgba(5, 10, 30, 0.6), rgba(10, 15, 40, 0.85)), url(var(--hero-image-url)) no-repeat center center/cover;
 }
 .teaser-bar {
-    margin-top: 20px;
-    padding: 10px;
+    margin-top: 14px;
+    padding: 8px 12px;
     background-color: rgba(255, 215, 0, 0.1);
     color: var(--color-accent);
     overflow: hidden;
@@ -91,43 +101,53 @@ header a:hover {
 
 /* --- Result Section --- */
 .result-section {
-    padding: 50px 5%;
+    padding: 44px 5%;
     text-align: center;
 }
 .result-box {
     background-color: var(--color-secondary);
-    border: 3px solid var(--color-accent);
-    padding: 30px;
-    border-radius: 15px;
-    max-width: 600px;
+    border: 2px solid var(--color-accent);
+    padding: 26px;
+    border-radius: 14px;
+    max-width: 680px;
     margin: 0 auto;
-    box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+    box-shadow: 0 0 22px rgba(255, 215, 0, 0.35);
 }
-.hidden {
-    display: none !important;
+.share-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
 }
 
-/* --- Service & Footer --- */
+/* --- Service & Reviews & Footer --- */
 .content-section {
-    padding: 50px 5%;
+    padding: 46px 5%;
     text-align: center;
 }
-.service-grid {
+.service-grid, .reviews-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 30px;
-    margin-top: 30px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 26px;
+    margin-top: 28px;
 }
-.service-item {
+.service-item, .review-item {
     background-color: var(--color-secondary);
-    padding: 20px;
-    border-radius: 10px;
-    border-bottom: 5px solid var(--color-accent);
+    padding: 18px;
+    border-radius: 12px;
+    border-bottom: 4px solid var(--color-accent);
+}
+.review-item .author {
+    font-weight: 600;
+    color: var(--color-text-light);
+}
+.review-item .stars {
+    color: var(--color-accent);
+    margin-top: 6px;
 }
 
 footer {
     background-color: #000000;
-    padding: 40px 5%;
+    padding: 36px 5%;
 }
 .footer-content {
     display: flex;
@@ -139,16 +159,18 @@ footer {
     border: 3px solid var(--color-accent);
 }
 
+/* --- Utility --- */
+.hidden { display: none !important; }
+
 /* --- Keyframe Animation (Node E) --- */
 @keyframes shake {
     0%, 100% { transform: translate(0, 0) rotate(0deg); }
     20%, 60% { transform: translate(-5px, 0) rotate(-2deg); }
     40%, 80% { transform: translate(5px, 0) rotate(2deg); }
 }
-
 .shaking-effect {
-    animation: shake 0.1s infinite; /* เรียกใช้ Animation */
-    pointer-events: none; /* ป้องกันการคลิกระหว่างเขย่า */
+    animation: shake 0.1s infinite;
+    pointer-events: none;
 }
 
 /* --- Mobile View --- */
@@ -164,6 +186,6 @@ footer {
         font-size: 0.9em;
     }
     .hero-content h2 {
-        font-size: 1.8em;
+        font-size: 1.7em;
     }
 }
