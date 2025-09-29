@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>เลือกแพ็กเกจ • Fortune</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand"><a href="../index.html" style="color:#fff;text-decoration:none">🔮 Fortune</a></div>
+      <nav>
+        <a href="../pages/packages.html" class="active">แพ็กเกจ</a>
+        <a href="../pages/draw.html">เสี่ยงทาย</a>
+        <a href="../pages/history.html">ประวัติ</a>
+        <span id="nav-auth"><a href="../pages/login.html">เข้าสู่ระบบ</a></span>
+        <span id="nav-me" class="hidden">บัญชี: <span id="me-id"></span> · <a href="#" onclick="FT.logout()">ออก</a></span>
+      </nav>
+    </header>
+
+    <div class="card hero">
+      <div class="badge">ขั้นที่ 2</div>
+      <h2>เลือกแพ็กเกจ</h2>
+      <p class="muted">เลือกแพ็กเกจที่ต้องการซื้อเพื่อรับเครดิตสำหรับเสี่ยงทาย</p>
+    </div>
+
+    <section class="card">
+      <div id="packages" class="grid"></div>
+    </section>
+
+    <div class="footer">© Fortune</div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="../app.js"></script>
+  <script>
+    FT.attachAdminShortcut();
+    FT.updateAuthUI();
+    FT.requireAuth('../pages/packages.html' + location.search);
+
+    const sourceId = parseInt(FT.qsGet('source_id', '0'), 10) || 0;
+
+    async function loadPackages(){
+      try{
+        const data = await FT.apiPackages();
+        const el = document.getElementById('packages');
+        el.innerHTML = '';
+        data.forEach(pkg=>{
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = `
+            <div class="pkg">
+              <div><b>${pkg.name}</b> <span class="muted">(${pkg.credits} สิทธิ์)</span> ${pkg.is_best_seller ? '<span class="best">Best Seller</span>' : ''}</div>
+              <div><b>${pkg.price.toFixed(2)}</b> บาท</div>
+            </div>
+            <button class="primary">ซื้อแพ็กเกจนี้</button>
+          `;
+          div.querySelector('button').addEventListener('click', async ()=>{
+            try{
+              const res = await FT.apiCreatePayment(pkg.id);
+              const next = `../pages/payment.html?tx=${encodeURIComponent(res.transaction_id)}${sourceId?`&source_id=${sourceId}`:''}`;
+              FT.goto(next);
+            }catch(e){ alert(e.message || e); }
+          });
+          el.appendChild(div);
+        });
+      }catch(e){ alert(e.message || e); }
+    }
+
+    loadPackages();
+  </script>
+</body>
+</html>

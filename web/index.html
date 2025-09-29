@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Fortune - ขั้นตอนใช้งานเรียบง่าย</title>
+  <title>Fortune • เลือกวัดเพื่อเริ่ม</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
@@ -11,409 +11,49 @@
 <body>
   <div class="container">
     <header>
-      <div class="brand">🔮 Fortune</div>
+      <div class="brand"><a href="./index.html" style="color:#fff;text-decoration:none">🔮 Fortune</a></div>
       <nav>
-        <a href="#" id="menu-help">คู่มือ</a>
+        <a href="./pages/packages.html">แพ็กเกจ</a>
+        <a href="./pages/draw.html">เสี่ยงทาย</a>
+        <a href="./pages/history.html">ประวัติ</a>
+        <span id="nav-auth"><a href="./pages/login.html">เข้าสู่ระบบ</a></span>
+        <span id="nav-me" class="hidden">บัญชี: <span id="me-id"></span> · <a href="#" id="btn-logout">ออก</a></span>
       </nav>
     </header>
 
     <div class="hero card">
       <div class="badge">บริการทำนายโชคชะตา • เซียมซี • ไพ่ยิปซี</div>
-      <h2>เสี่ยงทายแม่นยำ ใช้งานง่าย ปลอดภัย</h2>
-      <p class="muted">เริ่มต้นด้วยการเข้าสู่ระบบ เลือกแพ็กเกจ สแกนพร้อมเพย์ แล้วเสี่ยงทายได้ทันที</p>
+      <h2>เลือก “วัด” เพื่อเริ่มต้นตามลำดับขั้น</h2>
+      <p class="muted">ขั้นตอน: เลือกวัด → เข้าสู่ระบบ/สมัคร → เลือกแพ็กเกจ → ชำระเงิน → เสี่ยงทาย → ประวัติ</p>
     </div>
 
     <section id="temples" class="temple-list">
-      <!-- dynamically rendered temple plaques -->
+      <!-- dynamic plaques -->
     </section>
 
-    <div id="flow" class="hidden">
-      <div id="progress" class="stepper">
-        <div class="step" data-step="1"><div class="dot">1</div><div class="label">เข้าสู่ระบบ</div></div>
-        <div class="step" data-step="2"><div class="dot">2</div><div class="label">เลือกแพ็กเกจ</div></div>
-        <div class="step" data-step="3"><div class="dot">3</div><div class="label">ชำระเงิน</div></div>
-        <div class="step" data-step="4"><div class="dot">4</div><div class="label">เสี่ยงทาย</div></div>
-        <div class="step" data-step="5"><div class="dot">5</div><div class="label">ประวัติ</div></div>
-      </div>
-
-    <!-- STEP 1 -->
-    <section id="step-1" class="card split">
-      <div>
-        <h3>ขั้นที่ 1: เข้าสู่ระบบ</h3>
-        <div class="row">
-          <div>
-            <h4 class="muted">สมัครสมาชิก</h4>
-            <input id="reg-email" placeholder="อีเมล" />
-            <input id="reg-pass" type="password" placeholder="รหัสผ่าน" />
-            <button class="primary" onclick="register()">สมัคร</button>
-          </div>
-          <div>
-            <h4 class="muted">เข้าสู่ระบบ</h4>
-            <input id="login-email" placeholder="อีเมล" />
-            <input id="login-pass" type="password" placeholder="รหัสผ่าน" />
-            <button class="primary" onclick="login()">เข้า</button>
-          </div>
-        </div>
-      </div>
-      <aside class="card">
-        <div id="me" class="hidden">
-          <p>สถานะ: <span class="badge">เข้าสู่ระบบแล้ว</span></p>
-          <p class="muted">User ID: <span id="me-id"></span></p>
-          <button class="ghost" onclick="logout()">ออกจากระบบ</button>
-        </div>
-        <div id="me-guest">
-          <p class="muted">ยังไม่ได้เข้าสู่ระบบ</p>
-        </div>
-      </aside>
-    </section>
-
-    <!-- STEP 2 -->
-    <section id="step-2" class="card">
-      <h3>ขั้นที่ 2: เลือกแพ็กเกจ</h3>
-      <p class="muted">เลือกแพ็กเกจที่ต้องการ จากนั้นไปขั้นตอน “ชำระเงิน”</p>
-      <div id="packages" class="grid"></div>
-    </section>
-
-    <!-- STEP 3 -->
-    <section id="step-3" class="card hidden">
-      <h3>ขั้นที่ 3: ชำระเงินผ่าน PromptPay</h3>
-      <p class="muted">สแกน QR เพื่อชำระเงิน และอัปโหลดลิงก์สลิปเพื่อแจ้งชำระ</p>
-      <div class="row">
-        <div>
-          <div id="qr" class="qr"></div>
-          <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <span class="badge" id="tx-status">สถานะ: -</span>
-          </div>
-        </div>
-        <div>
-          <input id="slip-url" placeholder="ลิงก์สลิป (อัปโหลดรูปสลิปไปเก็บที่ใดก็ได้แล้ววาง URL)" style="width: 100%;" />
-          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-            <button class="primary" onclick="verify()">แจ้งชำระเงิน</button>
-            <button class="ghost" onclick="loadCredits()">เช็คเครดิตอีกครั้ง</button>
-          </div>
-          <p class="muted" style="margin-top:6px">หมายเหตุ: ระบบจะเพิ่มสิทธิ์ให้เมื่อแอดมินยืนยันการชำระเงินแล้ว</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- STEP 4 -->
-    <section id="step-4" class="card hidden">
-      <h3>ขั้นที่ 4: เสี่ยงคำทำนาย</h3>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <span class="badge">เครดิตคงเหลือ: <b id="credits">-</b></span>
-        <button class="ghost" onclick="loadCredits()">รีเฟรชเครดิต</button>
-      </div>
-
-      <div class="tabs">
-        <div id="tab-sensi" class="tab active">เซียมซี</div>
-        <div id="tab-tarot" class="tab">ไพ่ยิปซี</div>
-      </div>
-
-      <!-- hidden dropdown just to preserve logic; not shown -->
-      <div style="display:none">
-        <label>เลือกแหล่งทำนาย</label>
-        <select id="source"></select>
-      </div>
-
-      <!-- Sen-Si panel -->
-      <div id="panel-sensi">
-        <div style="margin-top:8px">
-          <button class="primary" onclick="draw()">เขย่าเซียมซี (ใช้ 1 สิทธิ์)</button>
-        </div>
-        <div id="drawn" class="hidden" style="margin-top:10px">
-          <h4 id="result-key"></h4>
-          <p id="verse"></p>
-          <p><b>สรุป:</b> <span id="summary"></span></p>
-          <p class="muted">เครดิตคงเหลือหลังเสี่ยงทาย: <b id="balance"></b></p>
-        </div>
-      </div>
-
-      <!-- Tarot panel -->
-      <div id="panel-tarot" class="hidden">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 6px">
-          <button class="primary" onclick="drawTarot(5)">ดู 5 ใบ (ใช้ 1 สิทธิ์)</button>
-          <button class="primary" onclick="drawTarot(10)">ดู 10 ใบ (ใช้ 2 สิทธิ์)</button>
-        </div>
-        <div id="tarot-result" class="tarot-grid"></div>
-        <div id="tarot-balance" class="muted" style="margin-top:6px"></div>
-      </div>
-    </section>
-
-    <!-- STEP 5 -->
-    <section id="step-5" class="card hidden">
-      <h3>ขั้นที่ 5: ประวัติการซื้อ/ทำนาย</h3>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="ghost" onclick="loadHistory()">รีเฟรชประวัติ</button>
-      </div>
-      <pre id="history" class="muted" style="margin-top:10px"></pre>
-    </section>
-    </div>
-
-    <div class="footer">© Fortune. ออกแบบใหม่ตามหน้าตัวอย่าง พร้อมซ่อนหลังบ้านเพื่อความปลอดภัย</div>
+    <div class="footer">© Fortune</div>
   </div>
 
   <script src="config.js"></script>
+  <script src="app.js"></script>
   <script>
-    const API = window.APP_CONFIG.API_BASE;
-    let token = localStorage.getItem('token') || '';
-    let userId = localStorage.getItem('user_id') || '';
-    let currentTx = null;
-    let selectedSourceId = null;
-    let sourcesList = [];
-    let tarotSourceId = null;
-    let senSiSourceId = null;
+    // Header auth
+    FT.attachAdminShortcut();
+    FT.updateAuthUI();
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) btnLogout.addEventListener('click', (e)=>{ e.preventDefault(); FT.logout(); });
 
-    // DEMO fallback (when backend isn’t connected yet)
-    const DEMO_GATEWAY = API.includes('gateway-production.example');
-    let DEMO = DEMO_GATEWAY;
-    function enableDemo(){ DEMO = true; console.warn('[DEMO] Enabled'); }
-    const DEMO_KEYS = {
-      credits: 'demo_credits',
-      history: 'demo_history',
-      tx: 'demo_tx_map'
-    };
-    function demoGet(key, def){ try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch(_){ return def; } }
-    function demoSet(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
-    function demoInit(){
-      if (localStorage.getItem(DEMO_KEYS.credits) == null) demoSet(DEMO_KEYS.credits, 0);
-      if (localStorage.getItem(DEMO_KEYS.history) == null) demoSet(DEMO_KEYS.history, { buy_history: [], fortune_history: [] });
-      if (localStorage.getItem(DEMO_KEYS.tx) == null) demoSet(DEMO_KEYS.tx, {});
-    }
-    if (DEMO) demoInit();
-
-    const auth = () => token ? { 'Authorization': 'Bearer ' + token } : {};
-    function showFlow(){ document.getElementById('flow').classList.remove('hidden'); }
-    function getSourceById(id){
-      return (sourcesList || []).find(s => s.id === id) || null;
-    }
-
-    function goto(step){
-      // show panel
-      for (let i=1;i<=5;i++){
-        const sec = document.getElementById('step-'+i);
-        if (!sec) continue;
-        if (i === step) sec.classList.remove('hidden'); else sec.classList.add('hidden');
-      }
-      // update stepper
-      const steps = document.querySelectorAll('#progress .step');
-      steps.forEach(s => {
-        const n = parseInt(s.dataset.step,10);
-        s.classList.remove('active','done');
-        if (n === step) s.classList.add('active');
-        else if (n < step) s.classList.add('done');
-      });
-    }
-    function canGo(step){
-      // gate conditions
-      if (step>=2 && !token) { alert('กรุณาเข้าสู่ระบบก่อน'); return false; }
-      return true;
-    }
-    function setStep(step){
-      if (!canGo(step)) return;
-      showFlow();
-      goto(step);
-      if (step === 4){
-        const src = selectedSourceId ? getSourceById(selectedSourceId) : null;
-        if (src && src.type === 'Tarot'){
-          activateTab('tarot');
-        } else {
-          activateTab('sensi');
-        }
-      }
-    }
-
-    function ensureSelectSource(){
-      if (selectedSourceId) {
-        const el = document.getElementById('source');
-        const opt = [...el.options].find(o => parseInt(o.value,10) === selectedSourceId);
-        if (opt) el.value = String(selectedSourceId);
-      }
-    }
-    function setLoggedIn(id, tok) {
-      userId = id; token = tok;
-      localStorage.setItem('user_id', id);
-      localStorage.setItem('token', tok);
-      document.getElementById('me').classList.remove('hidden');
-      document.getElementById('me-guest').classList.add('hidden');
-      document.getElementById('me-id').textContent = id;
-      loadCredits();
-      loadPackages();
-      loadSources().then(()=>{
-        ensureSelectSource();
-        // go to step 2 (เลือกแพ็กเกจ) ตามที่ร้องขอ
-        setStep(2);
-      });
-    }
-
-    async function register() {
-      const email = document.getElementById('reg-email').value.trim();
-      const password = document.getElementById('reg-pass').value;
-      if (!email || !password) return alert('กรอกอีเมลและรหัสผ่าน');
-      try{
-        const r = await fetch(API + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-        const data = await r.json();
-        if (r.ok) setLoggedIn(data.user_id, data.token);
-        else { throw new Error(JSON.stringify(data)); }
-      } catch(e){
-        enableDemo(); demoInit();
-        setLoggedIn('demo-user', 'demo-token');
-      }
-    }
-    async function login() {
-      const email = document.getElementById('login-email').value.trim();
-      const password = document.getElementById('login-pass').value;
-      if (!email || !password) return alert('กรอกอีเมลและรหัสผ่าน');
-      try{
-        const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-        const data = await r.json();
-        if (r.ok) setLoggedIn(data.user_id, data.token);
-        else { throw new Error(JSON.stringify(data)); }
-      } catch(e){
-        enableDemo(); demoInit();
-        setLoggedIn('demo-user', 'demo-token');
-      }
-    }
-    function logout() {
-      localStorage.removeItem('user_id'); localStorage.removeItem('token');
-      token=''; userId='';
-      currentTx=null;
-      document.getElementById('me').classList.add('hidden');
-      document.getElementById('me-guest').classList.remove('hidden');
-      setStep(1);
-    }
-
-    async function loadPackages() {
-      const el = document.getElementById('packages');
-      el.innerHTML = '';
-      try{
-        const r = await fetch(API + '/packages');
-        if (!r.ok) throw new Error('packages not ok');
-        const data = await r.json();
-        data.forEach(pkg => {
-          const div = document.createElement('div');
-          div.className = 'card';
-          div.innerHTML = `
-            <div class="pkg">
-              <div><b>${pkg.name}</b> <span class="muted">(${pkg.credits} สิทธิ์)</span> ${pkg.is_best_seller ? '<span class="best">Best Seller</span>' : ''}</div>
-              <div><b>${pkg.price.toFixed(2)}</b> บาท</div>
-            </div>
-            <button class="primary" ${!token ? 'disabled' : ''} onclick="buy(${pkg.id})">ซื้อแพ็กเกจนี้</button>
-          `;
-          el.appendChild(div);
-        });
-      } catch(e){
-        // DEMO fallback
-        enableDemo(); demoInit();
-        const demoPkgs = [
-          { id: 1, name: 'แพ็กเล็ก', price: 29.0, credits: 1, is_best_seller: false },
-          { id: 2, name: 'แพ็กกลาง', price: 79.0, credits: 3, is_best_seller: true },
-          { id: 3, name: 'แพ็กใหญ่', price: 199.0, credits: 10, is_best_seller: false },
-        ];
-        demoPkgs.forEach(pkg=>{
-          const div = document.createElement('div');
-          div.className = 'card';
-          div.innerHTML = `
-            <div class="pkg">
-              <div><b>${pkg.name}</b> <span class="muted">(${pkg.credits} สิทธิ์)</span> ${pkg.is_best_seller ? '<span class="best">Best Seller</span>' : ''}</div>
-              <div><b>${pkg.price.toFixed(2)}</b> บาท</div>
-            </div>
-            <button class="primary" ${!token ? 'disabled' : ''} onclick="buy(${pkg.id})">ซื้อแพ็กเกจนี้</button>
-          `;
-          el.appendChild(div);
-        });
-      }
-    }
-
-    async function buy(package_id) {
-      if (!token) return alert('กรุณาเข้าสู่ระบบก่อน');
-      if (DEMO) {
-        const tx = 'demo-' + Math.random().toString(36).slice(2,10);
-        currentTx = tx;
-        // sample QR (placeholder)
-        document.getElementById('qr').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=DEMO-${tx}" width="220" height="220" />`;
-        document.getElementById('tx-status').textContent = 'สถานะ: CREATED';
-        setStep(3);
-        // save demo buy history
-        const hist = demoGet(DEMO_KEYS.history, {buy_history:[], fortune_history:[]});
-        hist.buy_history.push({ transaction_id: tx, package_id, amount: 0, status: 'CREATED', created_at: new Date().toISOString() });
-        demoSet(DEMO_KEYS.history, hist);
-        const txmap = demoGet(DEMO_KEYS.tx, {});
-        txmap[tx] = { status: 'CREATED' };
-        demoSet(DEMO_KEYS.tx, txmap);
-        return;
-      }
-      const r = await fetch(API + '/payment/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...auth() },
-        body: JSON.stringify({ package_id })
-      });
-      const data = await r.json();
-      if (!r.ok) return alert(JSON.stringify(data));
-      currentTx = data.transaction_id;
-      document.getElementById('qr').innerHTML = `<img src="${data.qr_code_url}" width="220" height="220" />`;
-      document.getElementById('tx-status').textContent = 'สถานะ: CREATED';
-      setStep(3);
-    }
-
-    async function verify() {
-      const slip = document.getElementById('slip-url').value.trim();
-      if (!currentTx) return alert('ยังไม่มีรายการซื้อ');
-      if (!slip) return alert('วางลิงก์สลิปเพื่อแจ้งชำระเงิน');
-      if (DEMO) {
-        document.getElementById('tx-status').textContent = 'สถานะ: PENDING';
-        alert('DEMO: แจ้งชำระเงินแล้ว ระบบจะยืนยันอัตโนมัติในไม่กี่วินาที');
-        const before = parseInt(document.getElementById('credits').textContent || '0', 10);
-        // simulate confirm in 6s and add 3 credits
-        setTimeout(()=>{
-          const txmap = demoGet(DEMO_KEYS.tx, {});
-          if (txmap[currentTx]) txmap[currentTx].status = 'CONFIRMED';
-          demoSet(DEMO_KEYS.tx, txmap);
-          const c = demoGet(DEMO_KEYS.credits, 0) + 3;
-          demoSet(DEMO_KEYS.credits, c);
-        }, 6000);
-        startCreditWatcher(before);
-        return;
-      }
-      const r = await fetch(API + '/payment/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...auth() },
-        body: JSON.stringify({ transaction_id: currentTx, slip_image_url: slip })
-      });
-      const data = await r.json();
-      document.getElementById('tx-status').textContent = 'สถานะ: PENDING';
-      alert(data.message || JSON.stringify(data));
-      // start watching credits and transaction status
-      const before = parseInt(document.getElementById('credits').textContent || '0', 10);
-      startCreditWatcher(before);
-    }
-
-    async function getCredits(){
-      if (!token) return 0;
-      if (DEMO) return demoGet(DEMO_KEYS.credits, 0);
-      const r = await fetch(API + '/user/credits', { headers: { ...auth() } });
-      const data = await r.json();
-      return parseInt(data.credit_balance || 0, 10);
-    }
-    async function loadCredits() {
-      if (!token) return;
-      const balance = await getCredits();
-      document.getElementById('credits').textContent = balance;
-      if (balance > 0) {
-        if (!document.getElementById('source').options.length) await loadSources();
-      }
-    }
-
-    function renderTemplesActive() {
-      // Always show 4 active plaques (map to available sources; duplicate ids if necessary)
+    function renderTemples(sources){
       const list = document.getElementById('temples');
       list.innerHTML = '';
-      const sen = senSiSourceId || (sourcesList.find(s=>s.type==='Sen_Si')||{}).id || selectedSourceId;
-      const tar = tarotSourceId || (sourcesList.find(s=>s.type==='Tarot')||{}).id || selectedSourceId;
+      // Ensure we present 4 plaques (3 sen-si + 1 tarot) for the landing UX
+      const sen = (sources.find(s=>s.type==='Sen_Si')||{}).id || 1;
+      const tar = (sources.find(s=>s.type==='Tarot')||{}).id || 99;
       const items = [
-        { id: sen || 1, name: 'วัดเทพพระแม่อุษามาเทวี', type: 'Sen_Si' },
-        { id: sen || 1, name: 'วัดหลวงพ่อพัฒน์', type: 'Sen_Si' },
-        { id: sen || 1, name: 'วัดโพธิ์ชัย หนองคาย หลวงพ่อพระใส', type: 'Sen_Si' },
-        { id: tar || 99, name: 'ดูไพ่ยิปซี (5/10 ใบ)', type: 'Tarot' },
+        { id: sen, name: 'วัดเทพพระแม่อุษามาเทวี', type: 'Sen_Si' },
+        { id: sen, name: 'วัดหลวงพ่อพัฒน์', type: 'Sen_Si' },
+        { id: sen, name: 'วัดโพธิ์ชัย หนองคาย หลวงพ่อพระใส', type: 'Sen_Si' },
+        { id: tar, name: 'ดูไพ่ยิปซี (5/10 ใบ)', type: 'Tarot' },
       ];
       items.forEach(s=>{
         const icon = s.type === 'Tarot' ? '🎴' : '🛕';
@@ -432,252 +72,29 @@
             </div>
           </div>
         `;
-        div.querySelector('button').addEventListener('click', ()=> enterTemple(s.id));
+        div.querySelector('button').addEventListener('click', ()=>{
+          const id = s.id;
+          if (!FT.token){
+            const next = encodeURIComponent(`../pages/packages.html?source_id=${id}`);
+            FT.goto(`./pages/login.html?next=${next}&source_id=${id}`);
+          }else{
+            FT.goto(`./pages/packages.html?source_id=${id}`);
+          }
+        });
         list.appendChild(div);
       });
     }
-    async function loadSources() {
+
+    async function init(){
       try{
-        const r = await fetch(API + '/fortune/sources');
-        if (!r.ok) throw new Error('sources not ok');
-        const data = await r.json();
-        sourcesList = data || [];
-        tarotSourceId = (sourcesList.find(s=>s.type==='Tarot')||{}).id || null;
-        senSiSourceId = (sourcesList.find(s=>s.type==='Sen_Si')||{}).id || null;
-        const el = document.getElementById('source');
-        el.innerHTML = '';
-        (data||[]).forEach(s => {
-          const op = document.createElement('option');
-          op.value = s.id; op.textContent = `${s.name} (${s.type})`;
-          el.appendChild(op);
-        });
-        renderTemplesActive();
-      } catch(e){
-        enableDemo(); demoInit();
-        // DEMO local sources
-        sourcesList = [
-          { id: 1, name:'วัดจำลอง (เซียมซี)', type:'Sen_Si' },
-          { id: 99, name:'ไพ่ยิปซี (จำลอง)', type:'Tarot' },
-        ];
-        tarotSourceId = 99; senSiSourceId = 1;
-        const el = document.getElementById('source');
-        el.innerHTML = '';
-        sourcesList.forEach(s=>{
-          const op = document.createElement('option');
-          op.value = s.id; op.textContent = `${s.name} (${s.type})`;
-          el.appendChild(op);
-        });
-        renderTemplesActive();
+        const sources = await FT.apiSources();
+        renderTemples(sources || []);
+      }catch(_){
+        // Fallback simple static items if backend not reachable
+        renderTemples([{id:1,type:'Sen_Si'},{id:99,type:'Tarot'}]);
       }
     }
-
-    function enterTemple(id){
-      selectedSourceId = id;
-      // set tab based on selected source type
-      const src = (sourcesList||[]).find(s=>s.id===id);
-      if (src && src.type === 'Tarot'){
-        tarotSourceId = id;
-        activateTab('tarot');
-      } else {
-        activateTab('sensi');
-      }
-      if (!token) {
-        setStep(1);
-      } else {
-        showFlow();
-        ensureSelectSource();
-        // หลังเข้าวัด ไปขั้นเลือกแพ็กเกจตามที่ร้องขอ
-        setStep(2);
-      }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    async function draw() {
-      const credits = parseInt(document.getElementById('credits').textContent || '0', 10);
-      if (!credits || credits<=0) return alert('เครดิตไม่พอ กรุณาชำระเงินและรอแอดมินยืนยัน');
-      const srcId = selectedSourceId || parseInt(document.getElementById('source').value, 10);
-      if (DEMO){
-        const c = demoGet(DEMO_KEYS.credits, 0);
-        if (c <= 0) return alert('เครดิตไม่พอ');
-        demoSet(DEMO_KEYS.credits, c-1);
-        const n = Math.floor(Math.random()*100)+1;
-        const resKey = `เซียมซี ใบที่ ${n}`;
-        const verse = `คำทำนายใบที่ ${n} โชคดี มีโชคลาภ`;
-        const hist = demoGet(DEMO_KEYS.history, {buy_history:[], fortune_history:[]});
-        const id = 'f-'+Date.now();
-        hist.fortune_history.push({ id, source_id: srcId, source_type: 'Sen_Si', result_key: resKey, reading_date: new Date().toISOString(), verse_content: verse, fate_summary: 'โชคดี' });
-        demoSet(DEMO_KEYS.history, hist);
-        document.getElementById('result-key').textContent = resKey;
-        document.getElementById('verse').textContent = verse;
-        document.getElementById('summary').textContent = 'โชคดี';
-        document.getElementById('balance').textContent = c-1;
-        document.getElementById('drawn').classList.remove('hidden');
-        await loadCredits();
-        setStep(5);
-        await loadHistory();
-        return;
-      }
-      const r = await fetch(API + '/fortune/draw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...auth() },
-        body: JSON.stringify({ source_id: srcId })
-      });
-      const data = await r.json();
-      if (data.error) return alert(data.error);
-      document.getElementById('result-key').textContent = data.result_key;
-      document.getElementById('verse').textContent = data.verse_content || '';
-      document.getElementById('summary').textContent = data.fate_summary || '-';
-      document.getElementById('balance').textContent = data.new_credit_balance;
-      document.getElementById('drawn').classList.remove('hidden');
-      await loadCredits();
-      setStep(5);
-      await loadHistory();
-    }
-
-    async function drawTarot(count){
-      if (!tarotSourceId && !DEMO) return alert('ยังไม่มีแหล่งไพ่ยิปซี');
-      const credits = parseInt(document.getElementById('credits').textContent || '0', 10);
-      const cost = count === 10 ? 2 : 1;
-      if (credits < cost) return alert('เครดิตไม่พอ');
-
-      if (DEMO){
-        const cardsList = ['The Fool','The Magician','The High Priestess','The Empress','The Emperor','The Hierophant','The Lovers','The Chariot','Strength','The Hermit'];
-        const n = count;
-        const chosen = [];
-        for (let i=0;i<n;i++){
-          const name = cardsList[Math.floor(Math.random()*cardsList.length)];
-          const up = Math.random()<0.5;
-          chosen.push({ name, orientation: up?'Upright':'Reversed', meaning: up?'ความหมายเชิงบวก':'ความหมายเชิงท้าทาย' });
-        }
-        const grid = document.getElementById('tarot-result');
-        grid.innerHTML = '';
-        chosen.forEach(c=>{
-          const el = document.createElement('div');
-          el.className = 'tarot-card';
-          el.innerHTML = `<h5>${c.name} (${c.orientation})</h5><div class="muted">${c.meaning}</div>`;
-          grid.appendChild(el);
-        });
-        const c = demoGet(DEMO_KEYS.credits, 0) - cost;
-        demoSet(DEMO_KEYS.credits, c);
-        document.getElementById('tarot-balance').textContent = 'เครดิตคงเหลือ: ' + c;
-        // push history
-        const hist = demoGet(DEMO_KEYS.history, {buy_history:[], fortune_history:[]});
-        const id = 't-'+Date.now();
-        hist.fortune_history.push({ id, source_id: (tarotSourceId||99), source_type:'Tarot', result_key:`Tarot x${n}`, reading_date:new Date().toISOString(), verse_content: chosen.map(x=>`${x.name} (${x.orientation})`).join(', '), fate_summary: null });
-        demoSet(DEMO_KEYS.history, hist);
-        await loadCredits();
-        setStep(5);
-        await loadHistory();
-        return;
-      }
-
-      const r = await fetch(API + '/fortune/tarot/draw-multi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...auth() },
-        body: JSON.stringify({ source_id: tarotSourceId, count })
-      });
-      if (!r.ok) {
-        const err = await r.text();
-        return alert(err || 'ไม่สามารถทำนายได้');
-      }
-      const data = await r.json();
-      const grid = document.getElementById('tarot-result');
-      grid.innerHTML = '';
-      (data.cards||[]).forEach(c=>{
-        const el = document.createElement('div');
-        el.className = 'tarot-card';
-        el.innerHTML = `<h5>${c.name} (${c.orientation})</h5><div class="muted">${c.meaning}</div>`;
-        grid.appendChild(el);
-      });
-      document.getElementById('tarot-balance').textContent = 'เครดิตคงเหลือ: ' + data.new_credit_balance;
-      await loadCredits();
-      setStep(5);
-      await loadHistory();
-    }
-
-    async function loadHistory() {
-      if (DEMO){
-        document.getElementById('history').textContent = JSON.stringify(demoGet(DEMO_KEYS.history, {buy_history:[], fortune_history:[]}), null, 2);
-        return;
-      }
-      const r = await fetch(API + '/user/history/all', { headers: { ...auth() } });
-      const data = await r.json();
-      document.getElementById('history').textContent = JSON.stringify(data, null, 2);
-    }
-
-    let creditWatchTimer = null;
-    async function updateTxStatus(){
-      if (!currentTx) return;
-      if (DEMO){
-        const txmap = demoGet(DEMO_KEYS.tx, {});
-        const st = (txmap[currentTx]||{}).status || 'CREATED';
-        document.getElementById('tx-status').textContent = 'สถานะ: ' + st;
-        return;
-      }
-      try {
-        const r = await fetch(API + '/payment/status/' + encodeURIComponent(currentTx), { headers: { ...auth() }});
-        if (r.ok) {
-          const data = await r.json();
-          document.getElementById('tx-status').textContent = 'สถานะ: ' + (data.status || '-');
-        }
-      } catch(_){}
-    }
-    async function startCreditWatcher(before){
-      if (creditWatchTimer) clearInterval(creditWatchTimer);
-      creditWatchTimer = setInterval(async ()=>{
-        await updateTxStatus();
-        const now = await getCredits();
-        document.getElementById('credits').textContent = now;
-        if (now > before) {
-          clearInterval(creditWatchTimer);
-          creditWatchTimer = null;
-          alert('เครดิตเข้าแล้ว พร้อมเสี่ยงทายได้เลย');
-          setStep(4);
-        }
-      }, 3000);
-    }
-
-    // init
-    // clickable steps with gating
-    document.addEventListener('keydown', (e)=>{
-      if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'a') {
-        location.href = 'admin/index.html';
-      }
-    });
-    document.querySelectorAll('#progress .step').forEach(s=>{
-      s.addEventListener('click', ()=>{
-        const n = parseInt(s.dataset.step,10);
-        setStep(n);
-      });
-    });
-
-    // do not open flow automatically; keep landing with temple plaques
-    if (token) {
-      document.getElementById('me').classList.remove('hidden');
-      document.getElementById('me-guest').classList.add('hidden');
-      document.getElementById('me-id').textContent = userId;
-    }
-
-    // tabs switch
-    function activateTab(which){
-      const sensi = document.getElementById('panel-sensi');
-      const tarot = document.getElementById('panel-tarot');
-      const ts = document.getElementById('tab-sensi');
-      const tt = document.getElementById('tab-tarot');
-      if (which==='tarot'){
-        sensi.classList.add('hidden'); tarot.classList.remove('hidden');
-        ts.classList.remove('active'); tt.classList.add('active');
-      } else {
-        sensi.classList.remove('hidden'); tarot.classList.add('hidden');
-        ts.classList.add('active'); tt.classList.remove('active');
-      }
-    }
-    document.getElementById('tab-sensi').addEventListener('click', ()=> activateTab('sensi'));
-    document.getElementById('tab-tarot').addEventListener('click', ()=> activateTab('tarot'));
-
-    loadPackages();
-    loadSources();
-    if (token) loadCredits();
+    init();
   </script>
 </body>
 </html>

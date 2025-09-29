@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ประวัติ • Fortune</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand"><a href="../index.html" style="color:#fff;text-decoration:none">🔮 Fortune</a></div>
+      <nav>
+        <a href="../pages/packages.html">แพ็กเกจ</a>
+        <a href="../pages/draw.html">เสี่ยงทาย</a>
+        <a href="../pages/history.html" class="active">ประวัติ</a>
+        <span id="nav-auth"><a href="../pages/login.html">เข้าสู่ระบบ</a></span>
+        <span id="nav-me" class="hidden">บัญชี: <span id="me-id"></span> · <a href="#" onclick="FT.logout()">ออก</a></span>
+      </nav>
+    </header>
+
+    <div class="card hero">
+      <div class="badge">ขั้นที่ 5</div>
+      <h2>ประวัติการซื้อและทำนาย</h2>
+      <p class="muted">ดูรายการที่เคยซื้อและผลการทำนายย้อนหลัง</p>
+    </div>
+
+    <section class="card">
+      <button class="ghost" id="btn-refresh">รีเฟรช</button>
+      <pre id="history" class="muted" style="margin-top:10px;white-space:pre-wrap"></pre>
+    </section>
+
+    <div class="footer">© Fortune</div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="../app.js"></script>
+  <script>
+    FT.attachAdminShortcut();
+    FT.updateAuthUI();
+    FT.requireAuth('../pages/history.html');
+
+    async function load(){
+      try{
+        const data = await FT.apiHistory();
+        document.getElementById('history').textContent = JSON.stringify(data, null, 2);
+      }catch(e){ alert(e.message || e); }
+    }
+    document.getElementById('btn-refresh').addEventListener('click', load);
+    load();
+  </script>
+</body>
+</html>

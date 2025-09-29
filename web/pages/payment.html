@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ชำระเงิน • Fortune</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand"><a href="../index.html" style="color:#fff;text-decoration:none">🔮 Fortune</a></div>
+      <nav>
+        <a href="../pages/packages.html">แพ็กเกจ</a>
+        <a href="../pages/draw.html">เสี่ยงทาย</a>
+        <a href="../pages/history.html">ประวัติ</a>
+        <span id="nav-auth"><a href="../pages/login.html">เข้าสู่ระบบ</a></span>
+        <span id="nav-me" class="hidden">บัญชี: <span id="me-id"></span> · <a href="#" onclick="FT.logout()">ออก</a></span>
+      </nav>
+    </header>
+
+    <div class="card hero">
+      <div class="badge">ขั้นที่ 3</div>
+      <h2>ชำระเงินด้วย PromptPay</h2>
+      <p class="muted">สแกน QR โอนเงิน แล้ววางลิงก์สลิปเพื่อแจ้งชำระ ระบบจะยืนยันอัตโนมัติ</p>
+    </div>
+
+    <section class="card">
+      <div class="row">
+        <div>
+          <div id="qr" class="qr"></div>
+          <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge" id="tx-status">สถานะ: -</span>
+          </div>
+        </div>
+        <div>
+          <input id="slip-url" placeholder="ลิงก์สลิป (URL)" style="width: 100%;" />
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="primary" id="btn-verify">แจ้งชำระเงิน</button>
+            <button class="ghost" id="btn-refresh">เช็คสถานะ</button>
+          </div>
+          <p class="muted" style="margin-top:6px">หมายเหตุ: ระบบจะเพิ่มสิทธิ์เมื่อแอดมินยืนยันการชำระเงินแล้ว</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">© Fortune</div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="../app.js"></script>
+  <script>
+    FT.attachAdminShortcut();
+    FT.updateAuthUI();
+    FT.requireAuth('../pages/payment.html' + location.search);
+
+    const tx = FT.qsGet('tx', '');
+    const sourceId = parseInt(FT.qsGet('source_id','0'), 10) || 0;
+
+    async function init(){
+      if (!tx) { alert('ไม่พบรายการชำระเงิน'); return; }
+      try{
+        // แสดง QR จาก gateway
+        const st = await FT.apiPaymentStatus(tx);
+        document.getElementById('tx-status').textContent = 'สถานะ: ' + (st.status || 'CREATED');
+
+        // ลองสร้างรูป QR ใหม่จาก endpoint เดิม หาก gateway มี qr_code_url ให้เก็บช่วงสร้างไว้ก่อนหน้า (กรณีนี้โหลดใหม่จากสถานะไม่ได้)
+        // ที่นี่จะแสดง placeholder ถ้าไม่มีภาพจากสถานะ
+        const qr = new Image();
+        qr.width = 220; qr.height = 220;
+        // ให้ผู้ใช้เข้าแพ็กเกจหน้าเดิมหากไม่มีภาพจากสถานะ
+        qr.src = st.qr_code_url || 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(tx);
+        const box = document.getElementById('qr'); box.innerHTML = ''; box.appendChild(qr);
+      }catch(e){ alert(e.message || e); }
+    }
+
+    document.getElementById('btn-verify').addEventListener('click', async ()=>{
+      const slip = document.getElementById('slip-url').value.trim();
+      if (!slip) return alert('วางลิงก์สลิป');
+      try{
+        await FT.apiVerifyPayment(tx, slip);
+        document.getElementById('tx-status').textContent = 'สถานะ: PENDING';
+        const before = await FT.apiCredits();
+        await FT.startCreditWatcher(before, (now)=>{
+          alert('เครดิตเข้าแล้ว: ' + now);
+          const next = '../pages/draw.html' + (sourceId?`?source_id=${sourceId}`:'');
+          FT.goto(next);
+        });
+      }catch(e){ alert(e.message || e); }
+    });
+
+    document.getElementById('btn-refresh').addEventListener('click', async ()=>{
+      try{
+        const st = await FT.apiPaymentStatus(tx);
+        document.getElementById('tx-status').textContent = 'สถานะ: ' + (st.status || '-');
+      }catch(e){ alert(e.message || e); }
+    });
+
+    init();
+  </script>
+</body>
+</html>

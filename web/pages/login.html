@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>เข้าสู่ระบบ • Fortune</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand"><a href="../index.html" style="color:#fff;text-decoration:none">🔮 Fortune</a></div>
+      <nav>
+        <a href="../pages/packages.html">แพ็กเกจ</a>
+        <a href="../pages/draw.html">เสี่ยงทาย</a>
+        <a href="../pages/history.html">ประวัติ</a>
+        <span id="nav-auth"><a href="../pages/login.html" class="active">เข้าสู่ระบบ</a></span>
+        <span id="nav-me" class="hidden">บัญชี: <span id="me-id"></span> · <a href="#" onclick="FT.logout()">ออก</a></span>
+      </nav>
+    </header>
+
+    <div class="card hero">
+      <h2>เข้าสู่ระบบ / สมัครสมาชิก</h2>
+      <p class="muted">กรอกอีเมลและรหัสผ่านเพื่อเข้าสู่ระบบ หรือสมัครสมาชิกใหม่</p>
+    </div>
+
+    <section class="card split">
+      <div>
+        <h3>สมัครสมาชิก</h3>
+        <input id="reg-email" placeholder="อีเมล" />
+        <input id="reg-pass" type="password" placeholder="รหัสผ่าน" />
+        <button class="primary" id="btn-register">สมัคร</button>
+      </div>
+      <div>
+        <h3>เข้าสู่ระบบ</h3>
+        <input id="login-email" placeholder="อีเมล" />
+        <input id="login-pass" type="password" placeholder="รหัสผ่าน" />
+        <button class="primary" id="btn-login">เข้า</button>
+      </div>
+    </section>
+
+    <div class="footer">© Fortune</div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="../app.js"></script>
+  <script>
+    FT.attachAdminShortcut();
+    FT.updateAuthUI();
+    const next = FT.qsGet('next', '../pages/packages.html' + location.search);
+
+    document.getElementById('btn-register').addEventListener('click', async ()=>{
+      const email = document.getElementById('reg-email').value.trim();
+      const pass = document.getElementById('reg-pass').value;
+      if (!email || !pass) return alert('กรอกอีเมลและรหัสผ่าน');
+      try{
+        await FT.apiRegister(email, pass);
+        FT.updateAuthUI();
+        FT.goto(next);
+      }catch(e){ alert(e.message || e); }
+    });
+
+    document.getElementById('btn-login').addEventListener('click', async ()=>{
+      const email = document.getElementById('login-email').value.trim();
+      const pass = document.getElementById('login-pass').value;
+      if (!email || !pass) return alert('กรอกอีเมลและรหัสผ่าน');
+      try{
+        await FT.apiLogin(email, pass);
+        FT.updateAuthUI();
+        FT.goto(next);
+      }catch(e){ alert(e.message || e); }
+    });
+  </script>
+</body>
+</html>

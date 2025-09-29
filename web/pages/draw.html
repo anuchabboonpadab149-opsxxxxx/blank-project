@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>เสี่ยงทาย • Fortune</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand"><a href="../index.html" style="color:#fff;text-decoration:none">🔮 Fortune</a></div>
+      <nav>
+        <a href="../pages/packages.html">แพ็กเกจ</a>
+        <a href="../pages/draw.html" class="active">เสี่ยงทาย</a>
+        <a href="../pages/history.html">ประวัติ</a>
+        <span class="badge">เครดิต: <b id="credits">-</b></span>
+        <span id="nav-auth"><a href="../pages/login.html">เข้าสู่ระบบ</a></span>
+        <span id="nav-me" class="hidden">บัญชี: <span id="me-id"></span> · <a href="#" onclick="FT.logout()">ออก</a></span>
+      </nav>
+    </header>
+
+    <div class="card hero">
+      <div class="badge">ขั้นที่ 4</div>
+      <h2>เสี่ยงคำทำนาย</h2>
+      <p class="muted">เลือกแหล่งทำนาย แล้วเสี่ยงเซียมซี หรือเลือกไพ่ยิปซีแบบ 5/10 ใบ</p>
+    </div>
+
+    <section class="card">
+      <div class="tabs">
+        <div id="tab-sensi" class="tab active">เซียมซี</div>
+        <div id="tab-tarot" class="tab">ไพ่ยิปซี</div>
+      </div>
+
+      <div style="display:none">
+        <label>เลือกแหล่งทำนาย</label>
+        <select id="source"></select>
+      </div>
+
+      <div id="panel-sensi">
+        <div style="margin-top:8px">
+          <button class="primary" id="btn-sensi">เขย่าเซียมซี (ใช้ 1 สิทธิ์)</button>
+        </div>
+        <div id="drawn" class="hidden" style="margin-top:10px">
+          <h4 id="result-key"></h4>
+          <p id="verse"></p>
+          <p><b>สรุป:</b> <span id="summary"></span></p>
+          <p class="muted">เครดิตคงเหลือ: <b id="balance"></b></p>
+        </div>
+      </div>
+
+      <div id="panel-tarot" class="hidden">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 6px">
+          <button class="primary" id="btn-tarot-5">ดู 5 ใบ (ใช้ 1 สิทธิ์)</button>
+          <button class="primary" id="btn-tarot-10">ดู 10 ใบ (ใช้ 2 สิทธิ์)</button>
+        </div>
+        <div id="tarot-result" class="tarot-grid"></div>
+        <div id="tarot-balance" class="muted" style="margin-top:6px"></div>
+      </div>
+    </section>
+
+    <div class="footer">© Fortune</div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="../app.js"></script>
+  <script>
+    FT.attachAdminShortcut();
+    FT.updateAuthUI();
+    FT.requireAuth('../pages/draw.html' + location.search);
+
+    function activateTab(which){
+      const sensi = document.getElementById('panel-sensi');
+      const tarot = document.getElementById('panel-tarot');
+      const ts = document.getElementById('tab-sensi');
+      const tt = document.getElementById('tab-tarot');
+      if (which==='tarot'){
+        sensi.classList.add('hidden'); tarot.classList.remove('hidden');
+        ts.classList.remove('active'); tt.classList.add('active');
+      } else {
+        sensi.classList.remove('hidden'); tarot.classList.add('hidden');
+        ts.classList.add('active'); tt.classList.remove('active');
+      }
+    }
+    document.getElementById('tab-sensi').addEventListener('click', ()=> activateTab('sensi'));
+    document.getElementById('tab-tarot').addEventListener('click', ()=> activateTab('tarot'));
+
+    let sources = [];
+    let tarotSourceId = null;
+    let selectedSourceId = parseInt(FT.qsGet('source_id','0'),10) || 0;
+
+    async function load(){
+      const balance = await FT.apiCredits();
+      document.getElementById('credits').textContent = balance;
+
+      sources = await FT.apiSources();
+      const el = document.getElementById('source');
+      el.innerHTML = '';
+      sources.forEach(s=>{
+        const op = document.createElement('option');
+        op.value = s.id; op.textContent = `${s.name} (${s.type})`;
+        el.appendChild(op);
+      });
+      tarotSourceId = (sources.find(s=>s.type==='Tarot')||{}).id || null;
+
+      if (selectedSourceId){
+        const opt = [...el.options].find(o => parseInt(o.value,10) === selectedSourceId);
+        if (opt) el.value = String(selectedSourceId);
+        const src = sources.find(s=>s.id===selectedSourceId);
+        if (src && src.type === 'Tarot') activateTab('tarot');
+      }
+    }
+
+    document.getElementById('btn-sensi').addEventListener('click', async ()=>{
+      try{
+        const srcId = selectedSourceId || parseInt(document.getElementById('source').value,10);
+        const data = await FT.apiDraw(srcId);
+        document.getElementById('result-key').textContent = data.result_key;
+        document.getElementById('verse').textContent = data.verse_content || '';
+        document.getElementById('summary').textContent = data.fate_summary || '-';
+        document.getElementById('balance').textContent = data.new_credit_balance;
+        document.getElementById('drawn').classList.remove('hidden');
+        document.getElementById('credits').textContent = data.new_credit_balance;
+      }catch(e){ alert(e.message || e); }
+    });
+
+    document.getElementById('btn-tarot-5').addEventListener('click', ()=> drawTarot(5));
+    document.getElementById('btn-tarot-10').addEventListener('click', ()=> drawTarot(10));
+    async function drawTarot(n){
+      try{
+        if (!tarotSourceId) { alert('ยังไม่มีแหล่งไพ่ยิปซี'); return; }
+        const res = await FT.apiTarotMulti(tarotSourceId, n);
+        const grid = document.getElementById('tarot-result');
+        grid.innerHTML = '';
+        (res.cards||[]).forEach(c=>{
+          const el = document.createElement('div');
+          el.className = 'tarot-card';
+          el.innerHTML = `<h5>${c.name} (${c.orientation})</h5><div class="muted">${c.meaning}</div>`;
+          grid.appendChild(el);
+        });
+        document.getElementById('tarot-balance').textContent = 'เครดิตคงเหลือ: ' + res.new_credit_balance;
+        document.getElementById('credits').textContent = res.new_credit_balance;
+      }catch(e){ alert(e.message || e); }
+    }
+
+    load();
+  </script>
+</body>
+</html>
