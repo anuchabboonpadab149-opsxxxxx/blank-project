@@ -1,6 +1,8 @@
 // --- ค่าเริ่มต้นและการตั้งค่าแชร์ ---
 // หากเว็บไซต์ออนไลน์ ให้ตั้งค่า URL หน้าเว็บจริงไว้ที่นี่ เพื่อให้แชร์ไปยัง Line/Facebook ได้
 const SITE_URL = ""; // ตัวอย่าง: "https://yourbrand.com/fortune"
+// ตั้งค่า endpoint ฟอร์ม (เช่น Formspree/Netlify Functions/Cloudflare Workers)
+const FORM_ENDPOINT = ""; // ตัวอย่าง: "https://formspree.io/f/xxxxxxx"
 
 // --- ฐานข้อมูลคำทำนาย (FORTUNE_DATA) ---
 const FORTUNE_DATA = [
@@ -269,22 +271,45 @@ function attachBackToTop() {
     btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }
 
-// 14) Contact form (mailto)
+// 14) Contact form (endpoint ถ้ามี, fallback เป็น mailto)
 function attachContactForm() {
     const form = document.getElementById('contact-form');
     if (!form) return;
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('name').value.trim();
         const email = document.getElementById('email').value.trim();
         const message = document.getElementById('message').value.trim();
+
+        if (FORM_ENDPOINT) {
+            try {
+                await fetch(FORM_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, message })
+                });
+                alert('ส่งข้อความเรียบร้อย เราจะติดต่อกลับโดยเร็ว');
+                form.reset();
+                return;
+            } catch {
+                // ตกลงไปใช้ mailto
+            }
+        }
+
         const subject = encodeURIComponent(`ติดต่อจากเว็บ: ${name}`);
         const body = encodeURIComponent(`ชื่อ: ${name}\nอีเมล: ${email}\nข้อความ:\n${message}`);
         window.location.href = `mailto:tony@karmicreflection.com?subject=${subject}&body=${body}`;
     });
 }
 
-// 15) เริ่มต้นระบบเมื่อโหลดหน้า
+// 15) Service Worker registration
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    }
+}
+
+// 16) เริ่มต้นระบบเมื่อโหลดหน้า
 document.addEventListener('DOMContentLoaded', () => {
     startTeaserRotation();
     renderReviews();
@@ -296,7 +321,8 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFaqToggle();
     attachBackToTop();
     attachContactForm();
+    registerServiceWorker();
 });
 
-// 16) Click หลัก
+// 17) Click หลัก
 document.getElementById('shaking-button').addEventListener('click', generateFortune);

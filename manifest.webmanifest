@@ -1,0 +1,21 @@
+{
+  "name": "อ.โทนี่สะท้อนกรรม",
+  "short_name": "โทนี่สะท้อนกรรม",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0B1A3A",
+  "theme_color": "#0B1A3A",
+  "description": "เสี่ยงเซียมซีออนไลน์และดูดวงส่วนตัว",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192.png?text=%F0%9F%94%AE",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512.png?text=%F0%9F%94%AE",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
