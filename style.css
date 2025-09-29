@@ -1,0 +1,164 @@
+/* --- ธีมสีและฟอนต์ --- */
+:root {
+    --color-primary: #000033; /* น้ำเงินกรมท่าเข้ม */
+    --color-secondary: #0A0A57; /* น้ำเงินเข้มกว่า */
+    --color-accent: #FFD700; /* สีทองสว่าง */
+    --color-text-light: #F0F0F0;
+    --color-text-dark: #333333;
+    --font-mitr: 'Mitr', sans-serif;
+    --font-poppins: 'Poppins', sans-serif;
+}
+
+body {
+    font-family: var(--font-mitr);
+    background-color: var(--color-primary);
+    color: var(--color-text-light);
+    margin: 0;
+    line-height: 1.6;
+}
+
+h1, h2, h3 {
+    font-family: var(--font-poppins);
+    color: var(--color-accent);
+    text-align: center;
+}
+
+/* --- Header / Navigation --- */
+header {
+    background-color: var(--color-secondary);
+    padding: 15px 5%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+header a {
+    color: var(--color-text-light);
+    text-decoration: none;
+    margin-left: 20px;
+}
+
+/* --- CTA Button (ปุ่มเด่น) --- */
+.cta-button, .secondary-button {
+    padding: 15px 30px;
+    border: none;
+    border-radius: 50px;
+    font-size: 1.2em;
+    font-weight: 600;
+    cursor: pointer;
+    margin: 20px 0;
+    transition: all 0.3s ease;
+}
+.cta-button {
+    background-color: var(--color-accent);
+    color: var(--color-primary);
+    box-shadow: 0 0 20px var(--color-accent); /* แสงทองวิบวับ */
+}
+.cta-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 25px var(--color-accent);
+}
+.secondary-button {
+    background-color: transparent;
+    border: 2px solid var(--color-accent);
+    color: var(--color-accent);
+}
+
+/* --- Hero Section & Teaser --- */
+.hero-section {
+    min-height: 80vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 50px 20px;
+    /* จำลองภาพ Hero Background */
+    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 50, 0.8)), url('https://via.placeholder.com/1200x800?text=Tony+Mutelu+Image') no-repeat center center/cover;
+}
+.teaser-bar {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: rgba(255, 215, 0, 0.1);
+    color: var(--color-accent);
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* --- Result Section --- */
+.result-section {
+    padding: 50px 5%;
+    text-align: center;
+}
+.result-box {
+    background-color: var(--color-secondary);
+    border: 3px solid var(--color-accent);
+    padding: 30px;
+    border-radius: 15px;
+    max-width: 600px;
+    margin: 0 auto;
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+}
+.hidden {
+    display: none !important;
+}
+
+/* --- Service & Footer --- */
+.content-section {
+    padding: 50px 5%;
+    text-align: center;
+}
+.service-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    margin-top: 30px;
+}
+.service-item {
+    background-color: var(--color-secondary);
+    padding: 20px;
+    border-radius: 10px;
+    border-bottom: 5px solid var(--color-accent);
+}
+
+footer {
+    background-color: #000000;
+    padding: 40px 5%;
+}
+.footer-content {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.qr-code-box img {
+    border: 3px solid var(--color-accent);
+}
+
+/* --- Keyframe Animation (Node E) --- */
+@keyframes shake {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    20%, 60% { transform: translate(-5px, 0) rotate(-2deg); }
+    40%, 80% { transform: translate(5px, 0) rotate(2deg); }
+}
+
+.shaking-effect {
+    animation: shake 0.1s infinite; /* เรียกใช้ Animation */
+    pointer-events: none; /* ป้องกันการคลิกระหว่างเขย่า */
+}
+
+/* --- Mobile View --- */
+@media (max-width: 768px) {
+    header {
+        flex-direction: column;
+    }
+    header nav {
+        margin-top: 10px;
+    }
+    header nav a {
+        margin: 0 5px;
+        font-size: 0.9em;
+    }
+    .hero-content h2 {
+        font-size: 1.8em;
+    }
+}
