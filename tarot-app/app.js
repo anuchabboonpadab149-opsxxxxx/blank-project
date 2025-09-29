@@ -1,12 +1,13 @@
 /**
- * Tarot Studio — ดูดวงไพ่ยิปซี
- * - สับไพ่จริง (animation)
- * - ตัดไพ่
- * - เลือกไพ่ตามรูปแบบ: 1 ใบ, 4 ใบ, Celtic Cross, 10 ใบ
- * - ดวงรายวัน/เดือน/ปี แบบเลือกหัวข้อ (สุ่มแบบมีเมล็ดตามวันที่และชื่อ)
+ * อ.โทนี่สะท้อนกรรม — ระบบสมาชิก + สิทธิ์ + พร้อมเพย์ QR
+ * - ต้องเข้าสู่ระบบก่อนใช้งาน
+ * - การอ่านแต่ละครั้งใช้ 1 สิทธิ์ (ทุกโหมด)
+ * - โปรโมชั่น 5 แพ็กเกจ:
+ *   10 สิทธิ์ 39 บาท, 30 สิทธิ์ 99 บาท, 50 สิทธิ์ 149 บาท, 100 สิทธิ์ 279 บาท, 300 สิทธิ์ 699 บาท
+ * - เติมเงินผ่าน PromptPay เบอร์ 0916974995 โดยสร้าง Thai QR Payment (EMVCo) พร้อมจำนวนเงิน
  *
- * หมายเหตุ: ความหมายไพ่เป็นข้อความสั้นๆ สำหรับการใช้งานทั่วไป
- *           ต้องการอัปเดต/ขยายความหมาย สามารถแก้ไข TAROT_DECK ได้โดยตรง
+ * หมายเหตุ: ระบบตรวจสอบการชำระเงินอัตโนมัติจริงต้องเชื่อมต่อผู้ให้บริการรับชำระ (เช่น Omise/2C2P/GB Prime Pay/SCB Payment Link)
+ * ในโค้ดนี้มีโหมดจำลอง ("auto-verify simulation") เพื่อการเดโม เมื่อพร้อมเชื่อมต่อจริงให้ผมต่อ API/Webhook เพื่อเพิ่มสิทธิ์อัตโนมัติ
  */
 
 /* ========= DECK DATA ========= */
@@ -257,6 +258,17 @@ const TAROT_DECK = [
     reversed: "ยึดติดวัตถุ โลภ ใช้อำนาจเพื่อผลประโยชน์" },
 ];
 
+/* ========= PAYMENTS & PACKAGES ========= */
+
+const PROMPTPAY_PHONE = "0916974995";
+const PACKAGES = [
+  { id: "P10", title: "10 สิทธิ์", credits: 10, price: 39 },
+  { id: "P30", title: "30 สิทธิ์", credits: 30, price: 99 },
+  { id: "P50", title: "50 สิทธิ์", credits: 50, price: 149 },
+  { id: "P100", title: "100 สิทธิ์", credits: 100, price: 279 },
+  { id: "P300", title: "300 สิทธิ์", credits: 300, price: 699 },
+];
+
 /* ========= UTILITIES ========= */
 
 // Seeded RNG (xmur3 + mulberry32)
@@ -284,11 +296,6 @@ function createSeededRng(seedStr) {
   const seedFn = xmur3(seedStr);
   return mulberry32(seedFn());
 }
-function pickRandom(rng, arr) {
-  return arr[Math.floor(rng() * arr.length)];
-}
-
-// Shuffle array in-place with RNG
 function shuffle(rng, arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -296,11 +303,9 @@ function shuffle(rng, arr) {
   }
   return arr;
 }
-
 function randomOrientation(rng) {
   return rng() < 0.5 ? "upright" : "reversed";
 }
-
 function dateSeed(scope) {
   const now = new Date();
   if (scope === "year") return `${now.getFullYear()}`;
@@ -308,9 +313,58 @@ function dateSeed(scope) {
   return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
 
-/* ========= RENDERING ========= */
+/* ========= THAI QR PAYMENT (EMVCo) ========= */
+
+/**
+ * Build Thai QR Payment payload for PromptPay mobile number, with amount.
+ * - Static QR (Point of Initiation Method = 11)
+ * - Merchant Account Info (ID 29): AID + mobile number
+ * - Currency (53=764), Amount (54), Country (58=TH), Additional Data (62: Bill Number)
+ * - CRC16-CCITT (63)
+ */
+function crc16ccitt(str) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc <<= 1;
+      }
+      crc &= 0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, "0");
+}
+function tlv(id, value) {
+  const len = value.length.toString().padStart(2, "0");
+  return `${id}${len}${value}`;
+}
+function buildPromptPayPayloadMobile({ phone, amount, billNumber }) {
+  const AID = "A000000677010111"; // PromptPay AID
+  const merchantAccountInfo = tlv("00", AID) + tlv("01", phone.replace(/[^0-9]/g, ""));
+  const payload =
+    tlv("00", "01") +                       // Payload Format Indicator
+    tlv("01", "11") +                       // Point of Initiation Method (static)
+    tlv("29", merchantAccountInfo) +        // Merchant Account Info
+    tlv("53", "764") +                      // Currency code (THB)
+    tlv("54", Number(amount).toFixed(2)) +  // Amount
+    tlv("58", "TH") +                       // Country code
+    tlv("62", tlv("01", billNumber));       // Additional data (Bill Number)
+  const crc = crc16ccitt(payload + "6304");
+  return payload + "6304" + crc;
+}
+function buildQrImageUrl(payload) {
+  const data = encodeURIComponent(payload);
+  // Public QR image API
+  return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${data}`;
+}
+
+/* ========= AUTH & CREDITS ========= */
 
 const el = {
+  // Reading
   userName: document.getElementById("userName"),
   readingType: document.getElementById("readingType"),
   focusBtn: document.getElementById("focusBtn"),
@@ -323,17 +377,274 @@ const el = {
   dailyScope: document.getElementById("dailyScope"),
   dailyReadBtn: document.getElementById("dailyReadBtn"),
   dailyResults: document.getElementById("dailyResults"),
+  // Account
+  accountPanel: document.getElementById("accountPanel"),
+  loginBtn: document.getElementById("loginBtn"),
+  // Modals
+  overlay: document.getElementById("modalOverlay"),
+  authModal: document.getElementById("authModal"),
+  authClose: document.getElementById("authClose"),
+  tabLogin: document.getElementById("tabLogin"),
+  tabSignup: document.getElementById("tabSignup"),
+  loginPane: document.getElementById("loginPane"),
+  signupPane: document.getElementById("signupPane"),
+  loginPhone: document.getElementById("loginPhone"),
+  loginPassword: document.getElementById("loginPassword"),
+  doLogin: document.getElementById("doLogin"),
+  signupName: document.getElementById("signupName"),
+  signupPhone: document.getElementById("signupPhone"),
+  signupPassword: document.getElementById("signupPassword"),
+  doSignup: document.getElementById("doSignup"),
+  // Topup
+  topupModal: document.getElementById("topupModal"),
+  topupClose: document.getElementById("topupClose"),
+  packageGrid: document.getElementById("packageGrid"),
+  paymentPane: document.getElementById("paymentPane"),
+  selectedPackageText: document.getElementById("selectedPackageText"),
+  qrImage: document.getElementById("qrImage"),
+  orderId: document.getElementById("orderId"),
+  verifyBtn: document.getElementById("verifyBtn"),
+  cancelTopup: document.getElementById("cancelTopup"),
 };
 
 let workingDeck = [...TAROT_DECK];
+let users = []; // [{phone, name, password, credits}]
+let session = null; // current user {phone, name, credits}
+let pendingOrder = null; // {id, package, amount}
 
-// Build visual deck preview
-function renderDeckPreview(count = 20) {
+/* Storage */
+function loadUsers() {
+  try {
+    users = JSON.parse(localStorage.getItem("ts_users") || "[]");
+  } catch {
+    users = [];
+  }
+}
+function saveUsers() {
+  localStorage.setItem("ts_users", JSON.stringify(users));
+}
+function setSession(user) {
+  session = { phone: user.phone, name: user.name, credits: user.credits || 0 };
+  localStorage.setItem("ts_session", JSON.stringify(session));
+}
+function loadSession() {
+  try {
+    session = JSON.parse(localStorage.getItem("ts_session") || "null");
+  } catch {
+    session = null;
+  }
+}
+
+/* Account helpers */
+function findUserByPhone(phone) {
+  return users.find(u => u.phone === phone);
+}
+function updateAccountPanel() {
+  const panel = el.accountPanel;
+  panel.innerHTML = "";
+  if (!session) {
+    const btn = document.createElement("button");
+    btn.id = "loginBtn";
+    btn.className = "primary";
+    btn.textContent = "เข้าสู่ระบบ/สมัครสมาชิก";
+    btn.addEventListener("click", () => openAuthModal());
+    panel.appendChild(btn);
+  } else {
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = `สวัสดี, ${session.name}`;
+    const credits = document.createElement("div");
+    credits.className = "badge";
+    credits.textContent = `สิทธิ์คงเหลือ: ${session.credits}`;
+    const topup = document.createElement("button");
+    topup.id = "topupBtn";
+    topup.textContent = "เติมสิทธิ์";
+    topup.addEventListener("click", () => openTopupModal());
+    const logout = document.createElement("button");
+    logout.className = "ghost";
+    logout.textContent = "ออกจากระบบ";
+    logout.addEventListener("click", () => logoutUser());
+    panel.appendChild(name);
+    panel.appendChild(credits);
+    panel.appendChild(topup);
+    panel.appendChild(logout);
+  }
+}
+function logoutUser() {
+  session = null;
+  localStorage.removeItem("ts_session");
+  updateAccountPanel();
+}
+
+/* Auth modal */
+function openAuthModal() {
+  el.overlay.classList.remove("hidden");
+  el.authModal.classList.remove("hidden");
+}
+function closeAuthModal() {
+  el.overlay.classList.add("hidden");
+  el.authModal.classList.add("hidden");
+}
+function switchTab(tab) {
+  if (tab === "login") {
+    el.tabLogin.classList.add("active");
+    el.tabSignup.classList.remove("active");
+    el.loginPane.classList.remove("hidden");
+    el.signupPane.classList.add("hidden");
+  } else {
+    el.tabSignup.classList.add("active");
+    el.tabLogin.classList.remove("active");
+    el.signupPane.classList.remove("hidden");
+    el.loginPane.classList.add("hidden");
+  }
+}
+function signup() {
+  const name = (el.signupName.value || "").trim();
+  const phone = (el.signupPhone.value || "").trim();
+  const password = (el.signupPassword.value || "").trim();
+  if (!name || !phone || !password) {
+    alert("กรุณากรอกข้อมูลให้ครบ");
+    return;
+  }
+  if (findUserByPhone(phone)) {
+    alert("เบอร์นี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบ");
+    switchTab("login");
+    el.loginPhone.value = phone;
+    return;
+  }
+  const user = { name, phone, password, credits: 0 };
+  users.push(user);
+  saveUsers();
+  setSession(user);
+  closeAuthModal();
+  updateAccountPanel();
+}
+function login() {
+  const phone = (el.loginPhone.value || "").trim();
+  const password = (el.loginPassword.value || "").trim();
+  const user = findUserByPhone(phone);
+  if (!user || user.password !== password) {
+    alert("เบอร์/รหัสผ่านไม่ถูกต้อง");
+    return;
+  }
+  setSession(user);
+  closeAuthModal();
+  updateAccountPanel();
+}
+
+/* Topup modal */
+function openTopupModal() {
+  if (!session) {
+    openAuthModal();
+    return;
+  }
+  el.overlay.classList.remove("hidden");
+  el.topupModal.classList.remove("hidden");
+  el.paymentPane.classList.add("hidden");
+  renderPackages();
+}
+function closeTopupModal() {
+  el.overlay.classList.add("hidden");
+  el.topupModal.classList.add("hidden");
+  el.paymentPane.classList.add("hidden");
+}
+function renderPackages() {
+  el.packageGrid.innerHTML = "";
+  PACKAGES.forEach(pkg => {
+    const box = document.createElement("div");
+    box.className = "package";
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = `${pkg.title}`;
+    const price = document.createElement("div");
+    price.className = "price";
+    price.textContent = `${pkg.price} บาท`;
+    const cta = document.createElement("div");
+    cta.className = "cta";
+    const btn = document.createElement("button");
+    btn.className = "primary";
+    btn.textContent = "เลือกแพ็กเกจ";
+    btn.addEventListener("click", () => selectPackage(pkg));
+    cta.appendChild(btn);
+    box.appendChild(title);
+    box.appendChild(price);
+    box.appendChild(cta);
+    el.packageGrid.appendChild(box);
+  });
+}
+function selectPackage(pkg) {
+  const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  pendingOrder = { id: orderId, package: pkg, amount: pkg.price };
+  const payload = buildPromptPayPayloadMobile({
+    phone: PROMPTPAY_PHONE,
+    amount: pkg.price,
+    billNumber: orderId
+  });
+  el.selectedPackageText.textContent = `แพ็กเกจที่เลือก: ${pkg.title} — ราคา ${pkg.price} บาท (จะได้รับ ${pkg.credits} สิทธิ์)`;
+  el.qrImage.src = buildQrImageUrl(payload);
+  el.orderId.textContent = orderId;
+  el.paymentPane.classList.remove("hidden");
+}
+
+/* Verification (simulation mode) */
+const AUTO_VERIFY_SIMULATION = true;
+function verifyPayment() {
+  if (!pendingOrder) return;
+  if (!AUTO_VERIFY_SIMULATION) {
+    alert("ระบบตรวจสอบอัตโนมัติจริงต้องเชื่อมต่อผู้ให้บริการรับชำระ กรุณาติดต่อเพื่อเปิดใช้งาน");
+    return;
+  }
+  el.verifyBtn.disabled = true;
+  el.verifyBtn.textContent = "กำลังตรวจสอบ...";
+  // Simulate verification delay
+  setTimeout(() => {
+    el.verifyBtn.disabled = false;
+    el.verifyBtn.textContent = "ตรวจสอบการชำระเงินอัตโนมัติ";
+    // Credit top-up
+    const user = findUserByPhone(session.phone);
+    user.credits = (user.credits || 0) + pendingOrder.package.credits;
+    saveUsers();
+    setSession(user);
+    updateAccountPanel();
+    alert(`ชำระเงินสำเร็จ! เพิ่มสิทธิ์ ${pendingOrder.package.credits} สิทธิ์ให้บัญชีของคุณแล้ว`);
+    pendingOrder = null;
+    closeTopupModal();
+  }, 2000);
+}
+
+/* ========= READING FLOW (AUTH + CREDIT) ========= */
+
+function ensureAuth() {
+  if (!session) {
+    openAuthModal();
+    return false;
+  }
+  return true;
+}
+function consumeOneCredit() {
+  const user = findUserByPhone(session.phone);
+  const current = user.credits || 0;
+  if (current < 1) return false;
+  user.credits = current - 1;
+  saveUsers();
+  setSession(user);
+  updateAccountPanel();
+  return true;
+}
+function requireCreditOrTopup() {
+  if (!ensureAuth()) return false;
+  if (!consumeOneCredit()) {
+    alert("สิทธิ์คงเหลือไม่เพียงพอ กรุณาเติมสิทธิ์ก่อนใช้งาน");
+    openTopupModal();
+    return false;
+  }
+  return true;
+}
+
+/* ========= RENDERING (cards) ========= */
+
+function renderDeckPreview(count = 18) {
   el.deck.innerHTML = "";
-  const stack = document.createElement("div");
-  stack.className = "stack";
-  el.deck.appendChild(stack);
-
   const demoCards = shuffle(Math.random, [...TAROT_DECK]).slice(0, count);
   demoCards.forEach((card, idx) => {
     const cardEl = createCardBackEl();
@@ -359,32 +670,26 @@ function createCardBackEl() {
   cardEl.appendChild(inner);
   return cardEl;
 }
-
 function createFace(card, orientation) {
   const wrap = document.createElement("div");
   wrap.className = "tarot-card";
   wrap.style.setProperty("--rev", orientation === "reversed" ? "180deg" : "0deg");
   const inner = document.createElement("div");
   inner.className = "inner";
-
   const back = document.createElement("div");
   back.className = "face back";
   back.innerHTML = "<span class='card-tag'>หยิบไพ่</span>";
-
   const front = document.createElement("div");
   front.className = "face front";
   const tag = document.createElement("span");
   tag.className = "card-tag" + (orientation === "reversed" ? " rev" : "");
   tag.textContent = orientation === "reversed" ? "กลับหัว" : "ตั้งตรง";
-
   const name = document.createElement("div");
   name.className = "card-name";
   name.textContent = `${card.th}`;
-
   const meaning = document.createElement("div");
   meaning.className = "card-meaning";
   meaning.textContent = orientation === "reversed" ? card.reversed : card.upright;
-
   front.appendChild(tag);
   front.appendChild(name);
   front.appendChild(meaning);
@@ -393,11 +698,9 @@ function createFace(card, orientation) {
   wrap.appendChild(inner);
   return wrap;
 }
-
 function clearResults() {
   el.resultsList.innerHTML = "";
 }
-
 function addResult(title, card, orientation) {
   const item = document.createElement("div");
   item.className = "result-item";
@@ -422,17 +725,14 @@ function focusBreath() {
     el.focusBtn.disabled = false;
   }, 2000);
 }
-
 function performShuffle() {
   el.deck.classList.add("shuffling");
-  // Shuffle working deck with random RNG (non-seeded)
   const rng = createSeededRng(`${Date.now()}-${Math.random()}`);
   workingDeck = shuffle(rng, [...TAROT_DECK]);
   setTimeout(() => {
     el.deck.classList.remove("shuffling");
   }, 1800);
 }
-
 function performCut() {
   el.deck.classList.add("cutting");
   const half = Math.floor(workingDeck.length / 2);
@@ -445,6 +745,8 @@ function performCut() {
 }
 
 function startReading() {
+  if (!requireCreditOrTopup()) return;
+
   clearResults();
   el.spreadBoard.classList.remove("hidden");
   const type = el.readingType.value;
@@ -452,6 +754,7 @@ function startReading() {
   let positions = [];
   if (type === "single") {
     positions = [{ label: "สารจากไพ่ 1 ใบ", posClass: "" }];
+    el.spreadBoard.className = "spread-board";
   } else if (type === "four") {
     positions = [
       { label: "ความรัก", posClass: "" },
@@ -490,7 +793,6 @@ function startReading() {
     el.spreadBoard.className = "spread-board spread-celtic";
   }
 
-  // Seed based on optional name + current time for uniqueness
   const seedBase = `${el.userName.value || "guest"}-${Date.now()}`;
   const rng = createSeededRng(seedBase);
   const picks = shuffle(rng, [...workingDeck]).slice(0, positions.length);
@@ -507,6 +809,8 @@ function startReading() {
 }
 
 function doDailyReading() {
+  if (!requireCreditOrTopup()) return;
+
   el.dailyResults.innerHTML = "";
   const scope = el.dailyScope.value;
   const seed = `${dateSeed(scope)}-${el.userName.value || "guest"}`;
@@ -515,7 +819,6 @@ function doDailyReading() {
   const topicEls = Array.from(document.querySelectorAll('#daily .topics input[type="checkbox"]:checked'));
   const topics = topicEls.map(el => el.value);
 
-  // For each topic open one card (upright/reversed seeded)
   const picks = shuffle(rng, [...TAROT_DECK]);
   topics.forEach((topic, idx) => {
     const card = picks[idx % picks.length];
@@ -538,13 +841,30 @@ function doDailyReading() {
 /* ========= INIT ========= */
 
 function init() {
+  loadUsers();
+  loadSession();
+  updateAccountPanel();
+
   renderDeckPreview(18);
 
+  // Reading controls
   el.focusBtn.addEventListener("click", focusBreath);
   el.shuffleBtn.addEventListener("click", performShuffle);
   el.cutBtn.addEventListener("click", performCut);
   el.startReadingBtn.addEventListener("click", startReading);
-
   el.dailyReadBtn.addEventListener("click", doDailyReading);
+
+  // Auth modal events
+  el.loginBtn && el.loginBtn.addEventListener("click", openAuthModal);
+  el.authClose.addEventListener("click", closeAuthModal);
+  el.tabLogin.addEventListener("click", () => switchTab("login"));
+  el.tabSignup.addEventListener("click", () => switchTab("signup"));
+  el.doSignup.addEventListener("click", signup);
+  el.doLogin.addEventListener("click", login);
+
+  // Topup modal events
+  el.topupClose.addEventListener("click", closeTopupModal);
+  el.verifyBtn.addEventListener("click", verifyPayment);
+  el.cancelTopup.addEventListener("click", openTopupModal);
 }
 init();

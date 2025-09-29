@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ดูดวงไพ่ยิปซีออนไลน์ | Tarot Studio</title>
-  <meta name="description" content="เว็บดูดวงไพ่ยิปซีออนไลน์ สับไพ่จริง เปิดไพ่ 1 ใบ, 4 ใบ, Celtic Cross และ 10 ใบ พร้อมดวงรายวัน รายเดือน รายปี เลือกหัวข้อ การเงิน การงาน ความรัก โชคลาภ บริวาร สุขภาพ" />
+  <title>อ.โทนี่สะท้อนกรรม | ดูดวงไพ่ยิปซีออนไลน์</title>
+  <meta name="description" content="อ.โทนี่สะท้อนกรรม — เว็บดูดวงไพ่ยิปซีออนไลน์ สับไพ่จริง เปิดไพ่ 1 ใบ, 4 ใบ, Celtic Cross และ 10 ใบ พร้อมดวงรายวัน รายเดือน รายปี เลือกหัวข้อ การเงิน การงาน ความรัก โชคลาภ บริวาร สุขภาพ" />
   <meta name="theme-color" content="#151320" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +18,7 @@
       <div class="brand">
         <div class="brand-mark">♠︎</div>
         <div class="brand-text">
-          <h1>Tarot Studio</h1>
+          <h1>อ.โทนี่สะท้อนกรรม</h1>
           <p class="subtitle">เว็บดูดวงไพ่ยิปซีสับไพ่จริง เหมือนจับไพ่ด้วยมือ</p>
         </div>
       </div>
@@ -27,6 +27,10 @@
         <a href="#daily">ดวงรายวัน/เดือน/ปี</a>
         <a href="#guide">วิธีใช้งาน</a>
       </nav>
+      <div class="account" id="accountPanel">
+        <!-- Filled by JS -->
+        <button id="loginBtn" class="primary">เข้าสู่ระบบ/สมัครสมาชิก</button>
+      </div>
     </div>
   </header>
 
@@ -81,8 +85,9 @@
             <button id="focusBtn" class="ghost">ตั้งสมาธิ</button>
             <button id="shuffleBtn">สับไพ่</button>
             <button id="cutBtn" class="ghost">ตัดไพ่</button>
-            <button id="startReadingBtn" class="primary">เริ่มเปิดไพ่</button>
+            <button id="startReadingBtn" class="primary">เริ่มเปิดไพ่ (ใช้ 1 สิทธิ์)</button>
           </div>
+          <p class="note">หมายเหตุ: การอ่านไพ่ทุกแบบใช้สิทธิ์ 1 ครั้งต่อการอ่าน</p>
         </div>
 
         <div class="deck-area">
@@ -101,7 +106,7 @@
     <section id="daily" class="section alt">
       <div class="container">
         <h3>ดูดวงรายวัน/เดือน/ปี (เลือกหัวข้อได้)</h3>
-        <p class="note">สไตล์ MyHora: เลือกหัวข้อและเปิดไพ่ 1 ใบต่อหัวข้อ ใช้การสุ่มแบบมีเมล็ดตามวันที่</p>
+        <p class="note">สไตล์ MyHora: เลือกหัวข้อและเปิดไพ่ 1 ใบต่อหัวข้อ ใช้การสุ่มแบบมีเมล็ดตามวันที่ — การเปิดผลลัพธ์นี้ใช้สิทธิ์ 1 ครั้ง</p>
         <div class="daily-controls">
           <div class="control-group">
             <label for="dailyScope">ช่วงเวลา</label>
@@ -123,7 +128,7 @@
             </div>
           </div>
           <div class="control-group inline">
-            <button id="dailyReadBtn" class="primary">เปิดไพ่ตามหัวข้อ</button>
+            <button id="dailyReadBtn" class="primary">เปิดไพ่ตามหัวข้อ (ใช้ 1 สิทธิ์)</button>
           </div>
         </div>
         <div id="dailyResults" class="results-list"></div>
@@ -149,7 +154,7 @@
   <footer class="site-footer">
     <div class="container footer-inner">
       <div>
-        © 2025 Tarot Studio — สร้างสรรค์ประสบการณ์ดูไพ่ยิปซีออนไลน์
+        © 2025 อ.โทนี่สะท้อนกรรม — สร้างสรรค์ประสบการณ์ดูไพ่ยิปซีออนไลน์
       </div>
       <div class="footer-links">
         <a href="#reading">ดูไพ่</a>
@@ -158,6 +163,79 @@
       </div>
     </div>
   </footer>
+
+  <!-- Auth Modal -->
+  <div id="modalOverlay" class="modal-overlay hidden"></div>
+  <div id="authModal" class="modal hidden">
+    <div class="modal-header">
+      <h4>เข้าสู่ระบบ / สมัครสมาชิก</h4>
+      <button class="close" id="authClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <button id="tabLogin" class="tab active">เข้าสู่ระบบ</button>
+        <button id="tabSignup" class="tab">สมัครสมาชิก</button>
+      </div>
+      <div id="loginPane" class="pane">
+        <div class="form-grid">
+          <label>เบอร์มือถือ (ใช้เข้าสู่ระบบ)
+            <input id="loginPhone" type="tel" placeholder="เช่น 0916974995" />
+          </label>
+          <label>รหัสผ่าน
+            <input id="loginPassword" type="password" placeholder="รหัสผ่าน" />
+          </label>
+        </div>
+        <button id="doLogin" class="primary">เข้าสู่ระบบ</button>
+      </div>
+      <div id="signupPane" class="pane hidden">
+        <div class="form-grid">
+          <label>ชื่อที่แสดง
+            <input id="signupName" type="text" placeholder="เช่น ผู้ศรัทธา" />
+          </label>
+          <label>เบอร์มือถือ (PromptPay)
+            <input id="signupPhone" type="tel" placeholder="เช่น 0916974995" />
+          </label>
+          <label>รหัสผ่าน
+            <input id="signupPassword" type="password" placeholder="รหัสผ่าน" />
+          </label>
+        </div>
+        <button id="doSignup" class="primary">สมัครสมาชิก</button>
+      </div>
+      <p class="note">สมาชิกจำเป็นต้องมีสิทธิ์เพื่อใช้งาน: การอ่านแต่ละครั้งใช้ 1 สิทธิ์</p>
+    </div>
+  </div>
+
+  <!-- Topup Modal -->
+  <div id="topupModal" class="modal hidden">
+    <div class="modal-header">
+      <h4>โปรโมชั่นเติมสิทธิ์</h4>
+      <button class="close" id="topupClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="package-grid" id="packageGrid">
+        <!-- filled by JS -->
+      </div>
+      <div id="paymentPane" class="hidden">
+        <div class="payment-info">
+          <div id="selectedPackageText"></div>
+          <div class="qr-wrap">
+            <img id="qrImage" alt="PromptPay QR" />
+          </div>
+          <div class="help">
+            สแกนชำระผ่านพร้อมเพย์ เบอร์ 091-697-4995
+          </div>
+          <div class="ref">
+            รหัสรายการ: <span id="orderId"></span>
+          </div>
+          <div class="inline-actions">
+            <button id="verifyBtn" class="primary">ตรวจสอบการชำระเงินอัตโนมัติ</button>
+            <button id="cancelTopup" class="ghost">เลือกแพ็กเกจใหม่</button>
+          </div>
+          <p class="note">ระบบจะตรวจสอบและเพิ่มสิทธิ์ทันทีเมื่อชำระสำเร็จ</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="./app.js"></script>
 </body>
