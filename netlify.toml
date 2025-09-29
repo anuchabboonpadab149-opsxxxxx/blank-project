@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = "out"
+
+# เพิ่ม header สำหรับไฟล์ static
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# ตัวอย่าง redirects (ปรับเพิ่มได้ตามต้องการ)
+[[redirects]]
+  from = "/docs"
+  to = "/features"
+  status = 301
