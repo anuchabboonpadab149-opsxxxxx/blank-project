@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  gateway:
+    build: ./services/gateway
+    container_name: fortune-gateway
+    environment:
+      - DATABASE_URL=sqlite:///./gateway.db
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-me}
+      - JWT_EXPIRES_MIN=60
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-internal-secret}
+      - CREDIT_SERVICE_URL=http://credit:8001
+      - PAYMENT_SERVICE_URL=http://payment:8002
+      - FORTUNE_SERVICE_URL=http://fortune:8003
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-admin-secret}
+      - CORS_ALLOW_ORIGINS=*
+    ports:
+      - "8000:8000"
+    depends_on:
+      - credit
+      - payment
+      - fortune
+    volumes:
+      - gateway_data:/app
+
+  credit:
+    build: ./services/credit
+    container_name: fortune-credit
+    environment:
+      - DATABASE_URL=sqlite:///./credit.db
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-internal-secret}
+    ports:
+      - "8001:8001"
+    volumes:
+      - credit_data:/app
+
+  payment:
+    build: ./services/payment
+    container_name: fortune-payment
+    environment:
+      - DATABASE_URL=sqlite:///./payment.db
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-internal-secret}
+      - PROMPTPAY_ID=${PROMPTPAY_ID:-0916974995}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:8002}
+    ports:
+      - "8002:8002"
+    volumes:
+      - payment_data:/app
+
+  fortune:
+    build: ./services/fortune
+    container_name: fortune-fortune
+    environment:
+      - DATABASE_URL=sqlite:///./fortune.db
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-internal-secret}
+      - TAROT_UPRIGHT_PROB=${TAROT_UPRIGHT_PROB:-0.5}
+    ports:
+      - "8003:8003"
+    volumes:
+      - fortune_data:/app
+
+volumes:
+  gateway_data:
+  credit_data:
+  payment_data:
+  fortune_data:

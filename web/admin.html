@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - Fortune</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #0f1020; color: #f4f6fb; }
+    .card { background: #17182f; border: 1px solid #2b2c4a; border-radius: 12px; padding: 16px; margin: 12px 0; }
+    input, textarea, button { background: #0b0d1a; border: 1px solid #2b2c4a; color: #fff; border-radius: 8px; padding: 10px 12px; outline: none; }
+    button { cursor: pointer; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Admin Console</h1>
+  <a href="index.html">กลับหน้าแรก</a>
+
+  <div class="card">
+    <h2>ตั้งค่า Token</h2>
+    <input id="admin-token" placeholder="ใส่ ADMIN_TOKEN" />
+    <button onclick="saveToken()">บันทึก</button>
+  </div>
+
+  <div class="card">
+    <h2>Confirm Payment</h2>
+    <input id="tx-id" placeholder="transaction_id" />
+    <input id="user-id" placeholder="user_id" />
+    <input id="credits" placeholder="credits_to_add (ถ้าไม่ระบุจะใช้ตาม package)" />
+    <button onclick="confirmPayment()">ยืนยัน</button>
+    <pre id="confirm-result"></pre>
+  </div>
+
+  <div class="card">
+    <h2>เพิ่ม/แก้ไขแหล่งทำนาย (Source)</h2>
+    <input id="src-name" placeholder="ชื่อ" />
+    <input id="src-type" placeholder="ชนิด (Sen_Si/Tarot)" />
+    <input id="src-upright" placeholder="upright_prob เช่น 0.7 (เฉพาะ Tarot)" />
+    <input id="src-deck" placeholder="allowed_deck เช่น Major หรือรายชื่อคั่นด้วย |" />
+    <button onclick="upsertSource()">บันทึก</button>
+  </div>
+
+  <div class="card">
+    <h2>เพิ่มเนื้อหา เซียมซี</h2>
+    <input id="sen-src" placeholder="source_id" />
+    <input id="sen-num" placeholder="slip_number" />
+    <textarea id="sen-verse" placeholder="verse_content"></textarea>
+    <input id="sen-sum" placeholder="fate_summary" />
+    <button onclick="addSenSi()">เพิ่ม</button>
+  </div>
+
+  <div class="card">
+    <h2>เพิ่มเนื้อหา ไพ่ยิปซี</h2>
+    <input id="tarot-name" placeholder="card_name" />
+    <textarea id="tarot-up" placeholder="meaning_upright"></textarea>
+    <textarea id="tarot-re" placeholder="meaning_reversed"></textarea>
+    <button onclick="addTarot()">เพิ่ม</button>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    const API = window.APP_CONFIG.API_BASE;
+    function adminAuth() {
+      const token = localStorage.getItem('admin_token') || window.APP_CONFIG.ADMIN_BEARER || '';
+      return token ? { 'Authorization': 'Bearer ' + token } : {};
+    }
+    function saveToken() {
+      const t = document.getElementById('admin-token').value;
+      localStorage.setItem('admin_token', t);
+      alert('Saved');
+    }
+    async function confirmPayment() {
+      const tx = document.getElementById('tx-id').value;
+      const uid = document.getElementById('user-id').value;
+      const credits = document.getElementById('credits').value;
+      const r = await fetch(API + '/admin/payment/confirm?transaction_id=' + encodeURIComponent(tx) + '&user_id=' + encodeURIComponent(uid) + '&credits_to_add=' + encodeURIComponent(credits), { method: 'POST', headers: { ...adminAuth() }});
+      const data = await r.json();
+      document.getElementById('confirm-result').textContent = JSON.stringify(data, null, 2);
+    }
+    async function upsertSource() {
+      const name = document.getElementById('src-name').value;
+      const type = document.getElementById('src-type').value;
+      const upright_prob = document.getElementById('src-upright').value || null;
+      const allowed_deck = document.getElementById('src-deck').value || null;
+      const r = await fetch(API + '/admin/content/source', { method: 'POST', headers: { 'Content-Type': 'application/json', ...adminAuth() }, body: JSON.stringify({ name, type, upright_prob: upright_prob ? parseFloat(upright_prob) : null, allowed_deck })});
+      alert('Done ' + r.status);
+    }
+    async function addSenSi() {
+      const source_id = parseInt(document.getElementById('sen-src').value, 10);
+      const slip_number = parseInt(document.getElementById('sen-num').value, 10);
+      const verse_content = document.getElementById('sen-verse').value;
+      const fate_summary = document.getElementById('sen-sum').value;
+      const r = await fetch(API + '/admin/content/sen-si', { method: 'POST', headers: { 'Content-Type': 'application/json', ...adminAuth() }, body: JSON.stringify({ source_id, slip_number, verse_content, fate_summary })});
+      alert('Done ' + r.status);
+    }
+    async function addTarot() {
+      const card_name = document.getElementById('tarot-name').value;
+      const meaning_upright = document.getElementById('tarot-up').value;
+      const meaning_reversed = document.getElementById('tarot-re').value;
+      const r = await fetch(API + '/admin/content/tarot', { method: 'POST', headers: { 'Content-Type': 'application/json', ...adminAuth() }, body: JSON.stringify({ card_name, meaning_upright, meaning_reversed })});
+      alert('Done ' + r.status);
+    }
+  </script>
+</body>
+</html>

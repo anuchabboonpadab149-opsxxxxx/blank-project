@@ -1,24 +1,28 @@
-Fortune API - FastAPI Implementation
+Fortune System - Microservices + Web
 
 Overview
-This is a working scaffold that implements the External (Public) API and Internal (Microservices) API described in the blueprint. It uses FastAPI, SQLAlchemy and JWT Auth with SQLite by default.
+This repository contains:
+- Microservices (FastAPI) for gateway, credit, payment, fortune
+- Docker Compose for local/prod orchestration
+- Static Web (web/) ready to deploy to a free domain
+- Basic test suite (pytest)
 
-Quickstart
-1) Install dependencies
-   python -m venv .venv
-   source .venv/bin/activate   # Windows: .venv\Scripts\activate
-   pip install -r requirements.txt
+Run with Docker Compose
+1) Set up environment (optional)
+   export INTERNAL_TOKEN=internal-secret
+   export PROMPTPAY_ID=0916974995
+   export ADMIN_TOKEN=admin-secret
 
-2) Run the server
-   uvicorn app.main:app --reload
+2) Build and start
+   docker compose up --build
 
-3) Default config (env)
-   - DATABASE_URL=sqlite:///./app.db
-   - JWT_SECRET=dev-secret-change-me
-   - JWT_EXPIRES_MIN=60
-   - INTERNAL_TOKEN=internal-secret
+Services
+- Gateway: http://localhost:8000
+- Credit:  http://localhost:8001
+- Payment: http://localhost:8002
+- Fortune: http://localhost:8003
 
-Key Endpoints (External)
+Gateway (Public API)
 - POST /auth/register
 - POST /auth/login
 - POST /auth/logout
@@ -30,16 +34,40 @@ Key Endpoints (External)
 - GET  /fortune/sources
 - POST /fortune/draw
 
-Key Endpoints (Internal)
-- POST /internal/credits/deduct
-- POST /internal/credits/add
-- GET  /internal/credits/{user_id}
-- POST /internal/payment/process-success
-- GET  /internal/payment/lookup/{tx_id}
-- POST /internal/fortune/execute
-- POST /internal/fortune/record
+Admin (via Gateway)
+- POST /admin/payment/confirm  (Header: Authorization: Bearer <ADMIN_TOKEN>)
+- POST /admin/content/source
+- POST /admin/content/sen-si
+- POST /admin/content/tarot
 
-Notes
-- Payment QR is mocked with a placeholder URL for now. Integrate a PromptPay QR generator later.
-- Data is seeded with a few packages, a Sen_Si source and sample slips, and a Tarot source with a few cards.
-- This monolith simulates microservices with Internal endpoints secured via X-Internal-Token.
+Internal Contracts
+- Credit: /internal/credits/add, /internal/credits/deduct, /internal/credits/{user_id}
+- Payment: /internal/payment/create, /internal/payment/verify, /internal/payment/confirm, /internal/payment/lookup/{tx_id}, /internal/payment/user-history/{user_id}, /internal/packages
+- Fortune: /internal/fortune/sources, /internal/fortune/execute, /internal/fortune/record, /internal/fortune/user-history/{user_id}, admin endpoints above
+
+PromptPay QR (Real)
+- Implemented via Python library `promptpay`
+- Payment service generates EMVCo payload and on-the-fly QR PNG
+- Response includes both qr_payload and qr_code_url
+
+Static Web
+- web/index.html: user flows (register/login, buy, scan QR, verify slip, draw fortune, credits/history)
+- web/admin.html: confirm payment and manage content
+- web/config.js: set API_BASE and ADMIN_BEARER (or set at runtime)
+
+Local Dev (without Docker)
+- Install deps: pip install -r requirements.txt
+- Start services in separate shells:
+  uvicorn services.credit.app.main:app --port 8001
+  uvicorn services.payment.app.main:app --port 8002
+  uvicorn services.fortune.app.main:app --port 8003
+  uvicorn services.gateway.app.main:app --port 8000
+- Open web/index.html in a static server and set API_BASE to http://localhost:8000
+
+Tests
+- Run: pytest
+
+Monolith (legacy)
+- Old monolith (app/) remains for reference and can be run with:
+  uvicorn app.main:app --reload
+  Note: Payment QR in monolith is mocked; the microservices path uses real PromptPay payload.
