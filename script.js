@@ -233,7 +233,58 @@ function attachShareButtons() {
     if (fbBtn) fbBtn.addEventListener('click', () => shareFortune("facebook"));
 }
 
-// 11) เริ่มต้นระบบเมื่อโหลดหน้า
+// 11) เมนูมือถือ / Sticky header
+function attachNavToggle() {
+    const toggle = document.querySelector('.nav-toggle');
+    const nav = document.querySelector('.main-nav');
+    if (!toggle || !nav) return;
+    toggle.addEventListener('click', () => {
+        const isOpen = nav.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+}
+
+// 12) FAQ Toggle
+function attachFaqToggle() {
+    const items = document.querySelectorAll('.faq-item');
+    items.forEach(it => {
+        const q = it.querySelector('.faq-question');
+        const a = it.querySelector('.faq-answer');
+        if (!q || !a) return;
+        q.addEventListener('click', () => {
+            const visible = a.style.display === 'block';
+            a.style.display = visible ? 'none' : 'block';
+        });
+    });
+}
+
+// 13) Back-to-top
+function attachBackToTop() {
+    const btn = document.getElementById('back-to-top');
+    if (!btn) return;
+    window.addEventListener('scroll', () => {
+        const show = window.scrollY > 400;
+        btn.style.display = show ? 'block' : 'none';
+    });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+}
+
+// 14) Contact form (mailto)
+function attachContactForm() {
+    const form = document.getElementById('contact-form');
+    if (!form) return;
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('name').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const message = document.getElementById('message').value.trim();
+        const subject = encodeURIComponent(`ติดต่อจากเว็บ: ${name}`);
+        const body = encodeURIComponent(`ชื่อ: ${name}\nอีเมล: ${email}\nข้อความ:\n${message}`);
+        window.location.href = `mailto:tony@karmicreflection.com?subject=${subject}&body=${body}`;
+    });
+}
+
+// 15) เริ่มต้นระบบเมื่อโหลดหน้า
 document.addEventListener('DOMContentLoaded', () => {
     startTeaserRotation();
     renderReviews();
@@ -241,7 +292,11 @@ document.addEventListener('DOMContentLoaded', () => {
     attachNavSmoothScroll();
     attachKeyboardSupport();
     attachShareButtons();
+    attachNavToggle();
+    attachFaqToggle();
+    attachBackToTop();
+    attachContactForm();
 });
 
-// 12) Click หลัก
+// 16) Click หลัก
 document.getElementById('shaking-button').addEventListener('click', generateFortune);
