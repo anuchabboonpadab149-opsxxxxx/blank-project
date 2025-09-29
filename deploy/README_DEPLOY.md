@@ -1,44 +1,59 @@
-# Backend Deployment Guide
+# Backend Deployment Guide (Production)
 
 This repository contains 4 services:
-- gateway (public API + admin)
+- gateway (Public API + Admin)
 - credit-service
 - payment-service (PromptPay QR)
 - fortune-service
 
-## Option A: Render (recommended free starter)
-1) Connect this repo to Render.
-2) Render auto-detects `deploy/render.yaml`. It will create 4 services.
-3) After first deploy, update environment variables on the `gateway` service:
-   - INTERNAL_TOKEN = internal-secret
-   - ADMIN_TOKEN = your-production-admin-token
-   - CREDIT_SERVICE_URL = the Render URL of credit-service (e.g., https://credit-service.onrender.com)
-   - PAYMENT_SERVICE_URL = the Render URL of payment-service
-   - FORTUNE_SERVICE_URL = the Render URL of fortune-service
-   - CORS_ALLOW_ORIGINS = *
-4) On `payment-service`, set:
-   - PROMPTPAY_ID = your PromptPay ID (phone or e-wallet ID)
-   - Optionally set PUBLIC_BASE_URL to the `payment-service` URL if you want its internal QR endpoint to be directly fetchable.
-5) Redeploy. Test gateway at its public URL.
+We recommend deploying to Render using the Blueprint file `deploy/render.yaml`.
+
+## One-time Setup on Render (5–10 minutes)
+1) Create a new Render account (or log in).
+2) Click "New" → "Blueprint" and connect this repository.
+3) Render will create 4 Web Services automatically from `deploy/render.yaml`.
+
+Environment variables:
+- We already set secure defaults in `deploy/render.yaml`:
+  - gateway:
+    - ADMIN_TOKEN = prod-admin-7KcG3N2wVtLxq8P4nY1rS9mZ6uQ0bF5D
+    - JWT_SECRET  = prod-jwt-3u7Q3V6rBnZq1mT8fWc4yH9pLk2s
+    - INTERNAL_TOKEN = internal-secret (change if desired)
+    - CREDIT_SERVICE_URL / PAYMENT_SERVICE_URL / FORTUNE_SERVICE_URL = placeholders; update after first deploy
+  - payment-service:
+    - PROMPTPAY_ID = 0916974995 (replace with your real PromptPay ID)
+    - PUBLIC_BASE_URL = set to the payment-service URL after first deploy
+- After the first deploy completes, copy each service URL (credit/payment/fortune) and paste them into the gateway service ENV:
+  - CREDIT_SERVICE_URL = https://<credit-service>.onrender.com
+  - PAYMENT_SERVICE_URL = https://<payment-service>.onrender.com
+  - FORTUNE_SERVICE_URL = https://<fortune-service>.onrender.com
+- Also set `PUBLIC_BASE_URL` on payment-service to its own Render URL.
+- Redeploy gateway and payment-service.
+
+Health checks:
+- All services expose /healthz; Render will keep them healthy.
 
 ## Option B: Docker Compose on a VPS
 1) Install Docker & Docker Compose.
-2) Create a `.env` file with:
+2) Create a `.env` file (example):
    ```
    INTERNAL_TOKEN=internal-secret
-   ADMIN_TOKEN=admin-secret
+   ADMIN_TOKEN=prod-admin-7KcG3N2wVtLxq8P4nY1rS9mZ6uQ0bF5D
    PROMPTPAY_ID=0916974995
    ```
 3) Run:
    ```
-   docker compose up --build
+   docker compose up --build -d
    ```
-4) Reverse proxy the `gateway` (http://localhost:8000) via Nginx and set HTTPS.
+4) Put Nginx in front of the gateway (http://localhost:8000) with HTTPS.
 
-## Web Frontend
-The static site reads API base from:
-- URL param: `?api=https://your-gateway-domain`
-- LocalStorage key `api_base_override`
-- Fallback in `web/config.js`
+## Web Frontend (Production)
+- The static site reads API base from:
+  - URL param: `?api=https://<gateway-domain>`
+  - LocalStorage: `api_base_override`
+  - Fallback in `web/config.js`
+- After gateway is live, update `web/config.js` to set API_BASE to your gateway domain and redeploy `web/`.
 
-Deploy the `web/` folder to any static host and point it to your gateway domain.
+## Admin Access
+- Visit: https://<frontend-domain>/admin/index.html
+- Enter `ADMIN_TOKEN` from gateway ENV to operate admin functions.

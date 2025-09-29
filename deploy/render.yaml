@@ -11,6 +11,7 @@ services:
       - key: DATABASE_URL
         value: sqlite:///./app.db
     healthCheckPath: /healthz
+
   - type: web
     name: payment-service
     env: docker
@@ -21,11 +22,14 @@ services:
       - key: INTERNAL_TOKEN
         value: internal-secret
       - key: PROMPTPAY_ID
-        value: 0916974995
+        value: "0916974995"
       - key: DATABASE_URL
         value: sqlite:///./app.db
-      # Optional: PUBLIC_BASE_URL can be set to this service URL after first deploy
+      # After first deploy, set PUBLIC_BASE_URL to payment-service URL from Render dashboard
+      # - key: PUBLIC_BASE_URL
+      #   value: https://<payment-service>.onrender.com
     healthCheckPath: /healthz
+
   - type: web
     name: fortune-service
     env: docker
@@ -40,6 +44,7 @@ services:
       - key: DATABASE_URL
         value: sqlite:///./app.db
     healthCheckPath: /healthz
+
   - type: web
     name: gateway
     env: docker
@@ -50,7 +55,10 @@ services:
       - key: INTERNAL_TOKEN
         value: internal-secret
       - key: ADMIN_TOKEN
-        value: admin-secret
+        value: prod-admin-7KcG3N2wVtLxq8P4nY1rS9mZ6uQ0bF5D
+      - key: JWT_SECRET
+        value: prod-jwt-3u7Q3V6rBnZq1mT8fWc4yH9pLk2s
+      # Update these three to the actual service URLs after first deploy:
       - key: CREDIT_SERVICE_URL
         value: https://credit-service.onrender.com
       - key: PAYMENT_SERVICE_URL
@@ -59,4 +67,4 @@ services:
         value: https://fortune-service.onrender.com
       - key: CORS_ALLOW_ORIGINS
         value: "*"
-    healthCheckPath: /
+    healthCheckPath: /healthz
