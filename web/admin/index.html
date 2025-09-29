@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - จัดการระบบแบบลำดับขั้น</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">🛠️ Admin Console</div>
+      <nav>
+        <a href="../index.html">หน้าบ้าน (Public)</a>
+      </nav>
+    </header>
+
+    <div class="hero card">
+      <div class="badge">ควบคุมระบบ 3 ขั้นตอน</div>
+      <h2>หลังบ้าน: ปลอดภัย ชัดเจน เป็นขั้นตอน</h2>
+      <p class="muted">1) ตั้งค่า Token  2) ยืนยันการชำระเงิน  3) จัดการเนื้อหา</p>
+    </div>
+
+    <div id="progress" class="stepper">
+      <div class="step active" data-step="1"><div class="dot">1</div><div class="label">ตั้งค่า Token</div></div>
+      <div class="step" data-step="2"><div class="dot">2</div><div class="label">ยืนยันการชำระเงิน</div></div>
+      <div class="step" data-step="3"><div class="dot">3</div><div class="label">จัดการเนื้อหา</div></div>
+    </div>
+
+    <!-- STEP 1 -->
+    <section id="step-1" class="card split">
+      <div>
+        <h3>ขั้นที่ 1: ตั้งค่า ADMIN_TOKEN</h3>
+        <p class="muted">ใส่ Token เพื่อยืนยันสิทธิ์แอดมิน ก่อนเข้าจัดการระบบ</p>
+        <input id="admin-token" placeholder="ใส่ ADMIN_TOKEN" />
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="primary" onclick="saveToken()">บันทึก</button>
+          <button class="ghost" onclick="clearToken()">ล้าง Token</button>
+        </div>
+      </div>
+      <aside class="card">
+        <p>สถานะ: <span id="status-token" class="badge">ยังไม่ได้ตั้งค่า</span></p>
+        <p class="muted">หากมีการ Deploy แบบ Production แนะนำให้เก็บ Token ใน Secret</p>
+      </aside>
+    </section>
+
+    <!-- STEP 2 -->
+    <section id="step-2" class="card hidden">
+      <h3>ขั้นที่ 2: ยืนยันการชำระเงิน</h3>
+      <div class="row">
+        <div>
+          <input id="tx-id" placeholder="transaction_id" />
+          <input id="user-id" placeholder="user_id" />
+          <input id="credits" placeholder="credits_to_add (ถ้าไม่ระบุจะใช้ตาม package)" />
+          <button class="primary" onclick="confirmPayment()">ยืนยัน</button>
+        </div>
+        <div>
+          <pre id="confirm-result" class="muted"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3 -->
+    <section id="step-3" class="card hidden">
+      <h3>ขั้นที่ 3: จัดการเนื้อหา</h3>
+      <div class="row">
+        <div class="card">
+          <h4>แหล่งทำนาย (Source)</h4>
+          <input id="src-name" placeholder="ชื่อ" />
+          <input id="src-type" placeholder="ชนิด (Sen_Si/Tarot)" />
+          <input id="src-upright" placeholder="upright_prob เช่น 0.7 (เฉพาะ Tarot)" />
+          <input id="src-deck" placeholder="allowed_deck เช่น Major หรือรายชื่อคั่นด้วย |" />
+          <button class="primary" onclick="upsertSource()">บันทึก</button>
+        </div>
+        <div class="card">
+          <h4>เพิ่มเนื้อหา เซียมซี</h4>
+          <input id="sen-src" placeholder="source_id" />
+          <input id="sen-num" placeholder="slip_number" />
+          <textarea id="sen-verse" placeholder="verse_content"></textarea>
+          <input id="sen-sum" placeholder="fate_summary" />
+          <button class="primary" onclick="addSenSi()">เพิ่ม</button>
+        </div>
+      </div>
+      <div class="card">
+        <h4>เพิ่มเนื้อหา ไพ่ยิปซี</h4>
+        <input id="tarot-name" placeholder="card_name" />
+        <textarea id="tarot-up" placeholder="meaning_upright"></textarea>
+        <textarea id="tarot-re" placeholder="meaning_reversed"></textarea>
+        <button class="primary" onclick="addTarot()">เพิ่ม</button>
+      </div>
+    </section>
+
+    <div class="footer">© Fortune Admin. ออกแบบหลังบ้านใหม่ให้ใช้งานเป็นลำดับขั้น</div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script>
+    const API = window.APP_CONFIG.API_BASE;
+
+    function adminAuth() {
+      const token = localStorage.getItem('admin_token') || window.APP_CONFIG.ADMIN_BEARER || '';
+      return token ? { 'Authorization': 'Bearer ' + token } : {};
+    }
+    function hasToken(){ return !!(localStorage.getItem('admin_token') || window.APP_CONFIG.ADMIN_BEARER); }
+
+    function goto(step){
+      for (let i=1;i<=3;i++){
+        const sec = document.getElementById('step-'+i);
+        if (i===step) sec.classList.remove('hidden'); else sec.classList.add('hidden');
+      }
+      document.querySelectorAll('#progress .step').forEach(s=>{
+        const n = parseInt(s.dataset.step,10);
+        s.classList.remove('active','done');
+        if (n===step) s.classList.add('active');
+        else if (n<step) s.classList.add('done');
+      });
+    }
+    function setStep(n){
+      if (n>=2 && !hasToken()) { alert('กรุณาตั้งค่า ADMIN_TOKEN ก่อน'); return; }
+      goto(n);
+    }
+
+    function saveToken() {
+      const t = document.getElementById('admin-token').value.trim();
+      if (!t) return alert('กรุณาใส่ Token');
+      localStorage.setItem('admin_token', t);
+      document.getElementById('status-token').textContent = 'พร้อมใช้งาน';
+      setStep(2);
+    }
+    function clearToken(){
+      localStorage.removeItem('admin_token');
+      document.getElementById('status-token').textContent = 'ยังไม่ได้ตั้งค่า';
+      setStep(1);
+    }
+
+    async function confirmPayment() {
+      const tx = document.getElementById('tx-id').value.trim();
+      const uid = document.getElementById('user-id').value.trim();
+      const credits = document.getElementById('credits').value.trim();
+      if (!tx || !uid) return alert('กรอก transaction_id และ user_id');
+      const qs = new URLSearchParams({ transaction_id: tx, user_id: uid, credits_to_add: credits || ''}).toString();
+      const r = await fetch(API + '/admin/payment/confirm?' + qs, { method: 'POST', headers: { ...adminAuth() }});
+      const data = await r.json();
+      document.getElementById('confirm-result').textContent = JSON.stringify(data, null, 2);
+    }
+    async function upsertSource() {
+      const name = document.getElementById('src-name').value.trim();
+      const type = document.getElementById('src-type').value.trim();
+      const upright_prob = document.getElementById('src-upright').value.trim();
+      const allowed_deck = document.getElementById('src-deck').value.trim();
+      if (!name || !type) return alert('กรอกชื่อและชนิด');
+      const body = { name, type, upright_prob: upright_prob ? parseFloat(upright_prob) : null, allowed_deck: allowed_deck || null };
+      const r = await fetch(API + '/admin/content/source', { method: 'POST', headers: { 'Content-Type': 'application/json', ...adminAuth() }, body: JSON.stringify(body)});
+      alert('บันทึกแล้ว (' + r.status + ')');
+    }
+    async function addSenSi() {
+      const source_id = parseInt(document.getElementById('sen-src').value, 10);
+      const slip_number = parseInt(document.getElementById('sen-num').value, 10);
+      const verse_content = document.getElementById('sen-verse').value.trim();
+      const fate_summary = document.getElementById('sen-sum').value.trim();
+      if (!source_id || !slip_number || !verse_content) return alert('กรอกข้อมูลให้ครบ');
+      const r = await fetch(API + '/admin/content/sen-si', { method: 'POST', headers: { 'Content-Type': 'application/json', ...adminAuth() }, body: JSON.stringify({ source_id, slip_number, verse_content, fate_summary })});
+      alert('เพิ่มแล้ว (' + r.status + ')');
+    }
+    async function addTarot() {
+      const card_name = document.getElementById('tarot-name').value.trim();
+      const meaning_upright = document.getElementById('tarot-up').value.trim();
+      const meaning_reversed = document.getElementById('tarot-re').value.trim();
+      if (!card_name || !meaning_upright || !meaning_reversed) return alert('กรอกข้อมูลให้ครบ');
+      const r = await fetch(API + '/admin/content/tarot', { method: 'POST', headers: { 'Content-Type': 'application/json', ...adminAuth() }, body: JSON.stringify({ card_name, meaning_upright, meaning_reversed })});
+      alert('เพิ่มแล้ว (' + r.status + ')');
+    }
+
+    // init
+    document.querySelectorAll('#progress .step').forEach(s=>{
+      s.addEventListener('click', ()=> setStep(parseInt(s.dataset.step,10)));
+    });
+    if (hasToken()) {
+      document.getElementById('status-token').textContent = 'พร้อมใช้งาน';
+      setStep(2);
+    } else {
+      setStep(1);
+    }
+  </script>
+</body>
+</html>

@@ -3,106 +3,126 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Fortune - เสี่ยงเซียมซี / ไพ่ยิปซี</title>
+  <title>Fortune - ขั้นตอนใช้งานเรียบง่าย</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: "Prompt", system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background: #0f1020; color: #f4f6fb; }
-    .container { max-width: 920px; margin: 0 auto; padding: 24px; }
-    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .brand { font-size: 20px; font-weight: 600; }
-    .card { background: #17182f; border: 1px solid #2b2c4a; border-radius: 12px; padding: 16px; margin: 12px 0; }
-    input, select, button, textarea { background: #0b0d1a; border: 1px solid #2b2c4a; color: #fff; border-radius: 8px; padding: 10px 12px; outline: none; }
-    button { cursor: pointer; transition: all .2s; }
-    button.primary { background: #5a59ff; border-color: #5a59ff; }
-    button.primary:hover { filter: brightness(1.1); }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
-    .qr { background: #0b0d1a; border-radius: 8px; display: inline-block; padding: 10px; }
-    .muted { color: #a1a6c3; }
-    .hidden { display: none; }
-    nav a { color: #a1a6c3; margin-right: 12px; text-decoration: none; }
-    nav a.active { color: #fff; font-weight: 600; }
-    .footer { opacity: 0.6; font-size: 13px; margin-top: 32px; }
-    .pkg { display: flex; align-items: center; justify-content: space-between; padding: 12px; border: 1px dashed #2b2c4a; border-radius: 8px; }
-    .best { color: #ffbd59; font-weight: 600; margin-left: 8px; }
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="container">
     <header>
       <div class="brand">🔮 Fortune</div>
       <nav>
-        <a href="#" id="tab-home" class="active">หน้าหลัก</a>
-        <a href="#" id="tab-fortune">ทำนาย</a>
-        <a href="admin.html">Admin</a>
+        <a href="admin/index.html">หลังบ้าน (Admin)</a>
       </nav>
     </header>
 
-    <div id="home" class="card">
-      <h2>เข้าสู่ระบบ</h2>
+    <div class="hero card">
+      <div class="badge">เริ่มต้นใช้งานใน 5 ขั้นตอน</div>
+      <h2>ใช้งานง่าย ชัดเจน เป็นลำดับ</h2>
+      <p class="muted">1) เข้าสู่ระบบ  2) เลือกแพ็กเกจ  3) ชำระเงิน  4) เสี่ยงทาย  5) ดูประวัติ</p>
+    </div>
+
+    <div id="progress" class="stepper">
+      <div class="step" data-step="1"><div class="dot">1</div><div class="label">เข้าสู่ระบบ</div></div>
+      <div class="step" data-step="2"><div class="dot">2</div><div class="label">เลือกแพ็กเกจ</div></div>
+      <div class="step" data-step="3"><div class="dot">3</div><div class="label">ชำระเงิน</div></div>
+      <div class="step" data-step="4"><div class="dot">4</div><div class="label">เสี่ยงทาย</div></div>
+      <div class="step" data-step="5"><div class="dot">5</div><div class="label">ประวัติ</div></div>
+    </div>
+
+    <!-- STEP 1 -->
+    <section id="step-1" class="card split">
+      <div>
+        <h3>ขั้นที่ 1: เข้าสู่ระบบ</h3>
+        <div class="row">
+          <div>
+            <h4 class="muted">สมัครสมาชิก</h4>
+            <input id="reg-email" placeholder="อีเมล" />
+            <input id="reg-pass" type="password" placeholder="รหัสผ่าน" />
+            <button class="primary" onclick="register()">สมัคร</button>
+          </div>
+          <div>
+            <h4 class="muted">เข้าสู่ระบบ</h4>
+            <input id="login-email" placeholder="อีเมล" />
+            <input id="login-pass" type="password" placeholder="รหัสผ่าน" />
+            <button class="primary" onclick="login()">เข้า</button>
+          </div>
+        </div>
+      </div>
+      <aside class="card">
+        <div id="me" class="hidden">
+          <p>สถานะ: <span class="badge">เข้าสู่ระบบแล้ว</span></p>
+          <p class="muted">User ID: <span id="me-id"></span></p>
+          <button class="ghost" onclick="logout()">ออกจากระบบ</button>
+        </div>
+        <div id="me-guest">
+          <p class="muted">ยังไม่ได้เข้าสู่ระบบ</p>
+        </div>
+      </aside>
+    </section>
+
+    <!-- STEP 2 -->
+    <section id="step-2" class="card">
+      <h3>ขั้นที่ 2: เลือกแพ็กเกจ</h3>
+      <p class="muted">เลือกแพ็กเกจที่ต้องการ จากนั้นไปขั้นตอน “ชำระเงิน”</p>
+      <div id="packages" class="grid"></div>
+    </section>
+
+    <!-- STEP 3 -->
+    <section id="step-3" class="card hidden">
+      <h3>ขั้นที่ 3: ชำระเงินผ่าน PromptPay</h3>
+      <p class="muted">สแกน QR เพื่อชำระเงิน และอัปโหลดลิงก์สลิปเพื่อแจ้งชำระ</p>
       <div class="row">
         <div>
-          <h3 class="muted">สมัครสมาชิก</h3>
-          <input id="reg-email" placeholder="อีเมล" />
-          <input id="reg-pass" type="password" placeholder="รหัสผ่าน" />
-          <button class="primary" onclick="register()">สมัคร</button>
+          <div id="qr" class="qr"></div>
+          <div><small class="muted">payload: <code id="qr-payload"></code></small></div>
         </div>
         <div>
-          <h3 class="muted">เข้าสู่ระบบ</h3>
-          <input id="login-email" placeholder="อีเมล" />
-          <input id="login-pass" type="password" placeholder="รหัสผ่าน" />
-          <button class="primary" onclick="login()">เข้า</button>
+          <input id="slip-url" placeholder="ลิงก์สลิป (อัปโหลดรูปสลิปไปเก็บที่ใดก็ได้แล้ววาง URL)" style="width: 100%;" />
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="primary" onclick="verify()">แจ้งชำระเงิน</button>
+            <button class="ghost" onclick="loadCredits()">เช็คเครดิตอีกครั้ง</button>
+          </div>
+          <p class="muted" style="margin-top:6px">หมายเหตุ: ระบบจะเพิ่มสิทธิ์ให้เมื่อแอดมินยืนยันการชำระเงินแล้ว</p>
         </div>
       </div>
-      <div id="me" class="hidden">
-        <p>คุณได้เข้าสู่ระบบแล้ว: <span id="me-id"></span></p>
-        <button onclick="logout()">ออกจากระบบ</button>
-      </div>
-    </div>
+    </section>
 
-    <div class="card">
-      <h2>แพ็กเกจ</h2>
-      <div id="packages" class="grid"></div>
-    </div>
-
-    <div id="payment" class="card hidden">
-      <h2>ชำระเงินผ่าน PromptPay</h2>
-      <p class="muted">สแกน QR เพื่อชำระเงิน</p>
-      <div id="qr" class="qr"></div>
-      <div><small class="muted">payload: <code id="qr-payload"></code></small></div>
-      <div style="margin-top:10px">
-        <input id="slip-url" placeholder="ลิงก์สลิป (อัปโหลดรูปไปเก็บที่ใดก็ได้แล้ววาง URL)" style="width: 100%;" />
-        <button class="primary" onclick="verify()">แจ้งชำระเงิน</button>
+    <!-- STEP 4 -->
+    <section id="step-4" class="card hidden">
+      <h3>ขั้นที่ 4: เสี่ยงคำทำนาย</h3>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span class="badge">เครดิตคงเหลือ: <b id="credits">-</b></span>
+        <button class="ghost" onclick="loadCredits()">รีเฟรชเครดิต</button>
       </div>
-    </div>
-
-    <div id="fortune" class="card hidden">
-      <h2>เสี่ยงคำทำนาย</h2>
-      <div>
-        <label>เลือกแหล่งทำนาย</label>
-        <select id="source"></select>
+      <div class="row" style="margin-top:12px">
+        <div>
+          <label>เลือกแหล่งทำนาย</label>
+          <select id="source"></select>
+          <div style="margin-top:8px">
+            <button class="primary" onclick="draw()">เสี่ยงทาย 1 สิทธิ์</button>
+          </div>
+        </div>
+        <div id="drawn" class="hidden">
+          <h4 id="result-key"></h4>
+          <p id="verse"></p>
+          <p><b>สรุป:</b> <span id="summary"></span></p>
+          <p class="muted">เครดิตคงเหลือหลังเสี่ยงทาย: <b id="balance"></b></p>
+        </div>
       </div>
-      <div style="margin-top:8px">
-        <button class="primary" onclick="draw()">เสี่ยงทาย 1 สิทธิ์</button>
-      </div>
-      <div id="drawn" class="hidden" style="margin-top:12px">
-        <h3 id="result-key"></h3>
-        <p id="verse"></p>
-        <p><b>สรุป:</b> <span id="summary"></span></p>
-        <p>เครดิตคงเหลือ: <span id="balance"></span></p>
-      </div>
-    </div>
+    </section>
 
-    <div class="card">
-      <h2>เครดิตคงเหลือ</h2>
-      <p><span id="credits">-</span></p>
-      <button onclick="loadCredits()">รีเฟรชเครดิต</button>
-      <button onclick="loadHistory()">ดูประวัติ</button>
-      <pre id="history" class="muted"></pre>
-    </div>
+    <!-- STEP 5 -->
+    <section id="step-5" class="card hidden">
+      <h3>ขั้นที่ 5: ประวัติการซื้อ/ทำนาย</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="ghost" onclick="loadHistory()">รีเฟรชประวัติ</button>
+      </div>
+      <pre id="history" class="muted" style="margin-top:10px"></pre>
+    </section>
 
-    <div class="footer">© Fortune Demo. สำหรับทดสอบระบบเท่านั้น</div>
+    <div class="footer">© Fortune. ออกแบบใหม่ให้ใช้งานเป็นลำดับขั้น ชัดเจน สะดวก</div>
   </div>
 
   <script src="config.js"></script>
@@ -110,29 +130,58 @@
     const API = window.APP_CONFIG.API_BASE;
     let token = localStorage.getItem('token') || '';
     let userId = localStorage.getItem('user_id') || '';
+    let currentTx = null;
+
     const auth = () => token ? { 'Authorization': 'Bearer ' + token } : {};
+
+    function goto(step){
+      // show panel
+      for (let i=1;i<=5;i++){
+        const sec = document.getElementById('step-'+i);
+        if (!sec) continue;
+        if (i === step) sec.classList.remove('hidden'); else sec.classList.add('hidden');
+      }
+      // update stepper
+      const steps = document.querySelectorAll('#progress .step');
+      steps.forEach(s => {
+        const n = parseInt(s.dataset.step,10);
+        s.classList.remove('active','done');
+        if (n === step) s.classList.add('active');
+        else if (n < step) s.classList.add('done');
+      });
+    }
+    function canGo(step){
+      // gate conditions
+      if (step>=2 && !token) { alert('กรุณาเข้าสู่ระบบก่อน'); return false; }
+      return true;
+    }
+    function setStep(step){ if (canGo(step)) goto(step); }
 
     function setLoggedIn(id, tok) {
       userId = id; token = tok;
       localStorage.setItem('user_id', id);
       localStorage.setItem('token', tok);
       document.getElementById('me').classList.remove('hidden');
+      document.getElementById('me-guest').classList.add('hidden');
       document.getElementById('me-id').textContent = id;
       loadCredits();
       loadPackages();
       loadSources();
+      setStep(2);
     }
 
     async function register() {
-      const email = document.getElementById('reg-email').value;
+      const email = document.getElementById('reg-email').value.trim();
       const password = document.getElementById('reg-pass').value;
+      if (!email || !password) return alert('กรอกอีเมลและรหัสผ่าน');
       const r = await fetch(API + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
       const data = await r.json();
       if (r.ok) setLoggedIn(data.user_id, data.token); else alert(JSON.stringify(data));
     }
     async function login() {
-      const email = document.getElementById('login-email').value;
+      const email = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-pass').value;
+      if (!email || !password) return alert('กรอกอีเมลและรหัสผ่าน');
       const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
       const data = await r.json();
       if (r.ok) setLoggedIn(data.user_id, data.token); else alert(JSON.stringify(data));
@@ -140,7 +189,10 @@
     function logout() {
       localStorage.removeItem('user_id'); localStorage.removeItem('token');
       token=''; userId='';
+      currentTx=null;
       document.getElementById('me').classList.add('hidden');
+      document.getElementById('me-guest').classList.remove('hidden');
+      setStep(1);
     }
 
     async function loadPackages() {
@@ -162,8 +214,8 @@
       });
     }
 
-    let currentTx = null;
     async function buy(package_id) {
+      if (!token) return alert('กรุณาเข้าสู่ระบบก่อน');
       const r = await fetch(API + '/payment/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth() },
@@ -172,14 +224,15 @@
       const data = await r.json();
       if (!r.ok) return alert(JSON.stringify(data));
       currentTx = data.transaction_id;
-      document.getElementById('qr').innerHTML = `<img src="${data.qr_code_url}" width="200" height="200" />`;
+      document.getElementById('qr').innerHTML = `<img src="${data.qr_code_url}" width="220" height="220" />`;
       document.getElementById('qr-payload').textContent = data.qr_payload;
-      document.getElementById('payment').classList.remove('hidden');
+      setStep(3);
     }
 
     async function verify() {
-      const slip = document.getElementById('slip-url').value;
-      if (!currentTx) return;
+      const slip = document.getElementById('slip-url').value.trim();
+      if (!currentTx) return alert('ยังไม่มีรายการซื้อ');
+      if (!slip) return alert('วางลิงก์สลิปเพื่อแจ้งชำระเงิน');
       const r = await fetch(API + '/payment/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth() },
@@ -194,6 +247,11 @@
       const r = await fetch(API + '/user/credits', { headers: { ...auth() } });
       const data = await r.json();
       document.getElementById('credits').textContent = data.credit_balance;
+      // allow next step if has credits
+      if (data.credit_balance > 0) {
+        // prefetch sources
+        if (!document.getElementById('source').options.length) await loadSources();
+      }
     }
 
     async function loadSources() {
@@ -209,6 +267,8 @@
     }
 
     async function draw() {
+      const credits = parseInt(document.getElementById('credits').textContent || '0', 10);
+      if (!credits || credits<=0) return alert('เครดิตไม่พอ กรุณาชำระเงินและรอแอดมินยืนยัน');
       const source_id = parseInt(document.getElementById('source').value, 10);
       const r = await fetch(API + '/fortune/draw', {
         method: 'POST',
@@ -222,7 +282,9 @@
       document.getElementById('summary').textContent = data.fate_summary || '-';
       document.getElementById('balance').textContent = data.new_credit_balance;
       document.getElementById('drawn').classList.remove('hidden');
-      loadCredits();
+      await loadCredits();
+      setStep(5);
+      await loadHistory();
     }
 
     async function loadHistory() {
@@ -231,15 +293,24 @@
       document.getElementById('history').textContent = JSON.stringify(data, null, 2);
     }
 
-    // tabs
-    document.getElementById('tab-home').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('home').classList.remove('hidden'); document.getElementById('fortune').classList.add('hidden'); document.getElementById('tab-home').classList.add('active'); document.getElementById('tab-fortune').classList.remove('active'); });
-    document.getElementById('tab-fortune').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('home').classList.add('hidden'); document.getElementById('fortune').classList.remove('hidden'); document.getElementById('tab-home').classList.remove('active'); document.getElementById('tab-fortune').classList.add('active'); });
-
     // init
+    // clickable steps with gating
+    document.querySelectorAll('#progress .step').forEach(s=>{
+      s.addEventListener('click', ()=>{
+        const n = parseInt(s.dataset.step,10);
+        setStep(n);
+      });
+    });
+
     if (token) {
       document.getElementById('me').classList.remove('hidden');
+      document.getElementById('me-guest').classList.add('hidden');
       document.getElementById('me-id').textContent = userId;
+      setStep(2);
+    } else {
+      setStep(1);
     }
+
     loadPackages();
     loadSources();
     if (token) loadCredits();
