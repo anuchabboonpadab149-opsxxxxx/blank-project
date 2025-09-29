@@ -85,6 +85,24 @@ class FortuneDrawError(BaseModel):
     error: str
 
 
+class TarotMultiDrawRequest(BaseModel):
+    source_id: int
+    count: int  # 5 or 10
+
+
+class TarotCardOut(BaseModel):
+    name: str
+    orientation: str
+    meaning: str
+
+
+class TarotMultiDrawResponse(BaseModel):
+    fortune_id: str
+    result_key: str
+    cards: List[TarotCardOut]
+    new_credit_balance: int
+
+
 # History
 class BuyHistoryItem(BaseModel):
     transaction_id: str

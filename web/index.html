@@ -103,20 +103,39 @@
         <span class="badge">เครดิตคงเหลือ: <b id="credits">-</b></span>
         <button class="ghost" onclick="loadCredits()">รีเฟรชเครดิต</button>
       </div>
-      <div class="row" style="margin-top:12px">
-        <div>
-          <label>เลือกแหล่งทำนาย</label>
-          <select id="source"></select>
-          <div style="margin-top:8px">
-            <button class="primary" onclick="draw()">เสี่ยงทาย 1 สิทธิ์</button>
-          </div>
+
+      <div class="tabs">
+        <div id="tab-sensi" class="tab active">เซียมซี</div>
+        <div id="tab-tarot" class="tab">ไพ่ยิปซี</div>
+      </div>
+
+      <!-- hidden dropdown just to preserve logic; not shown -->
+      <div style="display:none">
+        <label>เลือกแหล่งทำนาย</label>
+        <select id="source"></select>
+      </div>
+
+      <!-- Sen-Si panel -->
+      <div id="panel-sensi">
+        <div style="margin-top:8px">
+          <button class="primary" onclick="draw()">เขย่าเซียมซี (ใช้ 1 สิทธิ์)</button>
         </div>
-        <div id="drawn" class="hidden">
+        <div id="drawn" class="hidden" style="margin-top:10px">
           <h4 id="result-key"></h4>
           <p id="verse"></p>
           <p><b>สรุป:</b> <span id="summary"></span></p>
           <p class="muted">เครดิตคงเหลือหลังเสี่ยงทาย: <b id="balance"></b></p>
         </div>
+      </div>
+
+      <!-- Tarot panel -->
+      <div id="panel-tarot" class="hidden">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 6px">
+          <button class="primary" onclick="drawTarot(5)">ดู 5 ใบ (ใช้ 1 สิทธิ์)</button>
+          <button class="primary" onclick="drawTarot(10)">ดู 10 ใบ (ใช้ 2 สิทธิ์)</button>
+        </div>
+        <div id="tarot-result" class="tarot-grid"></div>
+        <div id="tarot-balance" class="muted" style="margin-top:6px"></div>
       </div>
     </section>
 
@@ -140,6 +159,8 @@
     let userId = localStorage.getItem('user_id') || '';
     let currentTx = null;
     let selectedSourceId = null;
+    let sourcesList = [];
+    let tarotSourceId = null;
 
     const auth = () => token ? { 'Authorization': 'Bearer ' + token } : {};
     function showFlow(){ document.getElementById('flow').classList.remove('hidden'); }
@@ -185,7 +206,8 @@
       loadPackages();
       loadSources().then(()=>{
         ensureSelectSource();
-        if (selectedSourceId) setStep(4);
+        // go to step 2 (เลือกแพ็กเกจ) ตามที่ร้องขอ
+        setStep(2);
       });
     }
 
@@ -318,6 +340,8 @@
     async function loadSources() {
       const r = await fetch(API + '/fortune/sources');
       const data = await r.json();
+      sourcesList = data || [];
+      tarotSourceId = (sourcesList.find(s=>s.type==='Tarot')||{}).id || null;
       const el = document.getElementById('source');
       el.innerHTML = '';
       data.forEach(s => {
@@ -334,9 +358,9 @@
         setStep(1);
       } else {
         showFlow();
-        // make sure dropdown has this source selected
         ensureSelectSource();
-        setStep(4);
+        // หลังเข้าวัด ไปขั้นเลือกแพ็กเกจตามที่ร้องขอ
+        setStep(2);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -344,11 +368,11 @@
     async function draw() {
       const credits = parseInt(document.getElementById('credits').textContent || '0', 10);
       if (!credits || credits<=0) return alert('เครดิตไม่พอ กรุณาชำระเงินและรอแอดมินยืนยัน');
-      const source_id = parseInt(document.getElementById('source').value, 10);
+      const srcId = selectedSourceId || parseInt(document.getElementById('source').value, 10);
       const r = await fetch(API + '/fortune/draw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth() },
-        body: JSON.stringify({ source_id })
+        body: JSON.stringify({ source_id: srcId })
       });
       const data = await r.json();
       if (data.error) return alert(data.error);
@@ -357,6 +381,35 @@
       document.getElementById('summary').textContent = data.fate_summary || '-';
       document.getElementById('balance').textContent = data.new_credit_balance;
       document.getElementById('drawn').classList.remove('hidden');
+      await loadCredits();
+      setStep(5);
+      await loadHistory();
+    }
+
+    async function drawTarot(count){
+      if (!tarotSourceId) return alert('ยังไม่มีแหล่งไพ่ยิปซี');
+      const credits = parseInt(document.getElementById('credits').textContent || '0', 10);
+      const cost = count === 10 ? 2 : 1;
+      if (credits < cost) return alert('เครดิตไม่พอ');
+      const r = await fetch(API + '/fortune/tarot/draw-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth() },
+        body: JSON.stringify({ source_id: tarotSourceId, count })
+      });
+      if (!r.ok) {
+        const err = await r.text();
+        return alert(err || 'ไม่สามารถทำนายได้');
+      }
+      const data = await r.json();
+      const grid = document.getElementById('tarot-result');
+      grid.innerHTML = '';
+      (data.cards||[]).forEach(c=>{
+        const el = document.createElement('div');
+        el.className = 'tarot-card';
+        el.innerHTML = `<h5>${c.name} (${c.orientation})</h5><div class="muted">${c.meaning}</div>`;
+        grid.appendChild(el);
+      });
+      document.getElementById('tarot-balance').textContent = 'เครดิตคงเหลือ: ' + data.new_credit_balance;
       await loadCredits();
       setStep(5);
       await loadHistory();
@@ -414,6 +467,23 @@
       document.getElementById('me-guest').classList.add('hidden');
       document.getElementById('me-id').textContent = userId;
     }
+
+    // tabs switch
+    function activateTab(which){
+      const sensi = document.getElementById('panel-sensi');
+      const tarot = document.getElementById('panel-tarot');
+      const ts = document.getElementById('tab-sensi');
+      const tt = document.getElementById('tab-tarot');
+      if (which==='tarot'){
+        sensi.classList.add('hidden'); tarot.classList.remove('hidden');
+        ts.classList.remove('active'); tt.classList.add('active');
+      } else {
+        sensi.classList.remove('hidden'); tarot.classList.add('hidden');
+        ts.classList.add('active'); tt.classList.remove('active');
+      }
+    }
+    document.getElementById('tab-sensi').addEventListener('click', ()=> activateTab('sensi'));
+    document.getElementById('tab-tarot').addEventListener('click', ()=> activateTab('tarot'));
 
     loadPackages();
     loadSources();

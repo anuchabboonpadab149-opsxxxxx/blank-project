@@ -78,6 +78,30 @@ def execute(payload: dict, authorization: str | None = Header(default=None, alia
         }
 
 
+@router.post("/internal/fortune/tarot-multi")
+def tarot_multi(payload: dict, authorization: str | None = Header(default=None, alias="X-Internal-Token"), db: Session = Depends(get_db)):
+    require_internal(authorization)
+    source_id = int(payload.get("source_id"))
+    count = int(payload.get("count", 5))
+    src = db.query(FortuneSource).filter(FortuneSource.id == source_id).first()
+    if not src or src.type != "Tarot":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid tarot source")
+
+    upright_prob = src.upright_prob if src.upright_prob is not None else DEFAULT_UPRIGHT_PROB
+    allowed_deck = src.allowed_deck
+    query = db.query(TarotContent)
+    if allowed_deck:
+        if allowed_deck == "Major":
+            query = query.filter(TarotContent.card_name.in_(list(MAJOR_ARCANA)))
+        else:
+            names = [n.strip() for n in allowed_deck.split("|") if n.strip()]
+            if names:
+                query = query.filter(TarotContent.card_name.in_(names))
+    cards = query.all()
+    if not cards:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="No }
+
+
 @router.post("/internal/fortune/record")
 def record(payload: dict, authorization: str | None = Header(default=None, alias="X-Internal-Token"), db: Session = Depends(get_db)):
     require_internal(authorization)
