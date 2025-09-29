@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: credit
+  namespace: fortune
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: credit
+  template:
+    metadata:
+      labels:
+        app: credit
+    spec:
+      containers:
+        - name: credit
+          image: fortune-credit:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: fortune-secrets
+                  key: INTERNAL_TOKEN
+            - name: DATABASE_URL
+              value: "sqlite:///./credit.db"
+          ports:
+            - containerPort: 8001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: credit
+  namespace: fortune
+spec:
+  selector:
+    app: credit
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP

@@ -161,6 +161,25 @@
     let selectedSourceId = null;
     let sourcesList = [];
     let tarotSourceId = null;
+    let senSiSourceId = null;
+
+    // DEMO fallback (when backend isn’t connected yet)
+    const DEMO_GATEWAY = API.includes('gateway-production.example');
+    let DEMO = DEMO_GATEWAY;
+    function enableDemo(){ DEMO = true; console.warn('[DEMO] Enabled'); }
+    const DEMO_KEYS = {
+      credits: 'demo_credits',
+      history: 'demo_history',
+      tx: 'demo_tx_map'
+    };
+    function demoGet(key, def){ try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch(_){ return def; } }
+    function demoSet(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+    function demoInit(){
+      if (localStorage.getItem(DEMO_KEYS.credits) == null) demoSet(DEMO_KEYS.credits, 0);
+      if (localStorage.getItem(DEMO_KEYS.history) == null) demoSet(DEMO_KEYS.history, { buy_history: [], fortune_history: [] });
+      if (localStorage.getItem(DEMO_KEYS.tx) == null) demoSet(DEMO_KEYS.tx, {});
+    }
+    if (DEMO) demoInit();
 
     const auth = () => token ? { 'Authorization': 'Bearer ' + token } : {};
     function showFlow(){ document.getElementById('flow').classList.remove('hidden'); }
@@ -230,17 +249,29 @@
       const email = document.getElementById('reg-email').value.trim();
       const password = document.getElementById('reg-pass').value;
       if (!email || !password) return alert('กรอกอีเมลและรหัสผ่าน');
-      const r = await fetch(API + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-      const data = await r.json();
-      if (r.ok) setLoggedIn(data.user_id, data.token); else alert(JSON.stringify(data));
+      try{
+        const r = await fetch(API + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+        const data = await r.json();
+        if (r.ok) setLoggedIn(data.user_id, data.token);
+        else { throw new Error(JSON.stringify(data)); }
+      } catch(e){
+        enableDemo(); demoInit();
+        setLoggedIn('demo-user', 'demo-token');
+      }
     }
     async function login() {
       const email = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-pass').value;
       if (!email || !password) return alert('กรอกอีเมลและรหัสผ่าน');
-      const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-      const data = await r.json();
-      if (r.ok) setLoggedIn(data.user_id, data.token); else alert(JSON.stringify(data));
+      try{
+        const r = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+        const data = await r.json();
+        if (r.ok) setLoggedIn(data.user_id, data.token);
+        else { throw new Error(JSON.stringify(data)); }
+      } catch(e){
+        enableDemo(); demoInit();
+        setLoggedIn('demo-user', 'demo-token');
+      }
     }
     function logout() {
       localStorage.removeItem('user_id'); localStorage.removeItem('token');
@@ -252,26 +283,65 @@
     }
 
     async function loadPackages() {
-      const r = await fetch(API + '/packages');
-      const data = await r.json();
       const el = document.getElementById('packages');
       el.innerHTML = '';
-      data.forEach(pkg => {
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.innerHTML = `
-          <div class="pkg">
-            <div><b>${pkg.name}</b> <span class="muted">(${pkg.credits} สิทธิ์)</span> ${pkg.is_best_seller ? '<span class="best">Best Seller</span>' : ''}</div>
-            <div><b>${pkg.price.toFixed(2)}</b> บาท</div>
-          </div>
-          <button class="primary" ${!token ? 'disabled' : ''} onclick="buy(${pkg.id})">ซื้อแพ็กเกจนี้</button>
-        `;
-        el.appendChild(div);
-      });
+      try{
+        const r = await fetch(API + '/packages');
+        if (!r.ok) throw new Error('packages not ok');
+        const data = await r.json();
+        data.forEach(pkg => {
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = `
+            <div class="pkg">
+              <div><b>${pkg.name}</b> <span class="muted">(${pkg.credits} สิทธิ์)</span> ${pkg.is_best_seller ? '<span class="best">Best Seller</span>' : ''}</div>
+              <div><b>${pkg.price.toFixed(2)}</b> บาท</div>
+            </div>
+            <button class="primary" ${!token ? 'disabled' : ''} onclick="buy(${pkg.id})">ซื้อแพ็กเกจนี้</button>
+          `;
+          el.appendChild(div);
+        });
+      } catch(e){
+        // DEMO fallback
+        enableDemo(); demoInit();
+        const demoPkgs = [
+          { id: 1, name: 'แพ็กเล็ก', price: 29.0, credits: 1, is_best_seller: false },
+          { id: 2, name: 'แพ็กกลาง', price: 79.0, credits: 3, is_best_seller: true },
+          { id: 3, name: 'แพ็กใหญ่', price: 199.0, credits: 10, is_best_seller: false },
+        ];
+        demoPkgs.forEach(pkg=>{
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = `
+            <div class="pkg">
+              <div><b>${pkg.name}</b> <span class="muted">(${pkg.credits} สิทธิ์)</span> ${pkg.is_best_seller ? '<span class="best">Best Seller</span>' : ''}</div>
+              <div><b>${pkg.price.toFixed(2)}</b> บาท</div>
+            </div>
+            <button class="primary" ${!token ? 'disabled' : ''} onclick="buy(${pkg.id})">ซื้อแพ็กเกจนี้</button>
+          `;
+          el.appendChild(div);
+        });
+      }
     }
 
     async function buy(package_id) {
       if (!token) return alert('กรุณาเข้าสู่ระบบก่อน');
+      if (DEMO) {
+        const tx = 'demo-' + Math.random().toString(36).slice(2,10);
+        currentTx = tx;
+        // sample QR (placeholder)
+        document.getElementById('qr').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=DEMO-${tx}" width="220" height="220" />`;
+        document.getElementById('tx-status').textContent = 'สถานะ: CREATED';
+        setStep(3);
+        // save demo buy history
+        const hist = demoGet(DEMO_KEYS.history, {buy_history:[], fortune_history:[]});
+        hist.buy_history.push({ transaction_id: tx, package_id, amount: 0, status: 'CREATED', created_at: new Date().toISOString() });
+        demoSet(DEMO_KEYS.history, hist);
+        const txmap = demoGet(DEMO_KEYS.tx, {});
+        txmap[tx] = { status: 'CREATED' };
+        demoSet(DEMO_KEYS.tx, txmap);
+        return;
+      }
       const r = await fetch(API + '/payment/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth() },
@@ -289,6 +359,21 @@
       const slip = document.getElementById('slip-url').value.trim();
       if (!currentTx) return alert('ยังไม่มีรายการซื้อ');
       if (!slip) return alert('วางลิงก์สลิปเพื่อแจ้งชำระเงิน');
+      if (DEMO) {
+        document.getElementById('tx-status').textContent = 'สถานะ: PENDING';
+        alert('DEMO: แจ้งชำระเงินแล้ว ระบบจะยืนยันอัตโนมัติในไม่กี่วินาที');
+        const before = parseInt(document.getElementById('credits').textContent || '0', 10);
+        // simulate confirm in 6s and add 3 credits
+        setTimeout(()=>{
+          const txmap = demoGet(DEMO_KEYS.tx, {});
+          if (txmap[currentTx]) txmap[currentTx].status = 'CONFIRMED';
+          demoSet(DEMO_KEYS.tx, txmap);
+          const c = demoGet(DEMO_KEYS.credits, 0) + 3;
+          demoSet(DEMO_KEYS.credits, c);
+        }, 6000);
+        startCreditWatcher(before);
+        return;
+      }
       const r = await fetch(API + '/payment/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth() },
@@ -304,6 +389,7 @@
 
     async function getCredits(){
       if (!token) return 0;
+      if (DEMO) return demoGet(DEMO_KEYS.credits, 0);
       const r = await fetch(API + '/user/credits', { headers: { ...auth() } });
       const data = await r.json();
       return parseInt(data.credit_balance || 0, 10);
@@ -317,16 +403,19 @@
       }
     }
 
-    function renderTemples(sources){
+    function renderTemplesActive() {
+      // Always show 4 active plaques (map to available sources; duplicate ids if necessary)
       const list = document.getElementById('temples');
       list.innerHTML = '';
-      // ensure at least 4 plaques (fill with coming soon)
-      const items = [...sources];
-      while(items.length < 4){
-        items.push({ id: 0, name: 'เร็วๆนี้', type: 'ComingSoon' });
-      }
-      items.slice(0,4).forEach(s=>{
-        const isSoon = s.type === 'ComingSoon';
+      const sen = senSiSourceId || (sourcesList.find(s=>s.type==='Sen_Si')||{}).id || selectedSourceId;
+      const tar = tarotSourceId || (sourcesList.find(s=>s.type==='Tarot')||{}).id || selectedSourceId;
+      const items = [
+        { id: sen || 1, name: 'วัดเทพพระแม่อุษามาเทวี', type: 'Sen_Si' },
+        { id: sen || 1, name: 'วัดหลวงพ่อพัฒน์', type: 'Sen_Si' },
+        { id: sen || 1, name: 'วัดโพธิ์ชัย หนองคาย หลวงพ่อพระใส', type: 'Sen_Si' },
+        { id: tar || 99, name: 'ดูไพ่ยิปซี (5/10 ใบ)', type: 'Tarot' },
+      ];
+      items.forEach(s=>{
         const icon = s.type === 'Tarot' ? '🎴' : '🛕';
         const div = document.createElement('div');
         div.className = 'plaque';
@@ -339,32 +428,47 @@
             <div class="temple-icon">${icon}</div>
             <div>
               <h3 class="plaque-title">${s.name}</h3>
-              ${isSoon
-                ? `<span class="btn-soon">เร็วๆนี้</span>`
-                : `<button class="btn-gold" data-id="${s.id}">เข้าวัด</button>`
-              }
+              <button class="btn-gold" data-id="${s.id}">เข้าวัด</button>
             </div>
           </div>
         `;
-        if (!isSoon) {
-          div.querySelector('button').addEventListener('click', ()=> enterTemple(s.id));
-        }
+        div.querySelector('button').addEventListener('click', ()=> enterTemple(s.id));
         list.appendChild(div);
       });
     }
     async function loadSources() {
-      const r = await fetch(API + '/fortune/sources');
-      const data = await r.json();
-      sourcesList = data || [];
-      tarotSourceId = (sourcesList.find(s=>s.type==='Tarot')||{}).id || null;
-      const el = document.getElementById('source');
-      el.innerHTML = '';
-      data.forEach(s => {
-        const op = document.createElement('option');
-        op.value = s.id; op.textContent = `${s.name} (${s.type})`;
-        el.appendChild(op);
-      });
-      renderTemples(data);
+      try{
+        const r = await fetch(API + '/fortune/sources');
+        if (!r.ok) throw new Error('sources not ok');
+        const data = await r.json();
+        sourcesList = data || [];
+        tarotSourceId = (sourcesList.find(s=>s.type==='Tarot')||{}).id || null;
+        senSiSourceId = (sourcesList.find(s=>s.type==='Sen_Si')||{}).id || null;
+        const el = document.getElementById('source');
+        el.innerHTML = '';
+        (data||[]).forEach(s => {
+          const op = document.createElement('option');
+          op.value = s.id; op.textContent = `${s.name} (${s.type})`;
+          el.appendChild(op);
+        });
+        renderTemplesActive();
+      } catch(e){
+        enableDemo(); demoInit();
+        // DEMO local sources
+        sourcesList = [
+          { id: 1, name:'วัดจำลอง (เซียมซี)', type:'Sen_Si' },
+          { id: 99, name:'ไพ่ยิปซี (จำลอง)', type:'Tarot' },
+        ];
+        tarotSourceId = 99; senSiSourceId = 1;
+        const el = document.getElementById('source');
+        el.innerHTML = '';
+        sourcesList.forEach(s=>{
+          const op = document.createElement('option');
+          op.value = s.id; op.textContent = `${s.name} (${s.type})`;
+          el.appendChild(op);
+        });
+        renderTemplesActive();
+      }
     }
 
     function enterTemple(id){
@@ -392,6 +496,27 @@
       const credits = parseInt(document.getElementById('credits').textContent || '0', 10);
       if (!credits || credits<=0) return alert('เครดิตไม่พอ กรุณาชำระเงินและรอแอดมินยืนยัน');
       const srcId = selectedSourceId || parseInt(document.getElementById('source').value, 10);
+      if (DEMO){
+        const c = demoGet(DEMO_KEYS.credits, 0);
+        if (c <= 0) return alert('เครดิตไม่พอ');
+        demoSet(DEMO_KEYS.credits, c-1);
+        const n = Math.floor(Math.random()*100)+1;
+        const resKey = `เซียมซี ใบที่ ${n}`;
+        const verse = `คำทำนายใบที่ ${n} โชคดี มีโชคลาภ`;
+        const hist = demoGet(DEMO_KEYS.history, {buy_history:[], fortune_history:[]});
+        const id = 'f-'+Date.now();
+        hist.fortune_history.push({ id, source_id: srcId, source_type: 'Sen_Si', result_key: resKey, reading_date: new Date().toISOString(), verse_content: verse, fate_summary: 'โชคดี' });
+        demoSet(DEMO_KEYS.history, hist);
+        document.getElementById('result-key').textContent = resKey;
+        document.getElementById('verse').textContent = verse;
+        document.getElementById('summary').textContent = 'โชคดี';
+        document.getElementById('balance').textContent = c-1;
+        document.getElementById('drawn').classList.remove('hidden');
+        await loadCredits();
+        setStep(5);
+        await loadHistory();
+        return;
+      }
       const r = await fetch(API + '/fortune/draw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth() },
@@ -410,10 +535,42 @@
     }
 
     async function drawTarot(count){
-      if (!tarotSourceId) return alert('ยังไม่มีแหล่งไพ่ยิปซี');
+      if (!tarotSourceId && !DEMO) return alert('ยังไม่มีแหล่งไพ่ยิปซี');
       const credits = parseInt(document.getElementById('credits').textContent || '0', 10);
       const cost = count === 10 ? 2 : 1;
       if (credits < cost) return alert('เครดิตไม่พอ');
+
+      if (DEMO){
+        const cardsList = ['The Fool','The Magician','The High Priestess','The Empress','The Emperor','The Hierophant','The Lovers','The Chariot','Strength','The Hermit'];
+        const n = count;
+        const chosen = [];
+        for (let i=0;i<n;i++){
+          const name = cardsList[Math.floor(Math.random()*cardsList.length)];
+          const up = Math.random()<0.5;
+          chosen.push({ name, orientation: up?'Upright':'Reversed', meaning: up?'ความหมายเชิงบวก':'ความหมายเชิงท้าทาย' });
+        }
+        const grid = document.getElementById('tarot-result');
+        grid.innerHTML = '';
+        chosen.forEach(c=>{
+          const el = document.createElement('div');
+          el.className = 'tarot-card';
+          el.innerHTML = `<h5>${c.name} (${c.orientation})</h5><div class="muted">${c.meaning}</div>`;
+          grid.appendChild(el);
+        });
+        const c = demoGet(DEMO_KEYS.credits, 0) - cost;
+        demoSet(DEMO_KEYS.credits, c);
+        document.getElementById('tarot-balance').textContent = 'เครดิตคงเหลือ: ' + c;
+        // push history
+        const hist = demoGet(DEMO_KEYS.history, {buy_history:[], fortune_history:[]});
+        const id = 't-'+Date.now();
+        hist.fortune_history.push({ id, source_id: (tarotSourceId||99), source_type:'Tarot', result_key:`Tarot x${n}`, reading_date:new Date().toISOString(), verse_content: chosen.map(x=>`${x.name} (${x.orientation})`).join(', '), fate_summary: null });
+        demoSet(DEMO_KEYS.history, hist);
+        await loadCredits();
+        setStep(5);
+        await loadHistory();
+        return;
+      }
+
       const r = await fetch(API + '/fortune/tarot/draw-multi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth() },
@@ -439,6 +596,10 @@
     }
 
     async function loadHistory() {
+      if (DEMO){
+        document.getElementById('history').textContent = JSON.stringify(demoGet(DEMO_KEYS.history, {buy_history:[], fortune_history:[]}), null, 2);
+        return;
+      }
       const r = await fetch(API + '/user/history/all', { headers: { ...auth() } });
       const data = await r.json();
       document.getElementById('history').textContent = JSON.stringify(data, null, 2);
@@ -447,6 +608,12 @@
     let creditWatchTimer = null;
     async function updateTxStatus(){
       if (!currentTx) return;
+      if (DEMO){
+        const txmap = demoGet(DEMO_KEYS.tx, {});
+        const st = (txmap[currentTx]||{}).status || 'CREATED';
+        document.getElementById('tx-status').textContent = 'สถานะ: ' + st;
+        return;
+      }
       try {
         const r = await fetch(API + '/payment/status/' + encodeURIComponent(currentTx), { headers: { ...auth() }});
         if (r.ok) {

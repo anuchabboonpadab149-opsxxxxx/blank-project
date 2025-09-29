@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: fortune
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: fortune-gateway:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: fortune-secrets
+                  key: INTERNAL_TOKEN
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: fortune-secrets
+                  key: ADMIN_TOKEN
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: fortune-secrets
+                  key: JWT_SECRET
+            - name: CREDIT_SERVICE_URL
+              value: "http://credit:8001"
+            - name: PAYMENT_SERVICE_URL
+              value: "http://payment:8002"
+            - name: FORTUNE_SERVICE_URL
+              value: "http://fortune:8003"
+            - name: CORS_ALLOW_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: fortune-config
+                  key: CORS_ALLOW_ORIGINS
+          ports:
+            - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: fortune
+spec:
+  selector:
+    app: gateway
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP

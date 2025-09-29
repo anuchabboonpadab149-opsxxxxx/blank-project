@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fortune-config
+  namespace: fortune
+data:
+  CORS_ALLOW_ORIGINS: "*"
+  TAROT_UPRIGHT_PROB: "0.5"
