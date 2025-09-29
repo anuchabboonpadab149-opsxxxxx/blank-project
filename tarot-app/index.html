@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ดูดวงไพ่ยิปซีออนไลน์ | Tarot Studio</title>
+  <meta name="description" content="เว็บดูดวงไพ่ยิปซีออนไลน์ สับไพ่จริง เปิดไพ่ 1 ใบ, 4 ใบ, Celtic Cross และ 10 ใบ พร้อมดวงรายวัน รายเดือน รายปี เลือกหัวข้อ การเงิน การงาน ความรัก โชคลาภ บริวาร สุขภาพ" />
+  <meta name="theme-color" content="#151320" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <div class="brand-mark">♠︎</div>
+        <div class="brand-text">
+          <h1>Tarot Studio</h1>
+          <p class="subtitle">เว็บดูดวงไพ่ยิปซีสับไพ่จริง เหมือนจับไพ่ด้วยมือ</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="#reading">ดูไพ่ยิปซี</a>
+        <a href="#daily">ดวงรายวัน/เดือน/ปี</a>
+        <a href="#guide">วิธีใช้งาน</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container hero-inner">
+      <div class="hero-text">
+        <h2>ตั้งสมาธิ • สับไพ่ • ตัดไพ่ • เลือกไพ่</h2>
+        <p>
+          ออกแบบประสบการณ์เหมือนสับไพ่จริง ไม่ใช่แค่แอนิเมชัน
+          รองรับการอ่านไพ่หลากหลาย: 1 ใบ, 4 ใบ, Celtic Cross และ 10 ใบ
+        </p>
+        <div class="inspired">
+          <span>แรงบันดาลใจจาก:</span>
+          <ul>
+            <li>มายโหรา (myhora) – ดูดวงฟรีหลายหัวข้อ</li>
+            <li>ชาตริกซ์เก็ต (changtrixget) – เปิดไพ่ 10 ใบ ทำนายตรงๆ</li>
+            <li>ชิทสึเรนทาโร่ – สับไพ่จริง เลือกไพ่ได้ตามใจ</li>
+          </ul>
+        </div>
+      </div>
+      <div class="hero-art">
+        <div class="card-stack">
+          <div class="card back"></div>
+          <div class="card back"></div>
+          <div class="card back"></div>
+          <div class="card back"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="main">
+    <!-- Tarot Reading -->
+    <section id="reading" class="section">
+      <div class="container">
+        <h3>เลือกรูปแบบการอ่านไพ่</h3>
+        <div class="controls">
+          <div class="control-group">
+            <label for="userName">ชื่อ (ใส่หรือไม่ใส่ก็ได้)</label>
+            <input id="userName" type="text" placeholder="เช่น กานต์, Pim, etc." />
+          </div>
+          <div class="control-group">
+            <label for="readingType">รูปแบบการอ่าน</label>
+            <select id="readingType">
+              <option value="single">ไพ่ 1 ใบ (คำตอบเร็ว)</option>
+              <option value="four">ไพ่ 4 ใบ (รัก/งาน/เงิน/สุขภาพ)</option>
+              <option value="celtic">Celtic Cross (10 ใบ)</option>
+              <option value="ten">ไพ่ 10 ใบ (วงจรชีวิต)</option>
+            </select>
+          </div>
+          <div class="control-group inline">
+            <button id="focusBtn" class="ghost">ตั้งสมาธิ</button>
+            <button id="shuffleBtn">สับไพ่</button>
+            <button id="cutBtn" class="ghost">ตัดไพ่</button>
+            <button id="startReadingBtn" class="primary">เริ่มเปิดไพ่</button>
+          </div>
+        </div>
+
+        <div class="deck-area">
+          <div id="deck" class="deck"></div>
+          <div id="spreadBoard" class="spread-board hidden"></div>
+        </div>
+
+        <div class="results">
+          <h4>ผลการอ่าน</h4>
+          <div id="resultsList" class="results-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Daily/Monthly/Yearly -->
+    <section id="daily" class="section alt">
+      <div class="container">
+        <h3>ดูดวงรายวัน/เดือน/ปี (เลือกหัวข้อได้)</h3>
+        <p class="note">สไตล์ MyHora: เลือกหัวข้อและเปิดไพ่ 1 ใบต่อหัวข้อ ใช้การสุ่มแบบมีเมล็ดตามวันที่</p>
+        <div class="daily-controls">
+          <div class="control-group">
+            <label for="dailyScope">ช่วงเวลา</label>
+            <select id="dailyScope">
+              <option value="day">รายวัน</option>
+              <option value="month">รายเดือน</option>
+              <option value="year">รายปี</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="topics">หัวข้อที่สนใจ</label>
+            <div class="topics">
+              <label><input type="checkbox" value="การเงิน" checked /> การเงิน</label>
+              <label><input type="checkbox" value="โชคลาภ" checked /> โชคลาภ</label>
+              <label><input type="checkbox" value="การงาน" checked /> การงาน</label>
+              <label><input type="checkbox" value="ความรัก" checked /> ความรัก</label>
+              <label><input type="checkbox" value="บริวาร" /> บริวาร</label>
+              <label><input type="checkbox" value="สุขภาพ" /> สุขภาพ</label>
+            </div>
+          </div>
+          <div class="control-group inline">
+            <button id="dailyReadBtn" class="primary">เปิดไพ่ตามหัวข้อ</button>
+          </div>
+        </div>
+        <div id="dailyResults" class="results-list"></div>
+      </div>
+    </section>
+
+    <!-- Guide -->
+    <section id="guide" class="section">
+      <div class="container">
+        <h3>ข้อควรจำในการดูดวง</h3>
+        <ul class="guide-list">
+          <li><strong>ตั้งสมาธิ:</strong> ให้จิตสงบก่อนเปิดไพ่ จะช่วยให้การทำนายชัดเจน</li>
+          <li><strong>ความละเอียด:</strong> เลือกไพ่เมื่อพร้อม หากมีสิ่งรบกวน ควรค่อยกลับมาใหม่</li>
+          <li><strong>ความหมายของไพ่:</strong> การอ่านไพ่ประกอบด้วยการเปิดไพ่และตีความไพ่แต่ละใบ</li>
+        </ul>
+        <p class="disclaimer">
+          หมายเหตุ: ผลการอ่านเป็นแนวทางในการไตร่ตรอง ไม่ใช่คำตัดสินเด็ดขาด โปรดใช้วิจารณญาณและฟังหัวใจของตนเอง
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>
+        © 2025 Tarot Studio — สร้างสรรค์ประสบการณ์ดูไพ่ยิปซีออนไลน์
+      </div>
+      <div class="footer-links">
+        <a href="#reading">ดูไพ่</a>
+        <a href="#daily">ดวงรายวัน/เดือน/ปี</a>
+        <a href="#guide">คู่มือ</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
