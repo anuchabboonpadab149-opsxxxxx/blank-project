@@ -31,3 +31,8 @@ app.include_router(admin_router.router, prefix="/admin", tags=["Admin"])
 @app.get("/")
 def root():
     return {"message": "Gateway running"}
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}

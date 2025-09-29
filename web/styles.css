@@ -55,6 +55,7 @@ nav a.active{color:#fff;font-weight:600}
 .plaque .edge.left{left:-70px}
 .temple-card{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:16px}
 .temple-icon{font-size:62px;line-height:1.1;text-align:center}
+.temple-img{width:100px;height:auto;display:block;margin:0 auto}
 .plaque-title{margin:0 0 10px 0;font-size:22px;letter-spacing:.4px}
 .btn-gold{display:inline-block;padding:10px 18px;border-radius:12px;border:2px solid #d89a2f;background:linear-gradient(180deg, #ffd782 0%, #f5a442 100%);color:#4a2700;font-weight:700;box-shadow:0 4px 0 #b9781f}
 .btn-gold:active{transform:translateY(1px);box-shadow:0 3px 0 #b9781f}

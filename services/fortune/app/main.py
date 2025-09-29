@@ -20,3 +20,8 @@ app.include_router(router)
 @app.get("/")
 def root():
     return {"message": "Fortune service running"}
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
