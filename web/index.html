@@ -164,6 +164,9 @@
 
     const auth = () => token ? { 'Authorization': 'Bearer ' + token } : {};
     function showFlow(){ document.getElementById('flow').classList.remove('hidden'); }
+    function getSourceById(id){
+      return (sourcesList || []).find(s => s.id === id) || null;
+    }
 
     function goto(step){
       // show panel
@@ -186,7 +189,19 @@
       if (step>=2 && !token) { alert('กรุณาเข้าสู่ระบบก่อน'); return false; }
       return true;
     }
-    function setStep(step){ if (canGo(step)) goto(step); }
+    function setStep(step){
+      if (!canGo(step)) return;
+      showFlow();
+      goto(step);
+      if (step === 4){
+        const src = selectedSourceId ? getSourceById(selectedSourceId) : null;
+        if (src && src.type === 'Tarot'){
+          activateTab('tarot');
+        } else {
+          activateTab('sensi');
+        }
+      }
+    }
 
     function ensureSelectSource(){
       if (selectedSourceId) {
@@ -354,6 +369,14 @@
 
     function enterTemple(id){
       selectedSourceId = id;
+      // set tab based on selected source type
+      const src = (sourcesList||[]).find(s=>s.id===id);
+      if (src && src.type === 'Tarot'){
+        tarotSourceId = id;
+        activateTab('tarot');
+      } else {
+        activateTab('sensi');
+      }
       if (!token) {
         setStep(1);
       } else {

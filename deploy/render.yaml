@@ -1,0 +1,62 @@
+services:
+  - type: web
+    name: credit-service
+    env: docker
+    dockerfilePath: services/credit/Dockerfile
+    autoDeploy: true
+    plan: free
+    envVars:
+      - key: INTERNAL_TOKEN
+        value: internal-secret
+      - key: DATABASE_URL
+        value: sqlite:///./app.db
+    healthCheckPath: /healthz
+  - type: web
+    name: payment-service
+    env: docker
+    dockerfilePath: services/payment/Dockerfile
+    autoDeploy: true
+    plan: free
+    envVars:
+      - key: INTERNAL_TOKEN
+        value: internal-secret
+      - key: PROMPTPAY_ID
+        value: 0916974995
+      - key: DATABASE_URL
+        value: sqlite:///./app.db
+      # Optional: PUBLIC_BASE_URL can be set to this service URL after first deploy
+    healthCheckPath: /healthz
+  - type: web
+    name: fortune-service
+    env: docker
+    dockerfilePath: services/fortune/Dockerfile
+    autoDeploy: true
+    plan: free
+    envVars:
+      - key: INTERNAL_TOKEN
+        value: internal-secret
+      - key: TAROT_UPRIGHT_PROB
+        value: "0.5"
+      - key: DATABASE_URL
+        value: sqlite:///./app.db
+    healthCheckPath: /healthz
+  - type: web
+    name: gateway
+    env: docker
+    dockerfilePath: services/gateway/Dockerfile
+    autoDeploy: true
+    plan: free
+    envVars:
+      - key: INTERNAL_TOKEN
+        value: internal-secret
+      - key: ADMIN_TOKEN
+        value: admin-secret
+      - key: CREDIT_SERVICE_URL
+        value: https://credit-service.onrender.com
+      - key: PAYMENT_SERVICE_URL
+        value: https://payment-service.onrender.com
+      - key: FORTUNE_SERVICE_URL
+        value: https://fortune-service.onrender.com
+      - key: CORS_ALLOW_ORIGINS
+        value: "*"
+    healthCheckPath: /
