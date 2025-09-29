@@ -408,30 +408,42 @@ const el = {
 };
 
 let workingDeck = [...TAROT_DECK];
-let users = []; // [{phone, name, password, credits}]
-let session = null; // current user {phone, name, credits}
-let pendingOrder = null; // {id, package, amount}
+let currentOrderId = null; // latest order ID for status polling
 
-/* Storage */
-function loadUsers() {
-  try {
-    users = JSON.parse(localStorage.getItem("ts_users") || "[]");
-  } catch {
-    users = [];
+/* Auth token and API */
+const TOKEN_KEY = "ts_token";
+function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY) || "";
+}
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+const API_BASE = window.API_BASE || "";
+async function api(path, method = "GET", body = null) {
+  const headers = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const res = await fetch(`${API_BASE}/api${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data && (data.error || data.message) ? (data.error || data.message) : res.statusText;
+    throw new Error(msg);
   }
+  return data;
 }
-function saveUsers() {
-  localStorage.setItem("ts_users", JSON.stringify(users));
-}
-function setSession(user) {
-  session = { phone: user.phone, name: user.name, credits: user.credits || 0 };
-  localStorage.setItem("ts_session", JSON.stringify(session));
-}
-function loadSession() {
+async function getMe() {
   try {
-    session = JSON.parse(localStorage.getItem("ts_session") || "null");
+    return await api("/me", "GET");
   } catch {
-    session = null;
+    return null;
   }
 }
 
@@ -498,7 +510,7 @@ function switchTab(tab) {
     el.loginPane.classList.add("hidden");
   }
 }
-function signup() {
+async function signup() {
   const name = (el.signupName.value || "").trim();
   const phone = (el.signupPhone.value || "").trim();
   const password = (el.signupPassword.value || "").trim();
@@ -506,32 +518,35 @@ function signup() {
     alert("กรุณากรอกข้อมูลให้ครบ");
     return;
   }
-  if (findUserByPhone(phone)) {
-    alert("เบอร์นี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบ");
-    switchTab("login");
-    el.loginPhone.value = phone;
-    return;
-  }
-  const user = { name, phone, password, credits: 0 };
-  users.push(user);
-  saveUsers();
-  setSession(user);
-  closeAuthModal();
-  updateAccountPanel();
-}
-function login() {
+  try {
+    const resp = await api("/signup", "POST", { name, phone, password });
+    if (resp && resp.token) {
+      setToken(resp.token);
+      closeAuthModal();
+      updateAccountPanel();
+    } else {
+      alert("สมัครสมาชิกไม่สำเร็จ");
+    }
+  } catch (e) {
+    alert(e.message || "สมัครสมาชิกไม่สำเร็จ");
+ _code }new
+</}
+
+async function login() {
   const phone = (el.loginPhone.value || "").trim();
   const password = (el.loginPassword.value || "").trim();
-  const user = findUserByPhone(phone);
-  if (!user || user.password !== password) {
-    alert("เบอร์/รหัสผ่านไม่ถูกต้อง");
+  if (!phone || !password) {
+    alert("กรุณากรอกเบอร์และรหัสผ่าน");
     return;
   }
-  setSession(user);
-  closeAuthModal();
-  updateAccountPanel();
-}
-
+  try {
+    const resp = await api("/login", "POST", { phone, password });
+    if (resp && resp.token) {
+      setToken(resp.token);
+      closeAuthModal();
+      updateAccountPanel();
+    } else {
+      alert
 /* Topup modal */
 function openTopupModal() {
   if (!session) {
@@ -548,9 +563,16 @@ function closeTopupModal() {
   el.topupModal.classList.add("hidden");
   el.paymentPane.classList.add("hidden");
 }
-function renderPackages() {
+async function renderPackages() {
   el.packageGrid.innerHTML = "";
-  PACKAGES.forEach(pkg => {
+  let pkgs = [];
+  try {
+    pkgs = await api("/packages", "GET");
+  } catch {
+    // fallback to static list if server not reachable
+    pkgs = PACKAGES;
+  }
+  pkgs.forEach(pkg => {
     const box = document.createElement("div");
     box.className = "package";
     const title = document.createElement("div");
@@ -570,10 +592,11 @@ function renderPackages() {
     box.appendChild(price);
     box.appendChild(cta);
     el.packageGrid.appendChild(box);
-  });
-}
-function selectPackage(pkg) {
-  const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  }_code);new
+</}
+async function selectPackage(pkg) {
+  try {
+    const resp =now()}-${Math.floor(Math.random() * 1000)}`;
   pendingOrder = { id: orderId, package: pkg, amount: pkg.price };
   const payload = buildPromptPayPayloadMobile({
     phone: PROMPTPAY_PHONE,
@@ -586,52 +609,53 @@ function selectPackage(pkg) {
   el.paymentPane.classList.remove("hidden");
 }
 
-/* Verification (simulation mode) */
-const AUTO_VERIFY_SIMULATION = true;
-function verifyPayment() {
-  if (!pendingOrder) return;
-  if (!AUTO_VERIFY_SIMULATION) {
-    alert("ระบบตรวจสอบอัตโนมัติจริงต้องเชื่อมต่อผู้ให้บริการรับชำระ กรุณาติดต่อเพื่อเปิดใช้งาน");
-    return;
-  }
+/* Verification (real polling via backend order status) */
+async function verifyPayment() {
+  if (!currentOrderId) return;
   el.verifyBtn.disabled = true;
   el.verifyBtn.textContent = "กำลังตรวจสอบ...";
-  // Simulate verification delay
-  setTimeout(() => {
+  try {
+    const status = await api(`/orders/${currentOrderId}`, "GET");
+    if (status && status.status === "paid") {
+      alert("ชำระเงินสำเร็จ! ระบบเพิ่มสิทธิ์ให้ในบัญชีของคุณแล้ว");
+      // Refresh account panel
+      updateAccountPanel();
+      currentOrderId = null;
+      closeTopupModal();
+    } else if (status && status.status === "failed") {
+      alert("การชำระเงินล้มเหลว กรุณาลองใหม่");
+    } else {
+      alert("ยังไม่พบการชำระ กรุณารอสักครู่แล้วกดตรวจสอบอีกครั้ง");
+    }
+  } catch (e) {
+    alert(e.message || "ตรวจสอบคำสั่งซื้อไม่ได้");
+  } finally {
     el.verifyBtn.disabled = false;
     el.verifyBtn.textContent = "ตรวจสอบการชำระเงินอัตโนมัติ";
-    // Credit top-up
-    const user = findUserByPhone(session.phone);
-    user.credits = (user.credits || 0) + pendingOrder.package.credits;
-    saveUsers();
-    setSession(user);
-    updateAccountPanel();
-    alert(`ชำระเงินสำเร็จ! เพิ่มสิทธิ์ ${pendingOrder.package.credits} สิทธิ์ให้บัญชีของคุณแล้ว`);
-    pendingOrder = null;
-    closeTopupModal();
-  }, 2000);
+  }
 }
 
 /* ========= READING FLOW (AUTH + CREDIT) ========= */
 
 function ensureAuth() {
-  if (!session) {
+  if (!getToken()) {
     openAuthModal();
     return false;
   }
   return true;
 }
-function consumeOneCredit() {
-  const user = findUserByPhone(session.phone);
-  const current = user.credits || 0;
-  if (current < 1) return false;
-  user.credits = current - 1;
-  saveUsers();
-  setSession(user);
-  updateAccountPanel();
-  return true;
+async function consumeOneCredit() {
+  try {
+    await api("/credits/consume", "POST");
+    updateAccountPanel();
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
-function requireCreditOrTopup() {
+async function requireCreditOrTopup() {
+  if (!ensureAuth()) return false;
+  const ok = await consumetOrTopup() {
   if (!ensureAuth()) return false;
   if (!consumeOneCredit()) {
     alert("สิทธิ์คงเหลือไม่เพียงพอ กรุณาเติมสิทธิ์ก่อนใช้งาน");
@@ -787,8 +811,8 @@ function performCut() {
   }, 1200);
 }
 
-function startReading() {
-  if (!requireCreditOrTopup()) return;
+async function startReading() {
+  if (!(await requireCreditOrTopup())) return;
 
   clearResults();
   el.spreadBoard.classList.remove("hidden");
@@ -851,8 +875,8 @@ function startReading() {
   });
 }
 
-function doDailyReading() {
-  if (!requireCreditOrTopup()) return;
+async function doDailyReading() {
+  if (!(await requireCreditOrTopup())) return;
 
   el.dailyResults.innerHTML = "";
   const scope = el.dailyScope.value;
@@ -884,8 +908,6 @@ function doDailyReading() {
 /* ========= INIT ========= */
 
 function init() {
-  loadUsers();
-  loadSession();
   updateAccountPanel();
 
   renderDeckPreview(18);
