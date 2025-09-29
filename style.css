@@ -9,6 +9,8 @@
     --font-poppins: 'Poppins', sans-serif;
 }
 
+html { scroll-behavior: smooth; }
+
 body {
     font-family: var(--font-mitr);
     background-color: var(--color-primary);
@@ -36,6 +38,9 @@ header a {
     color: var(--color-text-light);
     text-decoration: none;
     margin-left: 20px;
+}
+header a:hover {
+    color: var(--color-accent);
 }
 
 /* --- CTA Button (ปุ่มเด่น) --- */
