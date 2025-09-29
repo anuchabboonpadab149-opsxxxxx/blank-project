@@ -288,7 +288,14 @@ button.ghost {
   padding: 12px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 8px;
+}
+.card-img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  object-fit: contain;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
 }
 .card-name {
   font-family: 'Playfair Display', serif;

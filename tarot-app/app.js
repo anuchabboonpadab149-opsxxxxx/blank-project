@@ -670,29 +670,72 @@ function createCardBackEl() {
   cardEl.appendChild(inner);
   return cardEl;
 }
+
+/* Image URL mapping (Wikimedia Commons public domain) */
+function imageUrl(card) {
+  if (card.arcana === "Major") {
+    const names = {
+      0: "Fool", 1: "Magician", 2: "High_Priestess", 3: "Empress", 4: "Emperor",
+      5: "Hierophant", 6: "Lovers", 7: "Chariot", 8: "Strength", 9: "Hermit",
+      10: "Wheel_of_Fortune", 11: "Justice", 12: "Hanged_Man", 13: "Death",
+      14: "Temperance", 15: "Devil", 16: "Tower", 17: "Star", 18: "Moon",
+      19: "Sun", 20: "Judgement", 21: "World"
+    };
+    const num = String(card.number).padStart(2, "0");
+    const fname = `RWS_Tarot_${num}_${names[card.number]}.jpg`;
+    return `https://commons.wikimedia.org/wiki/Special:FilePath/${fname}`;
+  }
+  const suitMap = { Cups: "Cups", Swords: "Swords", Wands: "Wands", Pentacles: "Pents" };
+  const suitName = suitMap[card.suit] || card.suit || "Cups";
+  const num = String(card.number).padStart(2, "0");
+  const fname = `${suitName}${num}.jpg`;
+  return `https://commons.wikimedia.org/wiki/Special:FilePath/${fname}`;
+}
 function createFace(card, orientation) {
   const wrap = document.createElement("div");
   wrap.className = "tarot-card";
   wrap.style.setProperty("--rev", orientation === "reversed" ? "180deg" : "0deg");
+
   const inner = document.createElement("div");
   inner.className = "inner";
+
   const back = document.createElement("div");
   back.className = "face back";
   back.innerHTML = "<span class='card-tag'>หยิบไพ่</span>";
+
   const front = document.createElement("div");
   front.className = "face front";
+
+  const img = document.createElement("img");
+  img.className = "card-img";
+  img.src = imageUrl(card);
+  img.alt = card.en;
+  img.referrerPolicy = "no-referrer"; // avoid referrer issues
+  img.onerror = () => {
+    img.remove();
+    const fallback = document.createElement("div");
+    fallback.className = "card-meaning";
+    fallback.textContent = "ไม่พบรูปไพ่ (แสดงเฉพาะข้อความ)";
+    front.appendChild(fallback);
+  };
+
   const tag = document.createElement("span");
   tag.className = "card-tag" + (orientation === "reversed" ? " rev" : "");
   tag.textContent = orientation === "reversed" ? "กลับหัว" : "ตั้งตรง";
+
   const name = document.createElement("div");
   name.className = "card-name";
   name.textContent = `${card.th}`;
+
   const meaning = document.createElement("div");
   meaning.className = "card-meaning";
   meaning.textContent = orientation === "reversed" ? card.reversed : card.upright;
+
+  front.appendChild(img);
   front.appendChild(tag);
   front.appendChild(name);
   front.appendChild(meaning);
+
   inner.appendChild(back);
   inner.appendChild(front);
   wrap.appendChild(inner);
