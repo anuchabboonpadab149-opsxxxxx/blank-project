@@ -8,6 +8,7 @@ router = APIRouter()
 INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN", "internal-secret")
 PAYMENT_SERVICE_URL = os.getenv("PAYMENT_SERVICE_URL", "http://payment:8002")
 FORTUNE_SERVICE_URL = os.getenv("FORTUNE_SERVICE_URL", "http://fortune:8003")
+CREDIT_SERVICE_URL = os.getenv("CREDIT_SERVICE_URL", "http://credit:8001")
 
 
 @router.post("/payment/confirm")
@@ -61,3 +62,13 @@ def add_tarot_content(card_name: str, meaning_upright: str, meaning_reversed: st
         if r.status_code != 200:
             raise HTTPException(status_code=r.status_code, detail=r.text)
         return r.json()
+
+
+@router.get("/dashboard")
+def dashboard(_=Depends(require_admin)):
+    headers = {"X-Internal-Token": INTERNAL_TOKEN}
+    with httpx.Client(timeout=10) as client:
+        pay = client.get(f"{PAYMENT_SERVICE_URL}/internal/admin/stats", headers=headers).json()
+        cred = client.get(f"{CREDIT_SERVICE_URL}/internal/admin/stats", headers=headers).json()
+        fort = client.get(f"{FORTUNE_SERVICE_URL}/internal/admin/stats", headers=headers).json()
+        return {"payment": pay, "credit": cred, "fortune": fort}

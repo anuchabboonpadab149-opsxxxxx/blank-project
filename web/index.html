@@ -76,7 +76,10 @@
       <div class="row">
         <div>
           <div id="qr" class="qr"></div>
-          <div><small class="muted">payload: <code id="qr-payload"></code></small></div>
+          <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <small class="muted">payload: <code id="qr-payload"></code></small>
+            <span class="badge" id="tx-status">สถานะ: -</span>
+          </div>
         </div>
         <div>
           <input id="slip-url" placeholder="ลิงก์สลิป (อัปโหลดรูปสลิปไปเก็บที่ใดก็ได้แล้ววาง URL)" style="width: 100%;" />
@@ -226,6 +229,7 @@
       currentTx = data.transaction_id;
       document.getElementById('qr').innerHTML = `<img src="${data.qr_code_url}" width="220" height="220" />`;
       document.getElementById('qr-payload').textContent = data.qr_payload;
+      document.getElementById('tx-status').textContent = 'สถานะ: CREATED';
       setStep(3);
     }
 
@@ -239,17 +243,24 @@
         body: JSON.stringify({ transaction_id: currentTx, slip_image_url: slip })
       });
       const data = await r.json();
+      document.getElementById('tx-status').textContent = 'สถานะ: PENDING';
       alert(data.message || JSON.stringify(data));
+      // start watching credits and transaction status
+      const before = parseInt(document.getElementById('credits').textContent || '0', 10);
+      startCreditWatcher(before);
     }
 
-    async function loadCredits() {
-      if (!token) return;
+    async function getCredits(){
+      if (!token) return 0;
       const r = await fetch(API + '/user/credits', { headers: { ...auth() } });
       const data = await r.json();
-      document.getElementById('credits').textContent = data.credit_balance;
-      // allow next step if has credits
-      if (data.credit_balance > 0) {
-        // prefetch sources
+      return parseInt(data.credit_balance || 0, 10);
+    }
+    async function loadCredits() {
+      if (!token) return;
+      const balance = await getCredits();
+      document.getElementById('credits').textContent = balance;
+      if (balance > 0) {
         if (!document.getElementById('source').options.length) await loadSources();
       }
     }
@@ -291,6 +302,32 @@
       const r = await fetch(API + '/user/history/all', { headers: { ...auth() } });
       const data = await r.json();
       document.getElementById('history').textContent = JSON.stringify(data, null, 2);
+    }
+
+    let creditWatchTimer = null;
+    async function updateTxStatus(){
+      if (!currentTx) return;
+      try {
+        const r = await fetch(API + '/payment/status/' + encodeURIComponent(currentTx), { headers: { ...auth() }});
+        if (r.ok) {
+          const data = await r.json();
+          document.getElementById('tx-status').textContent = 'สถานะ: ' + (data.status || '-');
+        }
+      } catch(_){}
+    }
+    async function startCreditWatcher(before){
+      if (creditWatchTimer) clearInterval(creditWatchTimer);
+      creditWatchTimer = setInterval(async ()=>{
+        await updateTxStatus();
+        const now = await getCredits();
+        document.getElementById('credits').textContent = now;
+        if (now > before) {
+          clearInterval(creditWatchTimer);
+          creditWatchTimer = null;
+          alert('เครดิตเข้าแล้ว พร้อมเสี่ยงทายได้เลย');
+          setStep(4);
+        }
+      }, 3000);
     }
 
     // init

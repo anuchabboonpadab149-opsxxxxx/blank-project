@@ -158,3 +158,21 @@ def admin_add_tarot(payload: dict, authorization: str | None = Header(default=No
     db.add(tc)
     db.commit()
     return {"id": tc.id}
+
+
+@router.get("/internal/admin/stats")
+def admin_stats(authorization: str | None = Header(default=None, alias="X-Internal-Token"), db: Session = Depends(get_db)):
+    require_internal(authorization)
+    total_sources = db.query(FortuneSource).count()
+    total_sensi = db.query(FortuneContent).count()
+    total_tarot_cards = db.query(TarotContent).count()
+    total_fortunes = db.query(FortuneHistory).count()
+    sen_si_count = db.query(FortuneHistory).filter(FortuneHistory.source_type == "Sen_Si").count()
+    tarot_count = db.query(FortuneHistory).filter(FortuneHistory.source_type == "Tarot").count()
+    return {
+        "total_sources": total_sources,
+        "total_sen_si_content": total_sensi,
+        "total_tarot_cards": total_tarot_cards,
+        "total_fortunes": total_fortunes,
+        "by_type": {"Sen_Si": sen_si_count, "Tarot": tarot_count},
+    }

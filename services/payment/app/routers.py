@@ -134,3 +134,21 @@ def user_history(user_id: str, authorization: str | None = Header(default=None, 
         {"transaction_id": t.id, "package_id": t.package_id, "amount": t.amount, "status": t.status, "created_at": t.created_at.isoformat()}
         for t in txs
     ]
+
+
+@router.get("/internal/admin/stats")
+def admin_stats(authorization: str | None = Header(default=None, alias="X-Internal-Token"), db: Session = Depends(get_db)):
+    require_internal(authorization)
+    txs = db.query(Transaction).all()
+    total = len(txs)
+    created = sum(1 for t in txs if t.status == "CREATED")
+    pending = sum(1 for t in txs if t.status == "PENDING")
+    confirmed = sum(1 for t in txs if t.status == "CONFIRMED")
+    total_confirmed_amount = sum(t.amount for t in txs if t.status == "CONFIRMED")
+    total_pending_amount = sum(t.amount for t in txs if t.status == "PENDING")
+    return {
+        "total_transactions": total,
+        "status_counts": {"CREATED": created, "PENDING": pending, "CONFIRMED": confirmed},
+        "total_confirmed_amount": total_confirmed_amount,
+        "total_pending_amount": total_pending_amount,
+    }

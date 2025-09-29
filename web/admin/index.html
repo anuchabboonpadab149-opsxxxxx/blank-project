@@ -49,6 +49,22 @@
     <!-- STEP 2 -->
     <section id="step-2" class="card hidden">
       <h3>ขั้นที่ 2: ยืนยันการชำระเงิน</h3>
+
+      <div class="card">
+        <h4>แดชบอร์ดสรุป</h4>
+        <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="ghost" onclick="loadDashboard()">รีเฟรชแดชบอร์ด</button>
+        </div>
+        <div id="dashboard" class="stat-grid">
+          <div class="stat"><h4>ธุรกรรมทั้งหมด</h4><div class="num" id="d-tx">-</div></div>
+          <div class="stat"><h4>ยืนยันแล้ว (ยอด)</h4><div class="num" id="d-confirm-amount">-</div></div>
+          <div class="stat"><h4>รอดำเนินการ (ยอด)</h4><div class="num" id="d-pending-amount">-</div></div>
+          <div class="stat"><h4>บัญชีเครดิต</h4><div class="num" id="d-accounts">-</div></div>
+          <div class="stat"><h4>เครดิตรวม</h4><div class="num" id="d-total-credit">-</div></div>
+          <div class="stat"><h4>คำทำนายทั้งหมด</h4><div class="num" id="d-fortunes">-</div></div>
+        </div>
+      </div>
+
       <div class="row">
         <div>
           <input id="tx-id" placeholder="transaction_id" />
@@ -128,11 +144,26 @@
       localStorage.setItem('admin_token', t);
       document.getElementById('status-token').textContent = 'พร้อมใช้งาน';
       setStep(2);
+      loadDashboard();
     }
     function clearToken(){
       localStorage.removeItem('admin_token');
       document.getElementById('status-token').textContent = 'ยังไม่ได้ตั้งค่า';
       setStep(1);
+    }
+
+    async function loadDashboard(){
+      const r = await fetch(API + '/admin/dashboard', { headers: { ...adminAuth() }});
+      const data = await r.json();
+      const pay = data.payment || {};
+      const cred = data.credit || {};
+      const fort = data.fortune || {};
+      document.getElementById('d-tx').textContent = pay.total_transactions ?? '-';
+      document.getElementById('d-confirm-amount').textContent = (pay.total_confirmed_amount ?? 0).toFixed ? pay.total_confirmed_amount.toFixed(2) : pay.total_confirmed_amount;
+      document.getElementById('d-pending-amount').textContent = (pay.total_pending_amount ?? 0).toFixed ? pay.total_pending_amount.toFixed(2) : pay.total_pending_amount;
+      document.getElementById('d-accounts').textContent = cred.total_accounts ?? '-';
+      document.getElementById('d-total-credit').textContent = cred.total_balance ?? '-';
+      document.getElementById('d-fortunes').textContent = fort.total_fortunes ?? '-';
     }
 
     async function confirmPayment() {
@@ -144,6 +175,7 @@
       const r = await fetch(API + '/admin/payment/confirm?' + qs, { method: 'POST', headers: { ...adminAuth() }});
       const data = await r.json();
       document.getElementById('confirm-result').textContent = JSON.stringify(data, null, 2);
+      loadDashboard();
     }
     async function upsertSource() {
       const name = document.getElementById('src-name').value.trim();
@@ -154,6 +186,7 @@
       const body = { name, type, upright_prob: upright_prob ? parseFloat(upright_prob) : null, allowed_deck: allowed_deck || null };
       const r = await fetch(API + '/admin/content/source', { method: 'POST', headers: { 'Content-Type': 'application/json', ...adminAuth() }, body: JSON.stringify(body)});
       alert('บันทึกแล้ว (' + r.status + ')');
+      loadDashboard();
     }
     async function addSenSi() {
       const source_id = parseInt(document.getElementById('sen-src').value, 10);
@@ -163,6 +196,7 @@
       if (!source_id || !slip_number || !verse_content) return alert('กรอกข้อมูลให้ครบ');
       const r = await fetch(API + '/admin/content/sen-si', { method: 'POST', headers: { 'Content-Type': 'application/json', ...adminAuth() }, body: JSON.stringify({ source_id, slip_number, verse_content, fate_summary })});
       alert('เพิ่มแล้ว (' + r.status + ')');
+      loadDashboard();
     }
     async function addTarot() {
       const card_name = document.getElementById('tarot-name').value.trim();
@@ -171,6 +205,7 @@
       if (!card_name || !meaning_upright || !meaning_reversed) return alert('กรอกข้อมูลให้ครบ');
       const r = await fetch(API + '/admin/content/tarot', { method: 'POST', headers: { 'Content-Type': 'application/json', ...adminAuth() }, body: JSON.stringify({ card_name, meaning_upright, meaning_reversed })});
       alert('เพิ่มแล้ว (' + r.status + ')');
+      loadDashboard();
     }
 
     // init
@@ -180,6 +215,7 @@
     if (hasToken()) {
       document.getElementById('status-token').textContent = 'พร้อมใช้งาน';
       setStep(2);
+      loadDashboard();
     } else {
       setStep(1);
     }

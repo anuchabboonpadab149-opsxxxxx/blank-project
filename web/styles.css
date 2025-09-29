@@ -27,7 +27,7 @@ nav a.active{color:#fff;font-weight:600}
 .stepper{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0 16px}
 .step{display:flex;align-items:center;gap:8px}
 .step .dot{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#0b0d1a;border:2px solid var(--border);color:#fff;font-size:13px}
-.step.active .dot{background:var(--brand);border-color:transparent}
+.step.active .dot{background:var(--brand);border-color:transparent;animation:pulse .8s ease-in-out}
 .step.done .dot{background:var(--ok)}
 .step .label{font-size:14px;color:var(--muted)}
 .step.active .label{color:#fff;font-weight:600}
@@ -35,3 +35,8 @@ nav a.active{color:#fff;font-weight:600}
 @media (max-width:860px){.row,.grid,.split{grid-template-columns:1fr}}
 .hero{padding:18px;border-radius:18px;border:1px solid var(--border);background:linear-gradient(180deg, #1b1c38 0%, #101129 100%)}
 .kbd{display:inline-block;border:1px solid var(--border);padding:2px 6px;border-radius:6px;background:#0b0d1a;font-size:12px;color:var(--muted)}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stat{padding:14px;border-radius:12px;border:1px solid var(--border);background:#0b0d1a}
+.stat h4{margin:0 0 4px 0;font-size:14px;color:var(--muted)}
+.stat .num{font-size:22px;font-weight:700}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(90,89,255,.7)}100%{box-shadow:0 0 0 12px rgba(90,89,255,0)}}

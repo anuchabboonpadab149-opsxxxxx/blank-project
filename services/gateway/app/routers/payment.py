@@ -37,6 +37,21 @@ def proxy_qrcode(tx_id: str):
         return Response(content=r.content, media_type="image/png")
 
 
+@router.get("/payment/status/{tx_id}")
+def payment_status(tx_id: str, user=Depends(get_current_user)):
+    with httpx.Client(timeout=10) as client:
+        r = client.get(
+            f"{PAYMENT_SERVICE_URL}/internal/payment/lookup/{tx_id}",
+            headers={"X-Internal-Token": INTERNAL_TOKEN},
+        )
+        if r.status_code != 200:
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+        data = r.json()
+        if data.get("user_id") != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your transaction")
+        return {"status": data.get("status")}
+
+
 @router.post("/payment/verify", response_model=PaymentVerifyResponse)
 def payment_verify(payload: PaymentVerifyRequest, user=Depends(get_current_user)):
     with httpx.Client(timeout=10) as client:

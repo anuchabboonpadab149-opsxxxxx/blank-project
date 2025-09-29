@@ -49,3 +49,12 @@ def get_balance(user_id: str, db: Session = Depends(get_db), authorization: str 
     require_internal(authorization)
     credit = db.query(UserCredit).filter(UserCredit.user_id == user_id).first()
     return {"balance": credit.balance if credit else 0}
+
+
+@router.get("/internal/admin/stats")
+def admin_stats(authorization: str | None = Header(default=None, alias="X-Internal-Token"), db: Session = Depends(get_db)):
+    require_internal(authorization)
+    rows = db.query(UserCredit).all()
+    total_accounts = len(rows)
+    total_balance = sum(r.balance for r in rows)
+    return {"total_accounts": total_accounts, "total_balance": total_balance}
