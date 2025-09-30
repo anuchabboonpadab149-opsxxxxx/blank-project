@@ -1,29 +1,23 @@
 /**
- * อ.โทนี่สะท้อนกรรม — Backend API (Express + SQLite + Omise PromptPay)
+ * อ.โทนี่สะท้อนกรรม — Backend API (Express + SQLite + Stripe PromptPay)
  */
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
 const Database = require('better-sqlite3');
-const Omise = require('omise');
+const Stripe = require('stripe');
 
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_jwt_secret';
-const PROMPTPAY_PHONE = process.env.PROMPTPAY_PHONE || '0916974995';
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'change_this_webhook_secret';
-const OMISE_PUBLIC_KEY = process.env.OMISE_PUBLIC_KEY || '';
-const OMISE_SECRET_KEY = process.env.OMISE_SECRET_KEY || '';
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
 
-const omise = new Omise({
-  publicKey: OMISE_PUBLIC_KEY,
-  secretKey: OMISE_SECRET_KEY,
-});
+const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 const app = express();
 
@@ -58,7 +52,7 @@ CREATE TABLE IF NOT EXISTS orders (
   credits INTEGER NOT NULL,
   amount INTEGER NOT NULL,
   status TEXT NOT NULL,
-  charge_id TEXT,
+  pi_id TEXT,
   created_at TEXT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -96,22 +90,6 @@ function authMiddleware(req, res, next) {
   } catch (e) {
     return res.status(401).json({ error: 'Invalid token' });
   }
-}
-function verifyWebhookSignature(req) {
-  const headerSig = req.headers['omise-signature'] || req.headers['x-omise-signature'];
-  if (headerSig) {
-    const hmac = crypto.createHmac('sha256', WEBHOOK_SECRET);
-    hmac.update(req.rawBody || '');
-    const digest = hmac.digest('hex');
-    try {
-      return crypto.timingSafeEqual(Buffer.from(digest, 'hex'), Buffer.from(headerSig, 'hex'));
-    } catch {
-      return false;
-    }
-  }
-  const q = (req.query || {}).secret;
-  const h = req.headers['x-webhook-secret'];
-  return (q && q === WEBHOOK_SECRET) || (h && h === WEBHOOK_SECRET);
 }
 
 /* ===== Auth ===== */
@@ -164,7 +142,7 @@ app.get('/api/packages', (req, res) => {
   res.json(packages);
 });
 
-/* ===== Topup / Orders ===== */
+/* ===== Topup / Orders (Stripe PromptPay) ===== */
 app.post('/api/topup/create-order', authMiddleware, async (req, res) => {
   try {
     const { packageId } = req.body || {};
@@ -172,32 +150,28 @@ app.post('/api/topup/create-order', authMiddleware, async (req, res) => {
     if (!pkg) return res.status(400).json({ error: 'Invalid package' });
     const amountSatang = satang(pkg.price);
 
-    // Create source for PromptPay
-    const source = await omise.sources.create({
-      type: 'promptpay',
+    // Create PaymentIntent for PromptPay
+    const intent = await stripe.paymentIntents.create({
       amount: amountSatang,
       currency: 'thb',
-      flow: 'offline'
-    });
-
-    // Create charge
-    const charge = await omise.charges.create({
-      amount: amountSatang,
-      currency: 'thb',
-      source: source.id,
+      payment_method_types: ['promptpay'],
       description: `Topup ${pkg.title} by ${req.user.phone}`
     });
 
+    // Confirm intent to get next_action with PromptPay QR code
+    const confirmed = await stripe.paymentIntents.confirm(intent.id, {
+      payment_method_data: { type: 'promptpay' }
+    });
+
     const orderId = makeOrderId(req.user.uid);
+
     const qrImage =
-      (charge && charge.source && charge.source.scannable_code && charge.source.scannable_code.image && charge.source.scannable_code.image.download_uri)
-      || (source && source.scannable_code && source.scannable_code.image && source.scannable_code.image.download_uri)
-      || '';
+      confirmed?.next_action?.promptpay_display_qr_code?.image_url || '';
 
     db.prepare(`
-      INSERT INTO orders (order_id, user_id, package_id, credits, amount, status, charge_id, created_at)
+      INSERT INTO orders (order_id, user_id, package_id, credits, amount, status, pi_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(orderId, req.user.uid, pkg.id, pkg.credits, amountSatang, 'pending', charge.id, nowIso());
+    `).run(orderId, req.user.uid, pkg.id, pkg.credits, amountSatang, 'pending', intent.id, nowIso());
 
     return res.json({ orderId, qrImage });
   } catch (e) {
@@ -212,22 +186,22 @@ app.get('/api/orders/:orderId', authMiddleware, async (req, res) => {
     const order = db.prepare('SELECT * FROM orders WHERE order_id = ? AND user_id = ?').get(orderId, req.user.uid);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    // If pending, refresh status from Omise
-    if (order.status === 'pending' && order.charge_id) {
+    // If pending, refresh status from Stripe
+    if (order.status === 'pending' && order.pi_id) {
       try {
-        const charge = await omise.charges.retrieve(order.charge_id);
-        if (charge && charge.status) {
-          if (charge.status === 'successful') {
+        const intent = await stripe.paymentIntents.retrieve(order.pi_id);
+        if (intent && intent.status) {
+          if (intent.status === 'succeeded') {
             db.prepare('UPDATE orders SET status = ? WHERE order_id = ?').run('paid', orderId);
             db.prepare('UPDATE users SET credits = credits + ? WHERE id = ?').run(order.credits, order.user_id);
             order.status = 'paid';
-          } else if (charge.status === 'failed') {
+          } else if (intent.status === 'canceled' || intent.status === 'requires_payment_method') {
             db.prepare('UPDATE orders SET status = ? WHERE order_id = ?').run('failed', orderId);
             order.status = 'failed';
-          }
+          } // processing/requires_action remain pending
         }
       } catch (e) {
-        console.warn('refresh charge failed:', e.message || e);
+        console.warn('refresh intent failed:', e.message || e);
       }
     }
 
@@ -237,29 +211,33 @@ app.get('/api/orders/:orderId', authMiddleware, async (req, res) => {
   }
 });
 
-/* ===== Webhooks (Omise) ===== */
-app.post('/api/webhooks/omise', (req, res) => {
-  // Verify signature/secret
-  const valid = verifyWebhookSignature(req);
-  if (!valid) return res.status(401).json({ error: 'Invalid signature' });
-
-  const event = req.body || {};
+/* ===== Webhooks (Stripe) ===== */
+app.post('/api/webhooks/stripe', (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
   try {
-    if (event.key === 'charge.complete') {
-      const charge = event.data;
-      const chargeId = charge && charge.id;
-      const status = charge && charge.status;
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message || err);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
 
-      if (chargeId) {
-        const order = db.prepare('SELECT * FROM orders WHERE charge_id = ?').get(chargeId);
-        if (order) {
-          if (status === 'successful') {
-            db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', order.id);
-            db.prepare('UPDATE users SET credits = credits + ? WHERE id = ?').run(order.credits, order.user_id);
-          } else if (status === 'failed') {
-            db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('failed', order.id);
-          }
-        }
+  try {
+    // Handle PaymentIntent events
+    if (event.type === 'payment_intent.succeeded') {
+      const intent = event.data.object;
+      const piId = intent.id;
+      const order = db.prepare('SELECT * FROM orders WHERE pi_id = ?').get(piId);
+      if (order && order.status !== 'paid') {
+        db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', order.id);
+        db.prepare('UPDATE users SET credits = credits + ? WHERE id = ?').run(order.credits, order.user_id);
+      }
+    } else if (event.type === 'payment_intent.payment_failed') {
+      const intent = event.data.object;
+      const piId = intent.id;
+      const order = db.prepare('SELECT * FROM orders WHERE pi_id = ?').get(piId);
+      if (order && order.status !== 'failed') {
+        db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('failed', order.id);
       }
     }
   } catch (e) {

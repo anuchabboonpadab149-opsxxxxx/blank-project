@@ -14,7 +14,8 @@
     "jsonwebtoken",
     "bcryptjs",
     "better-sqlite3",
-    "omise"
+    "omise",
+    "stripe"
   ],
   "devDependencies": [
     "nodemon"

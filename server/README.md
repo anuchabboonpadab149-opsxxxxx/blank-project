@@ -1,15 +1,15 @@
 # อ.โทนี่สะท้อนกรรม — Backend API
 
-Node.js + Express backend for real authentication, credits, and PromptPay via Omise (Opn). Handles creating PromptPay QR charges, polling status, and secure webhook updates to credit users automatically.
+Node.js + Express backend for real authentication, credits, and PromptPay via Stripe. Handles creating PaymentIntents for PromptPay, returning QR code image URL for scanning, polling status, and secure webhook updates to credit users automatically.
 
 ## Features
 
 - User signup/login with token (JWT)
 - Credits: consume 1 credit per reading
 - Packages listing (5 promotions)
-- Create PromptPay order via Omise and return QR image URI
-- Poll order status endpoint (refresh from Omise)
-- Webhook endpoint for Omise events to auto-credit on payment success
+- Create PromptPay PaymentIntent via Stripe and return QR image URL (`next_action.promptpay_display_qr_code.image_url`)
+- Poll order status endpoint (refresh from Stripe PaymentIntent)
+- Webhook endpoint for Stripe events (`payment_intent.succeeded`) to auto-credit on payment success
 - SQLite database (better-sqlite3)
 
 ## Quick start
@@ -29,8 +29,8 @@ cp .env.example .env
 
 Edit `.env`:
 
-- `OMISE_PUBLIC_KEY` and `OMISE_SECRET_KEY` — from your Omise/Opn account (enable PromptPay)
-- `WEBHOOK_SECRET` — random string to verify webhooks (see below)
+- `STRIPE_SECRET_KEY` — from your Stripe account (enable PromptPay)
+- `STRIPE_WEBHOOK_SECRET` — webhook signing secret from Stripe Dashboard
 - `JWT_SECRET` — random string for JWT
 - `PORT` — default 3000
 - `CORS_ORIGIN` — your frontend origin (e.g., https://your-domain.com)
@@ -51,21 +51,18 @@ In `tarot-app/index.html`, ensure:
 </script>
 ```
 
-Deploy frontend and backend; the site will consume credits and show real Omise PromptPay QR codes.
+Deploy frontend and backend; the site will consume credits and show real Stripe PromptPay QR codes.
 
-## Webhook setup (Omise)
+## Webhook setup (Stripe)
 
-- In Omise Dashboard, set Webhook URL to:
+- In Stripe Dashboard, set Webhook endpoint to:
 
 ```
-https://your-server.com/api/webhooks/omise?secret=WEBHOOK_SECRET_VALUE
+https://your-server.com/api/webhooks/stripe
 ```
 
-Replace `WEBHOOK_SECRET_VALUE` with your `WEBHOOK_SECRET` from `.env`.
-
-- On `charge.complete` event, if `status === "successful"`, backend marks the order paid and credits the user automatically.
-
-Note: If you want signature verification, we support the header names `omise-signature` or `x-omise-signature`. The signature should be HMAC SHA256 of raw body with `WEBHOOK_SECRET`. If your account uses a different header name, adjust in `server.js` (verifyWebhookSignature).
+- Use `STRIPE_WEBHOOK_SECRET` from `.env` in the backend to verify the signature header `Stripe-Signature`.
+- On `payment_intent.succeeded`, backend marks the order as paid and credits the user automatically.
 
 ## API
 
@@ -75,8 +72,8 @@ Note: If you want signature verification, we support the header names `omise-sig
 - `GET /api/me` — returns `{ name, phone, credits }`
 - `POST /api/credits/consume` — deduct 1 credit
 - `POST /api/topup/create-order { packageId }` — returns `{ orderId, qrImage }`
-- `GET /api/orders/:orderId` — returns `{ status }` and refreshes from Omise
-- `POST /api/webhooks/omise` — Omise events webhook (auto-credit)
+- `GET /api/orders/:orderId` — returns `{ status }` and refreshes from Stripe
+- `POST /api/webhooks/stripe` — Stripe events webhook (auto-credit)
 
 ## Database
 
@@ -84,13 +81,13 @@ Note: If you want signature verification, we support the header names `omise-sig
 
 Tables:
 - `users(id, phone UNIQUE, name, password_hash, credits INTEGER DEFAULT 0)`
-- `orders(id, order_id TEXT UNIQUE, user_id INTEGER, package_id TEXT, credits INTEGER, amount INTEGER, status TEXT, charge_id TEXT, created_at TEXT)`
+- `orders(id, order_id TEXT UNIQUE, user_id INTEGER, package_id TEXT, credits INTEGER, amount INTEGER, status TEXT, pi_id TEXT, created_at TEXT)`
 
 ## Deployment
 
 - Use a Node.js host (Render, Railway, Fly.io, etc.)
 - Ensure HTTPS and public access for webhook
-- Configure firewall to allow Omise webhook IPs if needed
+- Configure firewall to allow Stripe webhook IPs if needed
 
 ## Notes
 
