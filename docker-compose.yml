@@ -1,0 +1,29 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: app-backend
+    environment:
+      - PORT=8080
+      - ALLOWED_ORIGINS=http://localhost:8081
+    expose:
+      - "8080"
+    networks:
+      - appnet
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: app-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge
