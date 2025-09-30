@@ -217,27 +217,27 @@ app.post('/api/signup', async (req, res) => {
   try {
     const { name, phone, password } = req.body || {};
     if (!name || !phone || !password) return res.status(400).json({ error: 'Missing fields' });
-    const exists = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
+
+    const nameTrim = String(name).trim();
+    const rawPhone = String(phone);
+    const phoneDigits = rawPhone.replace(/\\D/g, '').trim();
+    const passTrim = String(password);
+
+    if (nameTrim.length < 1 || nameTrim.length > 100) return res.status(400).json({ error: 'Invalid name length' });
+    if (!/^[0-9]{8,15}$/.test(phoneDigits)) return res.status(400).json({ error: 'Invalid phone format' });
+    if (passTrim.length < 6 || passTrim.length > 128) return res.status(400).json({ error: 'Invalid password length' });
+
+    const exists = db.prepare('SELECT id FROM users WHERE phone = ?').get(phoneDigits);
     if (exists) return res.status(409).json({ error: 'Phone already registered' });
-    const hash = await bcrypt.hash(password, 10);
-    const info = db.prepare('INSERT INTO users (phone, name, password_hash, credits) VALUES (?, ?, ?, ?)').run(phone, name, hash, 0);
-    const user = { id: info.lastInsertRowid, phone, name, credits: 0 };
+
+    const hash = await bcrypt.hash(passTrim, 10);
+    const info = db.prepare('INSERT INTO users (phone, name, password_hash, credits) VALUES (?, ?, ?, ?)').run(phoneDigits, nameTrim, hash, 0);
+    const user = { id: info.lastInsertRowid, phone: phoneDigits, name: nameTrim, credits: 0 };
     return res.json({ token: signToken(user) });
   } catch (e) {
     return res.status(500).json({ error: 'Signup failed' });
   }
 });
-
-app.post('/api/login', async (req, res) => {
-  try {
-    const { phone, password } = req.body || {};
-    if (!phone || !password) return res.status(400).json({ error: 'Missing fields' });
-    const phoneTrim = String(phone).trim();
-    const passTrim = String(password);
-    if (!/^[0-9]{8,15}$/.test(phoneTrim)) return res.status(400).json({ error: 'Invalid phone format' });
-
-    const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(phoneTrim);
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     const ok = await bcrypt.compare(passTrim, user.password_hash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
     return res.json({ token: signToken(user) });

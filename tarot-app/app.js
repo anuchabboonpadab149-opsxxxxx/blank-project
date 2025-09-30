@@ -449,7 +449,8 @@ function switchTab(tab) {
 }
 async function signup() {
   const name = (el.signupName.value || "").trim();
-  const phone = (el.signupPhone.value || "").trim();
+  const rawPhone = (el.signupPhone.value || "").trim();
+  const phone = rawPhone.replace(/\D/g, "");
   const password = (el.signupPassword.value || "").trim();
   if (!name || !phone || !password) {
     alert("กรุณากรอกข้อมูลให้ครบ");
@@ -469,7 +470,8 @@ async function signup() {
   }
 }
 async function login() {
-  const phone = (el.loginPhone.value || "").trim();
+  const rawPhone = (el.loginPhone.value || "").trim();
+  const phone = rawPhone.replace(/\D/g, "");
   const password = (el.loginPassword.value || "").trim();
   if (!phone || !password) {
     alert("กรุณากรอกเบอร์และรหัสผ่าน");
@@ -714,7 +716,24 @@ function createFace(card, orientation) {
 
   const back = document.createElement("div");
   back.className = "face back";
-  back.innerHTML = "<div class='card-back-mark'>อ.โทนี่สะท้อนกรรม</div><span class='card-tag'>หยิบไพ่</span>";
+
+  // Brand watermark (image or text)
+  const wm = document.createElement("div");
+  wm.className = "back-watermark";
+  if (window.BRAND_LOGO_URL) {
+    wm.style.backgroundImage = `url(${window.BRAND_LOGO_URL})`;
+  } else {
+    const wmText = document.createElement("div");
+    wmText.className = "back-watermark-text";
+    wmText.textContent = "อ.โทนี่สะท้อนกรรม";
+    wm.appendChild(wmText);
+  }
+  back.appendChild(wm);
+
+  const backTag = document.createElement("span");
+  backTag.className = "card-tag";
+  backTag.textContent = "หยิบไพ่";
+  back.appendChild(backTag);
 
   const front = document.createElement("div");
   front.className = "face front";
@@ -1064,7 +1083,7 @@ async function siemseeDraw() {
       const temple = el.siemseeTemple?.value || "standard";
       const f = siemseeFortune(no, luckLabel, temple);
       // show result
-      elment("div");
+      const item = document.createElement("div");
       item.className = "result-item";
       const t = document.createElement("div");
       t.className = "title";
