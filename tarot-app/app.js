@@ -615,7 +615,20 @@ function createCardBackEl() {
   inner.className = "inner";
   const back = document.createElement("div");
   back.className = "face back";
-  back.innerHTML = ""; // remove 'tarot' text from card back
+
+  // Brand watermark (image or text)
+  const wm = document.createElement("div");
+  wm.className = "back-watermark";
+  if (window.BRAND_LOGO_URL) {
+    wm.style.backgroundImage = `url(${window.BRAND_LOGO_URL})`;
+  } else {
+    const wmText = document.createElement("div");
+    wmText.className = "back-watermark-text";
+    wmText.textContent = "อ.โทนี่สะท้อนกรรม";
+    wm.appendChild(wmText);
+  }
+  back.appendChild(wm);
+
   const front = document.createElement("div");
   front.className = "face front";
   inner.appendChild(back);
@@ -693,7 +706,7 @@ function createFace(card, orientation) {
 
   const back = document.createElement("div");
   back.className = "face back";
-  back.innerHTML = "<span class='card-tag'>หยิบไพ่</span>";
+  back.innerHTML = "<div class='card-back-mark'>อ.โทนี่สะท้อนกรรม</div><span class='card-tag'>หยิบไพ่</span>";
 
   const front = document.createElement("div");
   front.className = "face front";
