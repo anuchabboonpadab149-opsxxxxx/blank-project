@@ -615,7 +615,7 @@ function createCardBackEl() {
   inner.className = "inner";
   const back = document.createElement("div");
   back.className = "face back";
-  back.innerHTML = "<span class='card-tag'>tarot</span>";
+  back.innerHTML = ""; // remove 'tarot' text from card back
   const front = document.createElement("div");
   front.className = "face front";
   inner.appendChild(back);
@@ -889,6 +889,23 @@ async function doDailyReading() {
     d.textContent = `${card.th} — ${orientation === "reversed" ? card.reversed : card.upright}`;
     item.appendChild(t);
     item.appendChild(d);
+
+    // Detailed meanings per topic
+    const details = cardCategoryMeaning(card, orientation);
+    const ul = document.createElement("ul");
+    ul.className = "detail-list";
+    [
+      { k: "love", label: "ความรัก" },
+      { k: "work", label: "การงาน" },
+      { k: "money", label: "การเงิน" },
+      { k: "health", label: "สุขภาพ" },
+    ].forEach(it => {
+      const li = document.createElement("li");
+      li.innerHTML = `<strong>${it.label}:</strong> ${details[it.k]}`;
+      ul.appendChild(li);
+    });
+    item.appendChild(ul);
+
     el.dailyResults.appendChild(item);
   });
 }
@@ -1019,7 +1036,7 @@ async function siemseeDraw() {
       const temple = el.siemseeTemple?.value || "standard";
       const f = siemseeFortune(no, luckLabel, temple);
       // show result
-      elment("div");
+      const item = document.createElement("div");
       item.className = "result-item";
       const t = document.createElement("div");
       t.className = "title";

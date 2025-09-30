@@ -16,7 +16,9 @@
     "better-sqlite3",
     "omise",
     "stripe",
-    "node-fetch"
+    "node-fetch",
+    "helmet",
+    "express-rate-limit"
   ],
   "devDependencies": [
     "nodemon"

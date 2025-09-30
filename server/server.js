@@ -9,6 +9,10 @@ const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
 const Stripe = require('stripe');
 const fetch = require('node-fetch');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
@@ -46,6 +50,12 @@ app.use(cors({
   origin: CORS_ORIGIN,
   credentials: true,
 }));
+app.use(helmet());
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000, // generous limit to avoid blocking provider webhooks
+});
+app.use(limiter);
 
 /* ===== Database ===== */
 const db = new Database('data.sqlite');
@@ -222,9 +232,13 @@ app.post('/api/login', async (req, res) => {
   try {
     const { phone, password } = req.body || {};
     if (!phone || !password) return res.status(400).json({ error: 'Missing fields' });
-    const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(phone);
+    const phoneTrim = String(phone).trim();
+    const passTrim = String(password);
+    if (!/^[0-9]{8,15}$/.test(phoneTrim)) return res.status(400).json({ error: 'Invalid phone format' });
+
+    const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(phoneTrim);
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-    const ok = await bcrypt.compare(password, user.password_hash);
+    const ok = await bcrypt.compare(passTrim, user.password_hash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
     return res.json({ token: signToken(user) });
   } catch {
