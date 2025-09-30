@@ -144,6 +144,9 @@ textarea { resize: vertical; }
 }
 .dice.spin { transform: rotate(20deg) scale(1.05); }
 
+.inline-icon { width: 24px; height: 24px; vertical-align: middle; object-fit: contain; }
+.image-lg { width: 160px; height: auto; border-radius: 8px; border: 1px solid #2a3247; box-shadow: 0 6px 16px rgba(0,0,0,0.25); }
+
 /* Modal */
 .modal {
   position: fixed; inset: 0; display: grid; place-items: center;

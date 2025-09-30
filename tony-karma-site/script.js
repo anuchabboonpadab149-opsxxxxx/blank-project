@@ -107,6 +107,7 @@ const seeded = (seedStr) => {
   };
 };
 const pick = (arr, rnd = Math.random) => arr[Math.floor(rnd() * arr.length)];
+const cfg = () => window.APP_CONFIG || {};
 
 /* Presets */
 const ASTRO_PRESETS = {
@@ -245,9 +246,10 @@ $('#astro-form')?.addEventListener('submit', async (e) => {
     `ทำบุญด้านการศึกษา/หนังสือ จะเสริมปัญญาและการตัดสินใจ`
   ], seed);
 
+  const zodiacIcon = cfg().ZODIAC_ICONS?.[sign] || '';
   const content = `
     <h4>ข้อมูลกำเนิด</h4>
-    <p><strong>ชื่อ:</strong> ${name} • <strong>วันเกิด:</strong> ${formatDateTh(dob)} (${day}) • <strong>ราศี:</strong> ${sign} (ธาตุ ${element}) • <strong>นักษัตร:</strong> ${cz}${pob ? ` • <strong>เกิดที่:</strong> ${pob}` : ''}</p>
+    <p><strong>ชื่อ:</strong> ${name} • <strong>วันเกิด:</strong> ${formatDateTh(dob)} (${day}) • <strong>ราศี:</strong> ${zodiacIcon ? `<img class="inline-icon" src="${zodiacIcon}" alt="${sign}"> ` : ''}${sign} (ธาตุ ${element}) • <strong>นักษัตร:</strong> ${cz}${pob ? ` • <strong>เกิดที่:</strong> ${pob}` : ''}</p>
     <h4>คำทำนาย</h4>
     <ul class="list">
       <li><strong>ความรัก:</strong> ${love}</li>
@@ -394,7 +396,9 @@ const SIEMSI = [
 
 $('#shake-siemsi')?.addEventListener('click', () => {
   const s = pick(SIEMSI);
+  const jar = cfg().SIEMSI?.JAR || '';
   $('#siemsi-output').innerHTML = `
+    ${jar ? `<img class="image-lg" src="${jar}" alt="เซียมซี">` : ''}
     <p>ใบที่ <strong>${s.no}</strong> (${s.tone})</p>
     <p>${s.text}</p>
   `;
