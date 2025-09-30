@@ -638,7 +638,7 @@ function createCardBackEl() {
 }
 
 /* Image URL mapping (Wikimedia Commons public domain) */
-function imageUrl(card) {
+function imageUrlPrimary(card) {
   if (card.arcana === "Major") {
     const names = {
       0: "Fool", 1: "Magician", 2: "High_Priestess", 3: "Empress", 4: "Emperor",
@@ -651,6 +651,14 @@ function imageUrl(card) {
     const fname = `RWS_Tarot_${num}_${names[card.number]}.jpg`;
     return `https://commons.wikimedia.org/wiki/Special:FilePath/${fname}`;
   }
+  const suitMap = { Cups: "Cups", Swords: "Swords", Wands: "Wands", Pentacles: "Pentacles" };
+  const suitName = suitMap[card.suit] || card.suit || "Cups";
+  const num = String(card.number).padStart(2, "0");
+  const fname = `${suitName}${num}.jpg`;
+  return `https://commons.wikimedia.org/wiki/Special:FilePath/${fname}`;
+}
+function imageUrlFallback(card) {
+  if (card.arcana === "Major") return "";
   const suitMap = { Cups: "Cups", Swords: "Swords", Wands: "Wands", Pentacles: "Pents" };
   const suitName = suitMap[card.suit] || card.suit || "Cups";
   const num = String(card.number).padStart(2, "0");
@@ -713,10 +721,17 @@ function createFace(card, orientation) {
 
   const img = document.createElement("img");
   img.className = "card-img";
-  img.src = imageUrl(card);
+  img.src = imageUrlPrimary(card);
   img.alt = card.en;
   img.referrerPolicy = "no-referrer";
   img.onerror = () => {
+    // Try fallback filename pattern (e.g., Pents -> Pentacles)
+    const alt = imageUrlFallback(card);
+    if (alt && img.dataset.altTried !== "1") {
+      img.dataset.altTried = "1";
+      img.src = alt;
+      return;
+    }
     img.remove();
     const fallback = document.createElement("div");
     fallback.className = "card-meaning";

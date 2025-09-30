@@ -234,7 +234,7 @@
             <input id="signupName" type="text" placeholder="เช่น ผู้ศรัทธา" />
           </label>
           <label>เบอร์มือถือ (PromptPay)
-            <input id="signupPhone" type="tel" placeholder="เช่น 0916974995" />
+            <input id="signupPhone" type="tel" placeholder="เช่น 0916974995" pattern="[0-9]{8,15}" />
           </label>
           <label>รหัสผ่าน
             <input id="signupPassword" type="password" placeholder="รหัสผ่าน" />
@@ -263,7 +263,7 @@
             <img id="qrImage" alt="PromptPay QR" />
           </div>
           <div class="help">
-            สแกน PromptPay QR ที่ระบบสร้างผ่านแอปธนาคารของคุณ (Stripe)
+            สแกน PromptPay QR ที่ระบบสร้างผ่านแอปธนาคารของคุณ
           </div>
           <div class="ref">
             รหัสรายการ: <span id="orderId"></span>
