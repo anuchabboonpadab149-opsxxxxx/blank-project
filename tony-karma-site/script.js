@@ -11,26 +11,6 @@ const state = {
   user: null, // {id, email}
 };
 
-/* Persisted OpenAI key */
-(() => {
-  const keyInput = $('#openai-key');
-  const saveBtn = $('#save-key');
-  const clearBtn = $('#clear-key');
-
-  const saved = localStorage.getItem('openai_key');
-  if (saved && keyInput) keyInput.value = saved;
-
-  if (saveBtn) saveBtn.addEventListener('click', () => {
-    localStorage.setItem('openai_key', keyInput.value.trim());
-    saveBtn.textContent = 'บันทึกแล้ว';
-    setTimeout(() => (saveBtn.textContent = 'บันทึกคีย์'), 1200);
-  });
-  if (clearBtn) clearBtn.addEventListener('click', () => {
-    localStorage.removeItem('openai_key');
-    if (keyInput) keyInput.value = '';
-  });
-})();
-
 /* Auth - Supabase */
 (() => {
   const authStatus = $('#auth-status');
@@ -315,31 +295,37 @@ $('#astro-form')?.addEventListener('submit', async (e) => {
   }
 });
 
-/* TAROT */
+/* TAROT with real images (Rider–Waite–Smith, public domain thumbnails via Wikimedia) */
 const TAROT = [
-  { name: 'The Fool (การเริ่มต้น)', meaning: 'เริ่มต้นใหม่ เปิดใจ กล้าลอง สิ่งที่ไม่คุ้นเคยอาจนำโอกาส' },
-  { name: 'The Magician (นักมายากล)', meaning: 'ทรัพยากรพร้อม ใช้ทักษะและการสื่อสาร สร้างผลลัพธ์' },
-  { name: 'The High Priestess (สตรีนักบวช)', meaning: 'ใช้สัญชาตญาณ ความลับ ความนิ่งช่วยให้เห็นคำตอบ' },
-  { name: 'The Empress (จักรพรรดินี)', meaning: 'ความอุดมสมบูรณ์ ความรัก การดูแลตัวเองและผู้อื่น' },
-  { name: 'The Emperor (จักรพรรดิ)', meaning: 'โครงสร้าง ภาวะผู้นำ วางขอบเขตและกติกา' },
-  { name: 'The Hierophant (พระสันตะปาปา)', meaning: 'การเรียนรู้จากครู ระบบ ความเชื่อดั้งเดิม' },
-  { name: 'The Lovers (คนรัก)', meaning: 'การเลือก ความสัมพันธ์ ความกลมกลืนด้วยความจริงใจ' },
-  { name: 'The Chariot (รถศึก)', meaning: 'ก้าวไปข้างหน้า มีวินัย ฝ่าข้อจำกัดด้วยความมุ่งมั่น' },
-  { name: 'Strength (พลัง)', meaning: 'ใจเข้มแข็ง อ่อนโยนแต่หนักแน่น จัดการความกลัว' },
-  { name: 'The Hermit (ฤาษี)', meaning: 'ถอยกลับมาทบทวน ค้นหาความหมายภายใน' },
-  { name: 'Wheel of Fortune (วงล้อโชคชะตา)', meaning: 'วงจรเปลี่ยนแปลง โอกาสหมุนมาถึง จังหวะสำคัญ' },
-  { name: 'Justice (ความยุติธรรม)', meaning: 'ความเที่ยงตรง ผลลัพธ์ตามเหตุปัจจัย รับผิดชอบการตัดสินใจ' },
-  { name: 'The Hanged Man (คนถูกแขวน)', meaning: 'มุมมองใหม่ ยอมหยุดเพื่อเห็นทางออก' },
-  { name: 'Death (ความตาย)', meaning: 'ปิดฉากเพื่อเริ่มใหม่ เปลี่ยนแปลงเชิงลึก' },
-  { name: 'Temperance (ความพอดี)', meaning: 'สมดุล ปรับตัว ค่อยเป็นค่อยไป' },
-  { name: 'The Devil (ปีศาจ)', meaning: 'พันธนาการ ความยึดติด ตระหนักรู้แล้วค่อยๆปล่อย' },
-  { name: 'The Tower (หอคอย)', meaning: 'ความจริงเปิดเผย สิ่งที่ไม่มั่นคงพังเพื่อสร้างใหม่' },
-  { name: 'The Star (ดาว)', meaning: 'ความหวัง การเยียวยา มองไกลและซื่อสัตย์กับตนเอง' },
-  { name: 'The Moon (พระจันทร์)', meaning: 'สัญญาณคลุมเครือ อารมณ์สูงต่ำ เชื่อมกับสัญชาตญาณ' },
-  { name: 'The Sun (พระอาทิตย์)', meaning: 'ความสำเร็จ ความสุข ความชัดเจน' },
-  { name: 'Judgement (การพิพากษา)', meaning: 'ตื่นรู้ เรียกคืนพลัง เรียนจากอดีต' },
-  { name: 'The World (โลก)', meaning: 'ครบถ้วน สมบูรณ์ วงจรเสร็จสิ้นพร้อมเริ่มใหม่' },
+  { id: 0,  key: 'Fool',            name: 'The Fool (การเริ่มต้น)', meaning: 'เริ่มต้นใหม่ เปิดใจ กล้าลอง สิ่งที่ไม่คุ้นเคยอาจนำโอกาส' },
+  { id: 1,  key: 'Magician',        name: 'The Magician (นักมายากล)', meaning: 'ทรัพยากรพร้อม ใช้ทักษะและการสื่อสาร สร้างผลลัพธ์' },
+  { id: 2,  key: 'High_Priestess',  name: 'The High Priestess (สตรีนักบวช)', meaning: 'ใช้สัญชาตญาณ ความลับ ความนิ่งช่วยให้เห็นคำตอบ' },
+  { id: 3,  key: 'Empress',         name: 'The Empress (จักรพรรดินี)', meaning: 'ความอุดมสมบูรณ์ ความรัก การดูแลตัวเองและผู้อื่น' },
+  { id: 4,  key: 'Emperor',         name: 'The Emperor (จักรพรรดิ)', meaning: 'โครงสร้าง ภาวะผู้นำ วางขอบเขตและกติกา' },
+  { id: 5,  key: 'Hierophant',      name: 'The Hierophant (พระสันตะปาปา)', meaning: 'การเรียนรู้จากครู ระบบ ความเชื่อดั้งเดิม' },
+  { id: 6,  key: 'Lovers',          name: 'The Lovers (คนรัก)', meaning: 'การเลือก ความสัมพันธ์ ความกลมกลืนด้วยความจริงใจ' },
+  { id: 7,  key: 'Chariot',         name: 'The Chariot (รถศึก)', meaning: 'ก้าวไปข้างหน้า มีวินัย ฝ่าข้อจำกัดด้วยความมุ่งมั่น' },
+  { id: 8,  key: 'Strength',        name: 'Strength (พลัง)', meaning: 'ใจเข้มแข็ง อ่อนโยนแต่หนักแน่น จัดการความกลัว' },
+  { id: 9,  key: 'Hermit',          name: 'The Hermit (ฤาษี)', meaning: 'ถอยกลับมาทบทวน ค้นหาความหมายภายใน' },
+  { id: 10, key: 'Wheel_of_Fortune',name: 'Wheel of Fortune (วงล้อโชคชะตา)', meaning: 'วงจรเปลี่ยนแปลง โอกาสหมุนมาถึง จังหวะสำคัญ' },
+  { id: 11, key: 'Justice',         name: 'Justice (ความยุติธรรม)', meaning: 'ความเที่ยงตรง ผลลัพธ์ตามเหตุปัจจัย รับผิดชอบการตัดสินใจ' },
+  { id: 12, key: 'Hanged_Man',      name: 'The Hanged Man (คนถูกแขวน)', meaning: 'มุมมองใหม่ ยอมหยุดเพื่อเห็นทางออก' },
+  { id: 13, key: 'Death',           name: 'Death (ความตาย)', meaning: 'ปิดฉากเพื่อเริ่มใหม่ เปลี่ยนแปลงเชิงลึก' },
+  { id: 14, key: 'Temperance',      name: 'Temperance (ความพอดี)', meaning: 'สมดุล ปรับตัว ค่อยเป็นค่อยไป' },
+  { id: 15, key: 'Devil',           name: 'The Devil (ปีศาจ)', meaning: 'พันธนาการ ความยึดติด ตระหนักรู้แล้วค่อยๆปล่อย' },
+  { id: 16, key: 'Tower',           name: 'The Tower (หอคอย)', meaning: 'ความจริงเปิดเผย สิ่งที่ไม่มั่นคงพังเพื่อสร้างใหม่' },
+  { id: 17, key: 'Star',            name: 'The Star (ดาว)', meaning: 'ความหวัง การเยียวยา มองไกลและซื่อสัตย์กับตนเอง' },
+  { id: 18, key: 'Moon',            name: 'The Moon (พระจันทร์)', meaning: 'สัญญาณคลุมเครือ อารมณ์สูงต่ำ เชื่อมกับสัญชาตญาณ' },
+  { id: 19, key: 'Sun',             name: 'The Sun (พระอาทิตย์)', meaning: 'ความสำเร็จ ความสุข ความชัดเจน' },
+  { id: 20, key: 'Judgement',       name: 'Judgement (การพิพากษา)', meaning: 'ตื่นรู้ เรียกคืนพลัง เรียนจากอดีต' },
+  { id: 21, key: 'World',           name: 'The World (โลก)', meaning: 'ครบถ้วน สมบูรณ์ วงจรเสร็จสิ้นพร้อมเริ่มใหม่' },
 ];
+
+function tarotImageUrl(id, key) {
+  const pad = String(id).padStart(2, '0');
+  // Use Wikimedia Special:FilePath to avoid hash paths, request width=512
+  return `https://commons.wikimedia.org/wiki/Special:FilePath/RWS_Tarot_${pad}_${key}.jpg?width=512`;
+}
 
 $('#draw-tarot')?.addEventListener('click', () => {
   const n = parseInt($('#tarot-count').value, 10);
@@ -356,7 +342,9 @@ $('#draw-tarot')?.addEventListener('click', () => {
   cards.forEach((c, i) => {
     const el = document.createElement('div');
     el.className = 'tarot-card';
+    const img = tarotImageUrl(c.id, c.key);
     el.innerHTML = `
+      <img class="tarot-thumb" src="${img}" alt="${c.name}">
       <h4>${n === 3 ? ['อดีต','ปัจจุบัน','อนาคต'][i] + ' • ' : ''}${c.name} ${c.upright ? '(ไพ่ตั้ง)' : '(ไพ่กลับหัว)'}</h4>
       <p>${c.upright ? c.meaning : invertMeaning(c.meaning)}</p>
       <p class="minor">ข้อแนะนำ: ${adviceFromTarot(c)}</p>
