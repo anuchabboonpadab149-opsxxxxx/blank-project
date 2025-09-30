@@ -352,6 +352,14 @@ function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
 function clearToken() { localStorage.removeItem(TOKEN_KEY); }
 
 const API_BASE = window.API_BASE || "";
+// Fallback packages in case /api/packages fails
+const PACKAGES = [
+  { id: "P10",  title: "10 สิทธิ์",   credits: 10,  price: 39 },
+  { id: "P30",  title: "30 สิทธิ์",   credits: 30,  price: 99 },
+  { id: "P50",  title: "50 สิทธิ์",   credits: 50,  price: 149 },
+  { id: "P100", title: "100 สิทธิ์",  credits: 100, price: 279 },
+  { id: "P300", title: "300 สิทธิ์",  credits: 300, price: 699 },
+];
 async function api(path, method = "GET", body = null) {
   const headers = { "Content-Type": "application/json" };
   const token = getToken();

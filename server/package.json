@@ -15,7 +15,8 @@
     "bcryptjs",
     "better-sqlite3",
     "omise",
-    "stripe"
+    "stripe",
+    "node-fetch"
   ],
   "devDependencies": [
     "nodemon"

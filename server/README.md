@@ -1,15 +1,17 @@
 # อ.โทนี่สะท้อนกรรม — Backend API
 
-Node.js + Express backend for real authentication, credits, and PromptPay via Stripe. Handles creating PaymentIntents for PromptPay, returning QR code image URL for scanning, polling status, and secure webhook updates to credit users automatically.
+Node.js + Express backend for real authentication, credits, and PromptPay via Stripe or SCB Payment Gateway (เลือกได้ด้วย PAY_PROVIDER).
 
 ## Features
 
 - User signup/login with token (JWT)
 - Credits: consume 1 credit per reading
 - Packages listing (5 promotions)
-- Create PromptPay PaymentIntent via Stripe and return QR image URL (`next_action.promptpay_display_qr_code.image_url`)
-- Poll order status endpoint (refresh from Stripe PaymentIntent)
-- Webhook endpoint for Stripe events (`payment_intent.succeeded`) to auto-credit on payment success
+- Payment provider selectable:
+  - Stripe PromptPay (PaymentIntent → QR image URL → webhook)
+  - SCB Payment Gateway/Open API (Create QR → webhook or polling check)
+- Poll order status endpoint (refresh from provider)
+- Webhook endpoint (Stripe or SCB) to auto-credit on payment success
 - SQLite database (better-sqlite3)
 
 ## Quick start
@@ -29,8 +31,21 @@ cp .env.example .env
 
 Edit `.env`:
 
+- Set `PAY_PROVIDER=stripe` or `PAY_PROVIDER=scb`
+
+Stripe:
 - `STRIPE_SECRET_KEY` — from your Stripe account (enable PromptPay)
 - `STRIPE_WEBHOOK_SECRET` — webhook signing secret from Stripe Dashboard
+
+SCB:
+- `SCB_OAUTH_URL` — OAuth token endpoint
+- `SCB_CLIENT_ID`, `SCB_CLIENT_SECRET` — SCB OAuth credentials
+- `SCB_QR_CREATE_URL` — API endpoint to create dynamic QR
+- `SCB_CHECK_BILLPAY_URL` — API endpoint to check bill payment status (ref1/ref2/date)
+- `SCB_MERCHANT_ID`, `SCB_TERMINAL_ID`, `SCB_BILLER_ID` — merchant parameters required by SCB
+- `SCB_WEBHOOK_SECRET` — shared secret to validate webhook requests (query/header)
+
+Common:
 - `JWT_SECRET` — random string for JWT
 - `PORT` — default 3000
 - `CORS_ORIGIN` — your frontend origin (e.g., https://your-domain.com)
@@ -51,18 +66,24 @@ In `tarot-app/index.html`, ensure:
 </script>
 ```
 
-Deploy frontend and backend; the site will consume credits and show real Stripe PromptPay QR codes.
+Deploy frontend and backend; the site will consume credits and show real QR codes depending on provider.
 
-## Webhook setup (Stripe)
+## Webhook setup
 
-- In Stripe Dashboard, set Webhook endpoint to:
+Stripe:
+- Set Webhook endpoint:
+  ```
+  https://your-server.com/api/webhooks/stripe
+  ```
+- Use `STRIPE_WEBHOOK_SECRET` to verify header `Stripe-Signature`.
 
-```
-https://your-server.com/api/webhooks/stripe
-```
-
-- Use `STRIPE_WEBHOOK_SECRET` from `.env` in the backend to verify the signature header `Stripe-Signature`.
-- On `payment_intent.succeeded`, backend marks the order as paid and credits the user automatically.
+SCB:
+- Set Webhook endpoint:
+  ```
+  https://your-server.com/api/webhooks/scb?secret=SCB_WEBHOOK_SECRET
+  ```
+- Or send header `x-scb-webhook-secret: SCB_WEBHOOK_SECRET`.
+- On payment success, send payload containing `ref1` and `status` (exact format depends on SCB setup).
 
 ## API
 
@@ -72,8 +93,9 @@ https://your-server.com/api/webhooks/stripe
 - `GET /api/me` — returns `{ name, phone, credits }`
 - `POST /api/credits/consume` — deduct 1 credit
 - `POST /api/topup/create-order { packageId }` — returns `{ orderId, qrImage }`
-- `GET /api/orders/:orderId` — returns `{ status }` and refreshes from Stripe
+- `GET /api/orders/:orderId` — returns `{ status }` and refreshes from provider
 - `POST /api/webhooks/stripe` — Stripe events webhook (auto-credit)
+- `POST /api/webhooks/scb` — SCB webhook (auto-credit)
 
 ## Database
 
@@ -83,11 +105,15 @@ Tables:
 - `users(id, phone UNIQUE, name, password_hash, credits INTEGER DEFAULT 0)`
 - `orders(id, order_id TEXT UNIQUE, user_id INTEGER, package_id TEXT, credits INTEGER, amount INTEGER, status TEXT, pi_id TEXT, created_at TEXT)`
 
+Notes:
+- For Stripe, `pi_id` stores PaymentIntent ID.
+- For SCB, `pi_id` stores `ref1` (reference1) to match bill payment checks/webhooks.
+
 ## Deployment
 
 - Use a Node.js host (Render, Railway, Fly.io, etc.)
 - Ensure HTTPS and public access for webhook
-- Configure firewall to allow Stripe webhook IPs if needed
+- Configure firewall to allow provider webhook IPs if needed
 
 ## Notes
 
