@@ -65,7 +65,9 @@ body {
   margin: 24px 0; padding: 20px;
   background: var(--card);
   border: 1px solid #1e2433; border-radius: 14px;
+  transition: transform .2s ease, box-shadow .2s ease;
 }
+.card:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
 .card.soft { background: var(--soft); }
 
 .row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
@@ -84,6 +86,9 @@ textarea { resize: vertical; }
   margin-top: 16px; padding: 16px;
   border: 1px solid #2a3247; border-radius: 10px; background: #0e1220;
 }
+
+.small { color: var(--muted); font-size: 12px; }
+.danger { color: var(--danger); }
 
 .list { margin: 0; padding-left: 16px; color: var(--muted); }
 .list li { margin-bottom: 6px; }
@@ -118,6 +123,7 @@ textarea { resize: vertical; }
 /* Tarot cards display */
 .tarot-card {
   padding: 12px; border: 1px solid #2a3247; border-radius: 12px; background: #0e1220;
+  animation: fadeIn .25s ease both;
 }
 .tarot-card h4 { margin: 0 0 8px; }
 .tarot-card .minor { color: var(--muted); }
@@ -127,3 +133,24 @@ textarea { resize: vertical; }
   font-size: 40px; display: inline-block; transform-origin: center; transition: transform .3s ease;
 }
 .dice.spin { transform: rotate(20deg) scale(1.05); }
+
+/* Modal */
+.modal {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  background: rgba(0,0,0,0.5);
+}
+.modal[hidden] { display: none; }
+.modal-card {
+  width: min(520px, 92%); background: var(--card); border: 1px solid #1e2433; border-radius: 14px; padding: 16px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.45); animation: pop .18s ease;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pop {
+  from { transform: scale(.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

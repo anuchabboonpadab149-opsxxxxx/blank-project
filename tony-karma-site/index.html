@@ -27,6 +27,7 @@
         <a href="#siemsi">เซียมซี</a>
         <a href="#dice">ลูกเต๋า</a>
         <a href="#dream">ทำนายฝัน</a>
+        <a href="#history">ประวัติการทำนาย</a>
         <a href="#payment">ชำระเงิน/สนับสนุน</a>
       </nav>
     </div>
@@ -41,9 +42,16 @@
         <a class="btn" href="#tarot">สุ่มไพ่ยิปซี</a>
       </div>
 
+      <div class="row" style="margin:12px 0;">
+        <span id="auth-status" class="small">ยังไม่ได้เข้าสู่ระบบ</span>
+        <button id="btn-login" class="btn">เข้าสู่ระบบ</button>
+        <button id="btn-register" class="btn ghost">สมัครสมาชิก</button>
+        <button id="btn-logout" class="btn ghost" style="display:none;">ออกจากระบบ</button>
+      </div>
+
       <div class="ai-mode">
-        <h3>โหมด AI (ตัวเลือก)</h3>
-        <p>ใส่ OpenAI API Key เพื่อใช้โมเดลภาษาให้คำทำนายเชิงลึกบนเครื่องของคุณเอง (ไม่ควรใช้ในผลิตภัณฑ์จริง)</p>
+        <h3>โหมด AI (ทางเลือก)</h3>
+        <p>เพื่อความปลอดภัย แนะนำให้เชื่อมต่อผ่านพร็อกซีฝั่งเซิร์ฟเวอร์ (ต้องเข้าสู่ระบบ) หรือใช้คีย์ส่วนตัวชั่วคราว</p>
         <div class="ai-key-row">
           <input id="openai-key" type="password" placeholder="sk-... (คีย์ของคุณ)">
           <button id="save-key" class="btn">บันทึกคีย์</button>
@@ -74,6 +82,15 @@
         <label>
           จังหวัดที่เกิด (ถ้ามี)
           <input type="text" id="pob" placeholder="เช่น กรุงเทพฯ">
+        </label>
+        <label>
+          ชุดคำถาม/โทนคำทำนาย
+          <select id="astro-preset">
+            <option value="balanced">สมดุลกลาง</option>
+            <option value="love">โฟกัสความรัก</option>
+            <option value="career">โฟกัสการงาน/เงิน</option>
+            <option value="health">โฟกัสสุขภาพ/ใจ</option>
+          </select>
         </label>
         <button type="submit" class="btn primary">ทำนายดวงกำเนิด</button>
       </form>
@@ -118,9 +135,27 @@
           เล่าความฝันของคุณ
           <textarea id="dream-text" rows="4" placeholder="เช่น ฝันเห็นงูสีเขียวเลื้อยเข้าบ้าน..."></textarea>
         </label>
+        <label>
+          ชุดคำถาม/โทนการตีความ
+          <select id="dream-preset">
+            <option value="balanced">สมดุลกลาง</option>
+            <option value="relationship">สัมพันธ์/ความรู้สึก</option>
+            <option value="career">งาน/เป้าหมาย</option>
+            <option value="healing">เยียวยา/การเติบโต</option>
+          </select>
+        </label>
         <button type="submit" class="btn primary">ทำนายฝัน</button>
       </form>
       <div id="dream-output" class="output"></div>
+    </section>
+
+    <section id="history" class="card">
+      <h3>ประวัติการทำนาย</h3>
+      <p class="small">ระบบจะบันทึกเฉพาะบนอุปกรณ์ของคุณ หากต้องการซิงค์บัญชีสามารถเพิ่มฐานข้อมูลภายนอกภายหลัง</p>
+      <div id="history-list" class="output"></div>
+      <div class="row" style="margin-top:8px;">
+        <button id="clear-history" class="btn ghost">ล้างประวัติทั้งหมด</button>
+      </div>
     </section>
 
     <section id="payment" class="card">
@@ -149,7 +184,7 @@
       <h3>ข้อจำกัดและคำแนะนำ</h3>
       <ul class="list">
         <li>คำทำนายจัดทำเพื่อความบันเทิงและการสะท้อนตนเอง ไม่ใช่คำปรึกษาทางการแพทย์/การเงิน/กฎหมาย</li>
-        <li>โหมด AI ต้องใช้ OpenAI API Key ส่วนตัวซึ่งจะทำงานในอุปกรณ์ของคุณเท่านั้น</li>
+        <li>โหมด AI สามารถใช้ผ่านพร็อกซีฝั่งเซิร์ฟเวอร์เมื่อเข้าสู่ระบบ หรือใช้คีย์ส่วนตัวชั่วคราว</li>
         <li>สำหรับโดเมนฟรี สามารถเผยแพร่บน GitHub Pages, Netlify หรือ Vercel ได้ทันที</li>
       </ul>
     </section>
@@ -163,6 +198,36 @@
       </div>
     </div>
   </footer>
+
+  <!-- Auth modals -->
+  <div id="modal-login" class="modal" hidden>
+    <div class="modal-card">
+      <h3>เข้าสู่ระบบ</h3>
+      <div class="form-grid">
+        <label>อีเมล <input type="email" id="login-email" placeholder="you@example.com"></label>
+        <label>รหัสผ่าน <input type="password" id="login-password" placeholder="••••••••"></label>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="do-login" class="btn primary">เข้าสู่ระบบ</button>
+        <button data-close="login" class="btn ghost">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-register" class="modal" hidden>
+    <div class="modal-card">
+      <h3>สมัครสมาชิก</h3>
+      <div class="form-grid">
+        <label>อีเมล <input type="email" id="reg-email" placeholder="you@example.com"></label>
+        <label>รหัสผ่าน <input type="password" id="reg-password" placeholder="อย่างน้อย 8 ตัวอักษร"></label>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="do-register" class="btn primary">สมัครสมาชิก</button>
+        <button data-close="register" class="btn ghost">ปิด</button>
+      </div>
+      <p class="small">หมายเหตุ: ระบบสาธิตนี้บันทึกบนอุปกรณ์ของคุณเท่านั้น สามารถเชื่อมต่อบริการ Auth ภายนอกได้ภายหลัง</p>
+    </div>
+  </div>
 
   <script src="./script.js" defer></script>
 </body>

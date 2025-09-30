@@ -1,4 +1,9 @@
-const $, $$ = (sel, ctx = document) => ctx.querySelector(sel), (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
+const $, $ = (sel, ctx = document) => ctx.querySelector(sel), (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
+
+/* State */
+const state = {
+  user: null, // {email}
+};
 
 /* Persisted OpenAI key */
 (() => {
@@ -7,17 +12,92 @@ const $, $$ = (sel, ctx = document) => ctx.querySelector(sel), (sel, ctx = docum
   const clearBtn = $('#clear-key');
 
   const saved = localStorage.getItem('openai_key');
-  if (saved) keyInput.value = saved;
+  if (saved && keyInput) keyInput.value = saved;
 
-  saveBtn.addEventListener('click', () => {
+  if (saveBtn) saveBtn.addEventListener('click', () => {
     localStorage.setItem('openai_key', keyInput.value.trim());
     saveBtn.textContent = 'บันทึกแล้ว';
     setTimeout(() => (saveBtn.textContent = 'บันทึกคีย์'), 1200);
   });
-  clearBtn.addEventListener('click', () => {
+  if (clearBtn) clearBtn.addEventListener('click', () => {
     localStorage.removeItem('openai_key');
-    keyInput.value = '';
+    if (keyInput) keyInput.value = '';
   });
+})();
+
+/* Auth (demo - localStorage only) */
+(() => {
+  const authStatus = $('#auth-status');
+  const btnLogin = $('#btn-login');
+  const btnRegister = $('#btn-register');
+  const btnLogout = $('#btn-logout');
+  const modalLogin = $('#modal-login');
+  const modalRegister = $('#modal-register');
+
+  const savedUser = localStorage.getItem('user');
+  if (savedUser) {
+    state.user = JSON.parse(savedUser);
+  }
+  renderAuth();
+
+  btnLogin?.addEventListener('click', () => modalLogin.hidden = false);
+  btnRegister?.addEventListener('click', () => modalRegister.hidden = false);
+  $('[data-close="login"]')?.addEventListener('click', () => modalLogin.hidden = true);
+  $('[data-close="register"]')?.addEventListener('click', () => modalRegister.hidden = true);
+
+  $('#do-login')?.addEventListener('click', () => {
+    const email = $('#login-email').value.trim().toLowerCase();
+    const pass = $('#login-password').value;
+    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    if (users[email] && users[email].pass === pass) {
+      state.user = { email };
+      localStorage.setItem('user', JSON.stringify(state.user));
+      modalLogin.hidden = true;
+      renderAuth();
+    } else {
+      alert('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    }
+  });
+
+  $('#do-register')?.addEventListener('click', () => {
+    const email = $('#reg-email').value.trim().toLowerCase();
+    const pass = $('#reg-password').value;
+    if (!email || !pass || pass.length < 8) {
+      alert('กรอกอีเมลและรหัสผ่านอย่างน้อย 8 ตัว');
+      return;
+    }
+    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    if (users[email]) {
+      alert('อีเมลนี้ถูกใช้แล้ว');
+      return;
+    }
+    users[email] = { pass };
+    localStorage.setItem('users', JSON.stringify(users));
+    state.user = { email };
+    localStorage.setItem('user', JSON.stringify(state.user));
+    $('#modal-register').hidden = true;
+    renderAuth();
+  });
+
+  btnLogout?.addEventListener('click', () => {
+    state.user = null;
+    localStorage.removeItem('user');
+    renderAuth();
+  });
+
+  function renderAuth() {
+    if (state.user) {
+      authStatus.textContent = `เข้าสู่ระบบ: ${state.user.email}`;
+      btnLogin.style.display = 'none';
+      btnRegister.style.display = 'none';
+      btnLogout.style.display = 'inline-flex';
+    } else {
+      authStatus.textContent = 'ยังไม่ได้เข้าสู่ระบบ';
+      btnLogin.style.display = 'inline-flex';
+      btnRegister.style.display = 'inline-flex';
+      btnLogout.style.display = 'none';
+    }
+  }
 })();
 
 /* Utils */
@@ -39,6 +119,55 @@ const seeded = (seedStr) => {
 };
 const pick = (arr, rnd = Math.random) => arr[Math.floor(rnd() * arr.length)];
 
+/* Presets */
+const ASTRO_PRESETS = {
+  balanced: 'โทนสมดุล เน้นข้อแนะนำปฏิบัติได้',
+  love: 'โฟกัสความรักและความสัมพันธ์เป็นพิเศษ',
+  career: 'โฟกัสงาน การเติบโต รายได้ และการเงิน',
+  health: 'โฟกัสสุขภาพกายใจ การพักผ่อน สมดุลชีวิต',
+};
+const DREAM_PRESETS = {
+  balanced: 'โทนสมดุล สะท้อนใจอย่างอ่อนโยน',
+  relationship: 'โฟกัสความสัมพันธ์ ความรู้สึก ความผูกพัน',
+  career: 'โฟกัสเป้าหมาย งาน การตัดสินใจ',
+  healing: 'โฟกัสการเยียวยา การเติบโต และสติ',
+};
+
+/* History */
+function pushHistory(item) {
+  // Gate history for logged-in users only
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (!user) return;
+  const key = `history:${user.email}`;
+  const list = JSON.parse(localStorage.getItem(key) || '[]');
+  list.unshift({ ...item, ts: Date.now() });
+  localStorage.setItem(key, JSON.stringify(list.slice(0, 100)));
+  renderHistory();
+}
+function renderHistory() {
+  const container = $('#history-list');
+  if (!container) return;
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (!user) { container.innerHTML = '<p class="small">กรุณาเข้าสู่ระบบเพื่อดูประวัติ</p>'; return; }
+  const key = `history:${user.email}`;
+  const list = JSON.parse(localStorage.getItem(key) || '[]');
+  if (!list.length) { container.innerHTML = '<p class="small">ยังไม่มีประวัติ</p>'; return; }
+  container.innerHTML = list.map(it => {
+    const dt = new Date(it.ts).toLocaleString('th-TH');
+    return `<div class="card" style="margin:8px 0;">
+      <div class="small">${dt} • ประเภท: ${it.type}</div>
+      <div>${it.html}</div>
+    </div>`;
+  }).join('');
+}
+$('#clear-history')?.addEventListener('click', () => {
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (!user) return;
+  localStorage.removeItem(`history:${user.email}`);
+  renderHistory();
+});
+renderHistory();
+
 /* ASTROLOGY */
 const zodiac = (month, day) => {
   const z = [
@@ -46,7 +175,7 @@ const zodiac = (month, day) => {
     ['เมษ', 4, 20], ['พฤษภ', 5, 21], ['เมถุน', 6, 21],
     ['กรกฎ', 7, 22], ['สิงห์', 8, 23], ['กันย์', 9, 23],
     ['ตุลย์', 10, 23], ['พิจิก', 11, 22], ['ธนู', 12, 21],
-    ['มังกร', 12, 31], // cap for end of year
+    ['มังกร', 12, 31],
   ];
   for (let i = 0; i < z.length - 1; i++) {
     const [name, m, d] = z[i], [nextName, nm, nd] = z[i + 1];
@@ -67,17 +196,17 @@ const zodiacElement = (sign) => {
 };
 const chineseZodiac = (year) => {
   const names = ['ชวด(หนู)','ฉลู(วัว)','ขาล(เสือ)','เถาะ(กระต่าย)','มะโรง(มังกร)','มะเส็ง(งู)','มะเมีย(ม้า)','มะแม(แพะ)','วอก(ลิง)','ระกา(ไก่)','จอ(สุนัข)','กุน(หมู)'];
-  // 2020 = ชวด, adjust offset accordingly
   const offset = (year - 2020) % 12;
   return names[(offset + 12) % 12];
 };
 
-$('#astro-form').addEventListener('submit', async (e) => {
+$('#astro-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('#name').value.trim() || 'ผู้ถาม';
   const dob = $('#dob').value;
   const tob = $('#tob').value;
   const pob = $('#pob').value.trim();
+  const preset = $('#astro-preset')?.value || 'balanced';
 
   if (!dob) {
     $('#astro-output').innerHTML = `<p class="danger">กรุณาระบุวันเกิด</p>`;
@@ -134,21 +263,40 @@ $('#astro-form').addEventListener('submit', async (e) => {
     </ul>
   `;
 
-  const key = localStorage.getItem('openai_key')?.trim();
-  if (key) {
-    const prompt = `
+  const basePrompt = `
 คุณคือหมอดูชื่อ "อ.โทนี่สะท้อนกรรม" ให้คำทำนายภาษาไทย สุภาพ จริงใจ เชิงบวกแต่ไม่โอเวอร์
 ข้อมูลผู้ถาม: ชื่อ=${name}, วันเกิด=${formatDateTh(dob)} (${day}), ราศี=${sign} ธาตุ=${element}, นักษัตร=${cz}, เวลาเกิด=${tob||'-'}, สถานที่เกิด=${pob||'-'}
+โทน/ชุดคำถาม: ${ASTRO_PRESETS[preset]}
 โปรดสรุปคำทำนาย 5 ด้าน: ความรัก การงาน การเงิน สุขภาพ โชคลาภ ให้เป็นย่อหน้าอ่านง่าย 5-7 บรรทัด รวมข้อแนะนำสั้นๆที่ปฏิบัติได้
-    `.trim();
+  `.trim();
+
+  const key = localStorage.getItem('openai_key')?.trim();
+  if (key) {
     try {
-      const aiText = await askOpenAI(key, prompt);
-      $('#astro-output').innerHTML = content + `<div class="output"><h4>โหมด AI</h4><p>${aiText}</p></div>`;
+      const aiText = await askOpenAI(key, basePrompt);
+      const html = content + `<div class="output"><h4>โหมด AI</h4><p>${aiText}</p></div>`;
+      $('#astro-output').innerHTML = html;
+      pushHistory({ type: 'โหราศาสตร์', html });
     } catch (err) {
       $('#astro-output').innerHTML = content + `<p class="small">โหมด AI ไม่พร้อมใช้งาน: ${err.message}</p>`;
+      pushHistory({ type: 'โหราศาสตร์', html: content });
     }
   } else {
+    // Try serverless proxy if logged in
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      if (user) {
+        const aiText = await askOpenAIProxy(basePrompt);
+        const html = content + `<div class="output"><h4>โหมด AI (พร็อกซี)</h4><p>${aiText}</p></div>`;
+        $('#astro-output').innerHTML = html;
+        pushHistory({ type: 'โหราศาสตร์', html });
+        return;
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
     $('#astro-output').innerHTML = content;
+    pushHistory({ type: 'โหราศาสตร์', html: content });
   }
 });
 
@@ -178,7 +326,7 @@ const TAROT = [
   { name: 'The World (โลก)', meaning: 'ครบถ้วน สมบูรณ์ วงจรเสร็จสิ้นพร้อมเริ่มใหม่' },
 ];
 
-$('#draw-tarot').addEventListener('click', () => {
+$('#draw-tarot')?.addEventListener('click', () => {
   const n = parseInt($('#tarot-count').value, 10);
   const rnd = seeded(String(Date.now()));
   const cards = [];
@@ -200,6 +348,7 @@ $('#draw-tarot').addEventListener('click', () => {
     `;
     grid.appendChild(el);
   });
+  pushHistory({ type: 'ไพ่ยิปซี', html: grid.innerHTML });
 });
 
 const invertMeaning = (m) => {
@@ -240,16 +389,17 @@ const SIEMSI = [
   { no: 20, tone: 'ตื่นรู้', text: 'เรียนจากบทเรียนเก่า โอกาสใหม่กำลังมา' },
 ];
 
-$('#shake-siemsi').addEventListener('click', () => {
+$('#shake-siemsi')?.addEventListener('click', () => {
   const s = pick(SIEMSI);
   $('#siemsi-output').innerHTML = `
     <p>ใบที่ <strong>${s.no}</strong> (${s.tone})</p>
     <p>${s.text}</p>
   `;
+  pushHistory({ type: 'เซียมซี', html: $('#siemsi-output').innerHTML });
 });
 
 /* DICE */
-$('#roll-dice').addEventListener('click', () => {
+$('#roll-dice')?.addEventListener('click', () => {
   const diceEl = document.createElement('span');
   diceEl.className = 'dice spin';
   diceEl.textContent = '🎲';
@@ -267,6 +417,7 @@ $('#roll-dice').addEventListener('click', () => {
       'ลงมือทำทันที ไม่ผัดวัน'
     ][n-1];
     $('#dice-output').innerHTML = `<p>ผลการทอย: <strong>${n}</strong></p><p>คำแนะนำ: ${advice}</p>`;
+    pushHistory({ type: 'ลูกเต๋า', html: $('#dice-output').innerHTML });
   }, 500);
 });
 
@@ -284,9 +435,10 @@ const DREAM_MAP = [
   { keys: ['บ้าน','ครอบครัว'], topic: 'ความมั่นคง', meaning: 'ดูแลบ้านและครอบครัว เติมความอบอุ่น' },
 ];
 
-$('#dream-form').addEventListener('submit', async (e) => {
+$('#dream-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = $('#dream-text').value.trim();
+  const preset = $('#dream-preset')?.value || 'balanced';
   if (!text) {
     $('#dream-output').innerHTML = `<p class="danger">กรุณาเล่าความฝัน</p>`;
     return;
@@ -303,31 +455,47 @@ $('#dream-form').addEventListener('submit', async (e) => {
   ]);
   const templated = `<p>${baseMsg}</p><p class="minor">ข้อแนะนำ: ${advice}</p>`;
 
-  const key = localStorage.getItem('openai_key')?.trim();
-  if (key) {
-    const prompt = `
+  const prompt = `
 คุณคือหมอดู "อ.โทนี่สะท้อนกรรม" วิเคราะห์ความฝันภาษาไทยให้เป็นเชิงบวกและปฏิบัติได้
+บริบท/ชุดคำถาม: ${DREAM_PRESETS[preset]}
 ความฝัน: """${text}"""
 สรุปประเด็นที่สะท้อนใจ และให้ข้อแนะนำสั้นๆ 4-6 บรรทัด
-    `.trim();
+  `.trim();
+
+  const key = localStorage.getItem('openai_key')?.trim();
+  if (key) {
     try {
       const aiText = await askOpenAI(key, prompt);
-      $('#dream-output').innerHTML = templated + `<div class="output"><h4>โหมด AI</h4><p>${aiText}</p></div>`;
+      const html = templated + `<div class="output"><h4>โหมด AI</h4><p>${aiText}</p></div>`;
+      $('#dream-output').innerHTML = html;
+      pushHistory({ type: 'ทำนายฝัน', html });
     } catch (err) {
       $('#dream-output').innerHTML = templated + `<p class="small">โหมด AI ไม่พร้อมใช้งาน: ${err.message}</p>`;
+      pushHistory({ type: 'ทำนายฝัน', html: templated });
     }
   } else {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      if (user) {
+        const aiText = await askOpenAIProxy(prompt);
+        const html = templated + `<div class="output"><h4>โหมด AI (พร็อกซี)</h4><p>${aiText}</p></div>`;
+        $('#dream-output').innerHTML = html;
+        pushHistory({ type: 'ทำนายฝัน', html });
+        return;
+      }
+    } catch (e) {}
     $('#dream-output').innerHTML = templated;
+    pushHistory({ type: 'ทำนายฝัน', html: templated });
   }
 });
 
 /* Payment copy */
-$('#copy-account').addEventListener('click', () => {
+$('#copy-account')?.addEventListener('click', () => {
   const t = $('#scb-account').textContent.trim();
   navigator.clipboard.writeText(t);
 });
 
-/* OpenAI helper */
+/* OpenAI helper - direct (unsafe for production) */
 async function askOpenAI(key, prompt) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -351,4 +519,16 @@ async function askOpenAI(key, prompt) {
   const data = await res.json();
   const choice = data.choices?.[0]?.message?.content;
   return choice || '';
+}
+
+/* OpenAI helper - serverless proxy */
+async function askOpenAIProxy(prompt) {
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.text || '';
 }
