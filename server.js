@@ -1,10 +1,12 @@
 /**
  * Minimal agent-based top-up system (no payments)
+ * Now with basic accounts and RBAC (customer/agent/admin).
  * - Static form at / (public/index.html)
- * - Create orders via POST /api/orders
+ * - Login at /login (JSON API: /auth/login, /auth/logout, /me)
+ * - Create orders via POST /api/orders (customer only)
  * - View order status at /order/:id
- * - Agent dashboard at /agent (assign/fulfill)
- * - Fulfill endpoints to mark success/failed
+ * - Agent dashboard at /agent (assign/fulfill) - requires agent/admin
+ * - Fulfill endpoints to mark success/failed - requires agent/admin
  *
  * Note: This is an MVP using in-memory storage. Restarting the server clears data.
  */
@@ -18,14 +20,51 @@ app.use(express.urlencoded({ extended: true }));
 
 // In-memory DB
 const db = {
-  orders: [], // {id, bigoId, diamonds, note, status, agentId, createdAt, updatedAt}
+  orders: [], // {id, bigoId, diamonds, note, status, agentId, customerId, createdAt, updatedAt}
   users: [
-    // Minimal seed for agents (no auth; just placeholder)
-    { id: 1, role: 'agent', name: 'Agent 1' },
-    { id: 2, role: 'agent', name: 'Agent 2' }
+    // Seed users (plaintext passwords for demo ONLY)
+    { id: 1, role: 'admin', username: 'admin', password: 'admin123', name: 'Administrator' },
+    { id: 2, role: 'agent', username: 'agent', password: 'agent123', name: 'Agent One' },
+    { id: 3, role: 'customer', username: 'customer', password: 'customer123', name: 'Customer Demo' }
   ]
 };
 let idSeq = 1;
+
+// Simple session store: token -> userId
+const sessions = new Map();
+
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  return header.split(';').reduce((acc, pair) => {
+    const [k, v] = pair.trim().split('=');
+    if (k) acc[k] = decodeURIComponent(v || '');
+    return acc;
+  }, {});
+}
+
+function setSessionCookie(res, token) {
+  res.setHeader('Set-Cookie', `session_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax`);
+}
+
+function requireAuth(req, res, next) {
+  const cookies = parseCookies(req);
+  const token = cookies.session_token;
+  if (!token || !sessions.has(token)) {
+    return res.status(401).send('Unauthorized');
+  }
+  const userId = sessions.get(token);
+  req.user = db.users.find(u => u.id === userId) || null;
+  if (!req.user) return res.status(401).send('Unauthorized');
+  next();
+}
+
+function requireRole(roles) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).send('Unauthorized');
+    if (!roles.includes(req.user.role)) return res.status(403).send('Forbidden');
+    next();
+  };
+}
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -33,8 +72,37 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Health
 app.get('/health', (req, res) => res.json({ ok: true }));
 
-// Create order (no payment flow)
-app.post('/api/orders', (req, res) => {
+// Auth endpoints
+app.post('/auth/login', (req, res) => {
+  const { username, password } = req.body || {};
+  const user = db.users.find(u => u.username === String(username) && u.password === String(password));
+  if (!user) return res.status(401).json({ error: 'invalid_credentials' });
+  const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  sessions.set(token, user.id);
+  setSessionCookie(res, token);
+  res.json({ id: user.id, role: user.role, name: user.name, username: user.username });
+});
+
+app.post('/auth/logout', (req, res) => {
+  const cookies = parseCookies(req);
+  const token = cookies.session_token;
+  if (token) sessions.delete(token);
+  res.setHeader('Set-Cookie', 'session_token=; Path=/; Max-Age=0');
+  res.json({ ok: true });
+});
+
+app.get('/me', (req, res) => {
+  const cookies = parseCookies(req);
+  const token = cookies.session_token;
+  if (!token || !sessions.has(token)) return res.json(null);
+  const userId = sessions.get(token);
+  const user = db.users.find(u => u.id === userId);
+  if (!user) return res.json(null);
+  res.json({ id: user.id, role: user.role, name: user.name, username: user.username });
+});
+
+// Create order (no payment flow) - customer only
+app.post('/api/orders', requireAuth, requireRole(['customer']), (req, res) => {
   const { bigoId, diamonds, note } = req.body || {};
   const bigoStr = String(bigoId || '').trim();
   const diamondsNum = Number(diamonds);
@@ -54,6 +122,7 @@ app.post('/api/orders', (req, res) => {
     note: (note || '').toString().slice(0, 200),
     status: 'QUEUED', // QUEUED -> FULFILLING -> SUCCESS/FAILED
     agentId: null,
+    customerId: req.user.id,
     createdAt: now,
     updatedAt: now
   };
@@ -61,14 +130,17 @@ app.post('/api/orders', (req, res) => {
   return res.json({ id: order.id, status: order.status });
 });
 
-// Get raw order JSON
-app.get('/api/orders/:id', (req, res) => {
+// Get raw order JSON (only owner, or agent/admin)
+app.get('/api/orders/:id', requireAuth, (req, res) => {
   const order = db.orders.find(o => o.id === Number(req.params.id));
   if (!order) return res.status(404).json({ error: 'not_found' });
+  if (req.user.role === 'customer' && order.customerId !== req.user.id) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
   res.json(order);
 });
 
-// Simple status page
+// Simple status page (public view kept; no sensitive data shown)
 app.get('/order/:id', (req, res) => {
   const order = db.orders.find(o => o.id === Number(req.params.id));
   if (!order) return res.status(404).send('Order not found');
@@ -106,9 +178,8 @@ app.get('/order/:id', (req, res) => {
   `);
 });
 
-// Agent dashboard (no auth; for demo)
-app.get('/agent', (req, res) => {
-  // Group orders by status
+// Agent dashboard - requires agent/admin
+app.get('/agent', requireAuth, requireRole(['agent','admin']), (req, res) => {
   const queued = db.orders.filter(o => o.status === 'QUEUED');
   const fulfilling = db.orders.filter(o => o.status === 'FULFILLING');
   const done = db.orders.filter(o => o.status === 'SUCCESS' || o.status === 'FAILED');
@@ -160,7 +231,7 @@ app.get('/agent', (req, res) => {
       </style>
     </head>
     <body>
-      <h1>แดชบอร์ดตัวแทน (เดโม่ - ไม่มีระบบล็อกอิน)</h1>
+      <h1>แดชบอร์ดตัวแทน</h1>
       <p class="muted">ขั้นตอน: รับงาน → เปิด bigo.tv เติมจริง → กดสำเร็จ/ล้มเหลว</p>
 
       <h2>คิวใหม่ (QUEUED)</h2>
@@ -187,20 +258,20 @@ app.get('/agent', (req, res) => {
   `);
 });
 
-// Assign order to an agent (auto-assign Agent 1 for demo)
-app.post('/api/orders/:id/assign', (req, res) => {
+// Assign order to an agent (auto-assign current agent)
+app.post('/api/orders/:id/assign', requireAuth, requireRole(['agent','admin']), (req, res) => {
   const order = db.orders.find(o => o.id === Number(req.params.id));
   if (!order) return res.status(404).send('Order not found');
   if (order.status !== 'QUEUED') return res.status(400).send('Order not in queue');
 
-  order.agentId = 1;
+  order.agentId = req.user.id;
   order.status = 'FULFILLING';
   order.updatedAt = new Date().toISOString();
   res.redirect('/agent');
 });
 
 // Fulfill order result
-app.post('/api/orders/:id/fulfill', (req, res) => {
+app.post('/api/orders/:id/fulfill', requireAuth, requireRole(['agent','admin']), (req, res) => {
   const order = db.orders.find(o => o.id === Number(req.params.id));
   if (!order) return res.status(404).send('Order not found');
   if (order.status !== 'FULFILLING') return res.status(400).send('Order not fulfilling');
@@ -223,4 +294,5 @@ app.listen(PORT, () => {
   console.log(`Server running: http://localhost:${PORT}`);
   console.log(`Form: http://localhost:${PORT}/`);
   console.log(`Agent dashboard: http://localhost:${PORT}/agent`);
+  console.log('Seed accounts: admin/admin123, agent/agent123, customer/customer123');
 });

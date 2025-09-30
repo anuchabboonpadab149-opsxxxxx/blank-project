@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { font-family: system-ui, sans-serif; margin: 24px; background: #fafafa; }
-    .card { max-width: 560px; margin: auto; padding: 18px; border: 1px solid #ddd; border-radius: 12px; background: #fff; }
+    .card { max-width: 680px; margin: auto; padding: 18px; border: 1px solid #ddd; border-radius: 12px; background: #fff; }
     label { display:block; margin: 12px 0 6px; font-weight: 600; }
     input, select, button { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -16,13 +16,27 @@
     .packages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
     .pkg { padding: 10px; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; text-align: center; background: #f7f7f7; }
     .pkg.selected { border-color: #4a90e2; background: #eef5ff; }
+    .topbar { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .topbar input { width:auto; }
+    .user { font-size: 13px; color:#333; }
     a.btn { display:inline-block; margin-top: 12px; padding:10px 12px; background:#4a90e2; color:#fff; border-radius:8px; text-decoration:none }
   </style>
 </head>
 <body>
   <div class="card">
+    <div class="topbar">
+      <div>
+        <strong>เข้าสู่ระบบ</strong>
+        <input id="username" placeholder="username">
+        <input id="password" type="password" placeholder="password">
+        <button id="loginBtn">Login</button>
+        <button id="logoutBtn" style="display:none;">Logout</button>
+      </div>
+      <div class="user" id="userInfo">ยังไม่เข้าสู่ระบบ</div>
+    </div>
+
     <h2>สั่งเติมเพชรผ่านตัวแทน</h2>
-    <p class="hint">ระบบเดโม่นี้ไม่มีการชำระเงินอัตโนมัติ การเติมจริงดำเนินการโดยตัวแทนผ่าน bigo.tv</p>
+    <p class="hint">ระบบนี้ไม่มีการชำระเงินอัตโนมัติ การเติมจริงดำเนินการโดยตัวแทนผ่าน bigo.tv และต้องล็อกอินด้วยบัญชีลูกค้าเพื่อสร้างคำสั่งเติม</p>
 
     <div id="packages" class="packages"></div>
 
@@ -52,6 +66,43 @@
   </div>
 
   <script>
+    async function refreshUser() {
+      const res = await fetch('/me');
+      const user = await res.json();
+      const info = document.getElementById('userInfo');
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (user && user.username) {
+        info.textContent = `เข้าสู่ระบบเป็น ${user.username} (${user.role})`;
+        logoutBtn.style.display = 'inline-block';
+      } else {
+        info.textContent = 'ยังไม่เข้าสู่ระบบ';
+        logoutBtn.style.display = 'none';
+      }
+      return user;
+    }
+
+    document.getElementById('loginBtn').onclick = async () => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (res.ok) {
+        await refreshUser();
+        alert('เข้าสู่ระบบสำเร็จ');
+      } else {
+        alert('เข้าสู่ระบบไม่สำเร็จ');
+      }
+    };
+    document.getElementById('logoutBtn').onclick = async () => {
+      await fetch('/auth/logout', { method: 'POST' });
+      await refreshUser();
+      alert('ออกจากระบบแล้ว');
+    };
+    refreshUser();
+
     const packageList = [28, 71, 144, 288, 725, 1825, 4410, 7400, 15000, 76500, 155000];
     const container = document.getElementById('packages');
     let selected = null;
@@ -77,18 +128,24 @@
       err.style.display = 'none';
       ok.style.display = 'none';
 
+      const meRes = await fetch('/me');
+      const me = await meRes.json();
+      if (!me || me.role !== 'customer') {
+        err.textContent = 'กรุณาเข้าสู่ระบบด้วยบัญชีลูกค้าเพื่อสร้างคำสั่งเติม';
+        err.style.display = 'block';
+        return;
+      }
+
       const bigoId = document.getElementById('bigoId').value.trim();
       const customAmount = document.getElementById('customAmount').value.trim();
       const note = document.getElementById('note').value.trim();
 
-      // validate bigoId numeric 5–15 digits
       if (!/^[0-9]{5,15}$/.test(bigoId)) {
         err.textContent = 'กรุณากรอก Bigo ID เป็นตัวเลข 5–15 หลัก';
         err.style.display = 'block';
         return;
       }
 
-      // choose amount
       let diamonds = 0;
       if (customAmount) {
         diamonds = parseInt(customAmount, 10);
