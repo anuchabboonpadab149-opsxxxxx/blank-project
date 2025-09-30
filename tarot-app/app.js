@@ -1,15 +1,3 @@
-/**
- * อ.โทนี่สะท้อนกรรม — ระบบสมาชิก + สิทธิ์ + พร้อมเพย์ QR
- * - ต้องเข้าสู่ระบบก่อนใช้งาน
- * - การอ่านแต่ละครั้งใช้ 1 สิทธิ์ (ทุกโหมด)
- * - โปรโมชั่น 5 แพ็กเกจ:
- *   10 สิทธิ์ 39 บาท, 30 สิทธิ์ 99 บาท, 50 สิทธิ์ 149 บาท, 100 สิทธิ์ 279 บาท, 300 สิทธิ์ 699 บาท
- * - เติมเงินผ่าน PromptPay เบอร์ 0916974995 โดยสร้าง Thai QR Payment (EMVCo) พร้อมจำนวนเงิน
- *
- * หมายเหตุ: ระบบตรวจสอบการชำระเงินอัตโนมัติจริงต้องเชื่อมต่อผู้ให้บริการรับชำระ (เช่น Omise/2C2P/GB Prime Pay/SCB Payment Link)
- * ในโค้ดนี้มีโหมดจำลอง ("auto-verify simulation") เพื่อการเดโม เมื่อพร้อมเชื่อมต่อจริงให้ผมต่อ API/Webhook เพื่อเพิ่มสิทธิ์อัตโนมัติ
- */
-
 /* ========= DECK DATA ========= */
 
 const TAROT_DECK = [
@@ -258,17 +246,6 @@ const TAROT_DECK = [
     reversed: "ยึดติดวัตถุ โลภ ใช้อำนาจเพื่อผลประโยชน์" },
 ];
 
-/* ========= PAYMENTS & PACKAGES ========= */
-
-const PROMPTPAY_PHONE = "0916974995";
-const PACKAGES = [
-  { id: "P10", title: "10 สิทธิ์", credits: 10, price: 39 },
-  { id: "P30", title: "30 สิทธิ์", credits: 30, price: 99 },
-  { id: "P50", title: "50 สิทธิ์", credits: 50, price: 149 },
-  { id: "P100", title: "100 สิทธิ์", credits: 100, price: 279 },
-  { id: "P300", title: "300 สิทธิ์", credits: 300, price: 699 },
-];
-
 /* ========= UTILITIES ========= */
 
 // Seeded RNG (xmur3 + mulberry32)
@@ -313,55 +290,7 @@ function dateSeed(scope) {
   return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
 
-/* ========= THAI QR PAYMENT (EMVCo) ========= */
-
-/**
- * Build Thai QR Payment payload for PromptPay mobile number, with amount.
- * - Static QR (Point of Initiation Method = 11)
- * - Merchant Account Info (ID 29): AID + mobile number
- * - Currency (53=764), Amount (54), Country (58=TH), Additional Data (62: Bill Number)
- * - CRC16-CCITT (63)
- */
-function crc16ccitt(str) {
-  let crc = 0xFFFF;
-  for (let i = 0; i < str.length; i++) {
-    crc ^= str.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) {
-      if ((crc & 0x8000) !== 0) {
-        crc = (crc << 1) ^ 0x1021;
-      } else {
-        crc <<= 1;
-      }
-      crc &= 0xFFFF;
-    }
-  }
-  return crc.toString(16).toUpperCase().padStart(4, "0");
-}
-function tlv(id, value) {
-  const len = value.length.toString().padStart(2, "0");
-  return `${id}${len}${value}`;
-}
-function buildPromptPayPayloadMobile({ phone, amount, billNumber }) {
-  const AID = "A000000677010111"; // PromptPay AID
-  const merchantAccountInfo = tlv("00", AID) + tlv("01", phone.replace(/[^0-9]/g, ""));
-  const payload =
-    tlv("00", "01") +                       // Payload Format Indicator
-    tlv("01", "11") +                       // Point of Initiation Method (static)
-    tlv("29", merchantAccountInfo) +        // Merchant Account Info
-    tlv("53", "764") +                      // Currency code (THB)
-    tlv("54", Number(amount).toFixed(2)) +  // Amount
-    tlv("58", "TH") +                       // Country code
-    tlv("62", tlv("01", billNumber));       // Additional data (Bill Number)
-  const crc = crc16ccitt(payload + "6304");
-  return payload + "6304" + crc;
-}
-function buildQrImageUrl(payload) {
-  const data = encodeURIComponent(payload);
-  // Public QR image API
-  return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${data}`;
-}
-
-/* ========= AUTH & CREDITS ========= */
+/* ========= AUTH & API ========= */
 
 const el = {
   // Reading
@@ -377,6 +306,13 @@ const el = {
   dailyScope: document.getElementById("dailyScope"),
   dailyReadBtn: document.getElementById("dailyReadBtn"),
   dailyResults: document.getElementById("dailyResults"),
+  // Siemsee
+  siemseeName: document.getElementById("siemseeName"),
+  siemseeTemple: document.getElementById("siemseeTemple"),
+  siemseeShakeBtn: document.getElementById("seamseeShakeBtn"),
+  siemseeDrawBtn: document.getElementById("siemseeDrawBtn"),
+  siemseeCylinder: document.getElementById("siemseeCylinder"),
+  siemseeResult: document.getElementById("siemseeResult"),
   // Account
   accountPanel: document.getElementById("accountPanel"),
   loginBtn: document.getElementById("loginBtn"),
@@ -408,19 +344,12 @@ const el = {
 };
 
 let workingDeck = [...TAROT_DECK];
-let currentOrderId = null; // latest order ID for status polling
+let currentOrderId = null;
 
-/* Auth token and API */
 const TOKEN_KEY = "ts_token";
-function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || "";
-}
-function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
+function setToken(token) { localStorage.setItem(TOKEN_KEY, token); }
+function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
+function clearToken() { localStorage.removeItem(TOKEN_KEY); }
 
 const API_BASE = window.API_BASE || "";
 async function api(path, method = "GET", body = null) {
@@ -440,21 +369,16 @@ async function api(path, method = "GET", body = null) {
   return data;
 }
 async function getMe() {
-  try {
-    return await api("/me", "GET");
-  } catch {
-    return null;
-  }
+  try { return await api("/me", "GET"); } catch { return null; }
 }
 
-/* Account helpers */
-function findUserByPhone(phone) {
-  return users.find(u => u.phone === phone);
-}
+/* ========= ACCOUNT UI ========= */
+
 function updateAccountPanel() {
   const panel = el.accountPanel;
   panel.innerHTML = "";
-  if (!session) {
+  const token = getToken();
+  if (!token) {
     const btn = document.createElement("button");
     btn.id = "loginBtn";
     btn.className = "primary";
@@ -462,33 +386,38 @@ function updateAccountPanel() {
     btn.addEventListener("click", () => openAuthModal());
     panel.appendChild(btn);
   } else {
-    const name = document.createElement("div");
-    name.className = "name";
-    name.textContent = `สวัสดี, ${session.name}`;
-    const credits = document.createElement("div");
-    credits.className = "badge";
-    credits.textContent = `สิทธิ์คงเหลือ: ${session.credits}`;
-    const topup = document.createElement("button");
-    topup.id = "topupBtn";
-    topup.textContent = "เติมสิทธิ์";
-    topup.addEventListener("click", () => openTopupModal());
-    const logout = document.createElement("button");
-    logout.className = "ghost";
-    logout.textContent = "ออกจากระบบ";
-    logout.addEventListener("click", () => logoutUser());
-    panel.appendChild(name);
-    panel.appendChild(credits);
-    panel.appendChild(topup);
-    panel.appendChild(logout);
+    getMe().then((me) => {
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = `สวัสดี, ${me?.name || "สมาชิก"}`;
+      const credits = document.createElement("div");
+      credits.className = "badge";
+      credits.textContent = `สิทธิ์คงเหลือ: ${me?.credits ?? 0}`;
+      const topup = document.createElement("button");
+      topup.id = "topupBtn";
+      topup.textContent = "เติมสิทธิ์";
+      topup.addEventListener("click", () => openTopupModal());
+      const logout = document.createElement("button");
+      logout.className = "ghost";
+      logout.textContent = "ออกจากระบบ";
+      logout.addEventListener("click", () => logoutUser());
+      panel.appendChild(name);
+      panel.appendChild(credits);
+      panel.appendChild(topup);
+      panel.appendChild(logout);
+    }).catch(() => {
+      clearToken();
+      updateAccountPanel();
+    });
   }
 }
 function logoutUser() {
-  session = null;
-  localStorage.removeItem("ts_session");
+  clearToken();
   updateAccountPanel();
 }
 
-/* Auth modal */
+/* ========= AUTH MODAL ========= */
+
 function openAuthModal() {
   el.overlay.classList.remove("hidden");
   el.authModal.classList.remove("hidden");
@@ -529,9 +458,8 @@ async function signup() {
     }
   } catch (e) {
     alert(e.message || "สมัครสมาชิกไม่สำเร็จ");
- _code }new
-</}
-
+  }
+}
 async function login() {
   const phone = (el.loginPhone.value || "").trim();
   const password = (el.loginPassword.value || "").trim();
@@ -546,13 +474,17 @@ async function login() {
       closeAuthModal();
       updateAccountPanel();
     } else {
-      alert
-/* Topup modal */
-function openTopupModal() {
-  if (!session) {
-    openAuthModal();
-    return;
+      alert("เข้าสู่ระบบไม่สำเร็จ");
+    }
+  } catch (e) {
+    alert(e.message || "เข้าสู่ระบบไม่สำเร็จ");
   }
+}
+
+/* ========= TOPUP ========= */
+
+function openTopupModal() {
+  if (!ensureAuth()) return;
   el.overlay.classList.remove("hidden");
   el.topupModal.classList.remove("hidden");
   el.paymentPane.classList.add("hidden");
@@ -566,12 +498,7 @@ function closeTopupModal() {
 async function renderPackages() {
   el.packageGrid.innerHTML = "";
   let pkgs = [];
-  try {
-    pkgs = await api("/packages", "GET");
-  } catch {
-    // fallback to static list if server not reachable
-    pkgs = PACKAGES;
-  }
+  try { pkgs = await api("/packages", "GET"); } catch { pkgs = PACKAGES; }
   pkgs.forEach(pkg => {
     const box = document.createElement("div");
     box.className = "package";
@@ -592,24 +519,20 @@ async function renderPackages() {
     box.appendChild(price);
     box.appendChild(cta);
     el.packageGrid.appendChild(box);
-  }_code);new
-</}
+  });
+}
 async function selectPackage(pkg) {
   try {
-    const resp =now()}-${Math.floor(Math.random() * 1000)}`;
-  pendingOrder = { id: orderId, package: pkg, amount: pkg.price };
-  const payload = buildPromptPayPayloadMobile({
-    phone: PROMPTPAY_PHONE,
-    amount: pkg.price,
-    billNumber: orderId
-  });
-  el.selectedPackageText.textContent = `แพ็กเกจที่เลือก: ${pkg.title} — ราคา ${pkg.price} บาท (จะได้รับ ${pkg.credits} สิทธิ์)`;
-  el.qrImage.src = buildQrImageUrl(payload);
-  el.orderId.textContent = orderId;
-  el.paymentPane.classList.remove("hidden");
+    const resp = await api("/topup/create-order", "POST", { packageId: pkg.id });
+    currentOrderId = resp.orderId;
+    el.selectedPackageText.textContent = `แพ็กเกจที่เลือก: ${pkg.title} — ราคา ${pkg.price} บาท (จะได้รับ ${pkg.credits} สิทธิ์)`;
+    el.qrImage.src = resp.qrImage || "";
+    el.orderId.textContent = resp.orderId;
+    el.paymentPane.classList.remove("hidden");
+  } catch (e) {
+    alert(e.message || "สร้างคำสั่งซื้อไม่ได้ กรุณาลองใหม่");
+  }
 }
-
-/* Verification (real polling via backend order status) */
 async function verifyPayment() {
   if (!currentOrderId) return;
   el.verifyBtn.disabled = true;
@@ -618,7 +541,6 @@ async function verifyPayment() {
     const status = await api(`/orders/${currentOrderId}`, "GET");
     if (status && status.status === "paid") {
       alert("ชำระเงินสำเร็จ! ระบบเพิ่มสิทธิ์ให้ในบัญชีของคุณแล้ว");
-      // Refresh account panel
       updateAccountPanel();
       currentOrderId = null;
       closeTopupModal();
@@ -635,7 +557,7 @@ async function verifyPayment() {
   }
 }
 
-/* ========= READING FLOW (AUTH + CREDIT) ========= */
+/* ========= CREDIT FLOW ========= */
 
 function ensureAuth() {
   if (!getToken()) {
@@ -649,15 +571,14 @@ async function consumeOneCredit() {
     await api("/credits/consume", "POST");
     updateAccountPanel();
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }
 async function requireCreditOrTopup() {
   if (!ensureAuth()) return false;
-  const ok = await consumetOrTopup() {
-  if (!ensureAuth()) return false;
-  if (!consumeOneCredit()) {
+  const ok = await consumeOneCredit();
+  if (!ok) {
     alert("สิทธิ์คงเหลือไม่เพียงพอ กรุณาเติมสิทธิ์ก่อนใช้งาน");
     openTopupModal();
     return false;
@@ -665,7 +586,7 @@ async function requireCreditOrTopup() {
   return true;
 }
 
-/* ========= RENDERING (cards) ========= */
+/* ========= TAROT RENDERING ========= */
 
 function renderDeckPreview(count = 18) {
   el.deck.innerHTML = "";
@@ -734,7 +655,7 @@ function createFace(card, orientation) {
   img.className = "card-img";
   img.src = imageUrl(card);
   img.alt = card.en;
-  img.referrerPolicy = "no-referrer"; // avoid referrer issues
+  img.referrerPolicy = "no-referrer";
   img.onerror = () => {
     img.remove();
     const fallback = document.createElement("div");
@@ -905,6 +826,99 @@ async function doDailyReading() {
   });
 }
 
+/* ========= SIEMSEE (เซียมซี) ========= */
+
+function siemseeShake() {
+  if (!el.siemseeCylinder) return;
+  el.siemseeCylinder.classList.add("shaking");
+  setTimeout(() => el.siemseeCylinder.classList.remove("shaking"), 1800);
+}
+function siemseeFortune(no, luckLabel) {
+  const labels = {
+    "โชคดีมาก": {
+      general: "ดวงเปิดทาง ชัยชนะและความสำเร็จมาเร็ว แผนที่ตั้งใจจะเห็นผลเป็นรูปธรรม",
+      love: "ความรักสดใส คนโสดมีเกณฑ์เจอคนเข้ากันดี",
+      work: "งานเดินหน้า ผู้ใหญ่สนับสนุน โอกาสใหม่ชัดเจน",
+      money: "การเงินคล่องตัว พบช่องทางรายได้ใหม่",
+      health: "แข็งแรง หากดูแลตัวเองต่อเนื่องผลลัพธ์ดี"
+    },
+    "โชคดี": {
+      general: "โชคดีพอดี ผลสำเร็จค่อยๆปรากฏ ขยันและสม่ำเสมอ",
+      love: "สัมพันธ์ดี ต้องคุยกันให้มากขึ้น",
+      work: "ก้าวหน้าอย่างพอดี รายละเอียดต้องใส่ใจ",
+      money: "เก็บออมเพิ่มขึ้น ระวังรายจ่ายฟุ่มเฟือย",
+      health: "ดีโดยรวม พักผ่อนให้พอ"
+    },
+    "เสมอตัว": {
+      general: "เสมอตัว เน้นความพอดี โฟกัสที่ควบคุมได้",
+      love: "คุยกันเยอะขึ้น ปรับความเข้าใจ",
+      work: "ตั้งใจและวางแผนให้ชัด ลดการผัดวัน",
+      money: "รับ-จ่ายสมดุล ไม่เสี่ยงสูง",
+      health: "ดูแลพื้นฐาน อาหาร นอน ออกกำลัง"
+    },
+    "ระวัง": {
+      general: "ชะลอเรื่องใหญ่ ระวังอารมณ์และคำพูด",
+      love: "อาจเกิดความไม่เข้าใจ ใจเย็นและรับฟัง",
+      work: "มีอุปสรรค ต้องอดทนและแก้เป็นจุดๆ",
+      money: "ระวังรายจ่ายบาน งดเสี่ยง",
+      health: "ระวังออฟฟิศซินโดรม/พักผ่อนไม่พอ"
+    },
+    "ร้าย": {
+      general: "ให้หยุดพักและทบทวน งดตัดสินใจใหญ่ ระวังคำพูด",
+      love: "ใจเย็น หลีกเลี่ยงการปะทะ ถอยหนึ่งก้าว",
+      work: "เลื่อนแผน ตรวจงานให้ละเอียด อย่าฝืน",
+      money: "งดใช้จ่ายฟุ่มเฟือย หลีกเลี่ยงความเสี่ยง",
+      health: "ถ้ามีอาการผิดปกติพบแพทย์"
+    }
+  };
+  const tpl = labels[luckLabel] || labels["เสมอตัว"];
+  const msg = `ดวงโดยรวม: ${tpl.general} ความรัก: ${tpl.love} การงาน: ${tpl.work} การเงิน: ${tpl.money} สุขภาพ: ${tpl.health}`;
+  return { no, title: `ใบที่ ${no} — ${luckLabel}`, message: msg };
+}
+async function siemseeDraw() {
+  if (!(await requireCreditOrTopup())) return;
+
+  // Visual: shake + drop
+  if (el.siemseeCylinder) {
+    el.siemseeCylinder.classList.add("shaking");
+    setTimeout(() => el.siemseeCylinder.classList.remove("shaking"), 900);
+    el.siemseeCylinder.innerHTML = "";
+    const stick = document.createElement("div");
+    stick.className = "siemsee-stick";
+
+    // Seeded pick by name + time
+    const seed = `${(el.siemseeName?.value || "guest").trim()}-${Date.now()}`;
+    const rng = createSeededRng(seed);
+    const no = Math.floor(rng() * 60) + 1;
+
+    const luckLabels = ["โชคดีมาก", "โชคดี", "เสมอตัว", "ระวัง", "ร้าย"];
+    const luckLabel = luckLabels[no % luckLabels.length];
+
+    const num = document.createElement("div");
+    num.className = "num";
+    num.textContent = `เลข ${no}`;
+    stick.appendChild(num);
+    el.siemseeCylinder.appendChild(stick);
+
+    setTimeout(() => {
+      const f = siemseeFortune(no, luckLabel);
+      // show result
+      el.siemseeResult.innerHTML = "";
+      const item = document.createElement("div");
+      item.className = "result-item";
+      const t = document.createElement("div");
+      t.className = "title";
+      t.textContent = f.title;
+      const d = document.createElement("div");
+      d.className = "desc";
+      d.textContent = f.message;
+      item.appendChild(t);
+      item.appendChild(d);
+      el.siemseeResult.appendChild(item);
+    }, 950);
+  }
+}
+
 /* ========= INIT ========= */
 
 function init() {
@@ -918,6 +932,10 @@ function init() {
   el.cutBtn.addEventListener("click", performCut);
   el.startReadingBtn.addEventListener("click", startReading);
   el.dailyReadBtn.addEventListener("click", doDailyReading);
+
+  // Siemsee controls
+  el.siemseeShakeBtn && el.siemseeShakeBtn.addEventListener("click", siemseeShake);
+  el.siemseeDrawBtn && el.siemseeDrawBtn.addEventListener("click", siemseeDraw);
 
   // Auth modal events
   el.loginBtn && el.loginBtn.addEventListener("click", openAuthModal);

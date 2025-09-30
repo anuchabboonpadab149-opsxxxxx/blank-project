@@ -25,6 +25,7 @@
       <nav class="nav">
         <a href="#reading">ดูไพ่ยิปซี</a>
         <a href="#daily">ดวงรายวัน/เดือน/ปี</a>
+        <a href="#seamsee">เซียมซี</a>
         <a href="#guide">วิธีใช้งาน</a>
       </nav>
       <div class="account" id="accountPanel">
@@ -132,6 +133,70 @@
           </div>
         </div>
         <div id="dailyResults" class="results-list"></div>
+      </div>
+    </section>
+
+    <!-- Siemsee -->
+    <section id="siemsee" class="section alt">
+      <div class="container">
+        <h3>เขย่าเซียมซีตามวัด</h3>
+        <p class="note">หยิบใบเซียมซี 1 ครั้ง ใช้ 1 สิทธิ์ — ระบบจะเพิ่ม/ลดสิทธิ์โดยอัตโนมัติ</p>
+
+        <div class="controls">
+          <div class="control-group">
+            <label for="siemseeName">ชื่อ (ใส่หรือไม่ใส่ก็ได้)</label>
+            <input id="siemseeName" type="text" placeholder="เช่น ผู้ศรัทธา" />
+          </div>
+          <div class="control-group inline">
+            <button id="siemseeShakeBtn" class="ghost">เขย่าเซียมซี</button>
+            <button id="siemseeDrawBtn" class="primary">หยิบใบเซียมซี (ใช้ 1 สิทธิ์)</button>
+          </div>
+        </div>
+
+        <div class="siemsee-zone">
+          <div class="siemsee-visual">
+            <div id="siemseeCylinder" class="siemsee-cylinder">
+              <!-- sticks visualized via CSS -->
+            </div>
+          </div>
+          <div class="siemsee-results">
+            <h4>ผลใบเซียมซี</h4>
+            <div id="siemseeResult" class="results-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Siemsee (เซียมซี) -->
+    <section id="seamsee" class="section alt">
+      <div class="container">
+        <h3>เซียมซีตามวัด (เขย่ากระบอกให้ไม้ตก)</h3>
+        <p class="note">รูปแบบการเสี่ยงเน้นประสบการณ์เหมือนวัดจริง: เขย่ากระบอกแล้วไม้ตก ได้หมายเลขใบเซียมซีพร้อมคำทำนายหมวดต่างๆ</p>
+        <div class="controls">
+          <div class="control-group">
+            <label for="siemseeName">ชื่อ (ช่วยตั้งเมล็ดสุ่ม)</label>
+            <input id="siemseeName" type="text" placeholder="ชื่อผู้ถาม" />
+          </div>
+          <div class="control-group">
+            <label for="siemseeTemple">รูปแบบ/วัด</label>
+            <select id="siemseeTemple">
+              <option value="standard">แบบวัดทั่วไป (60 ใบ)</option>
+              <option value="watpho">วัดโพธิ์ (ต้นแบบ 60 ใบ)</option>
+            </select>
+          </div>
+          <div class="control-group inline">
+            <button id="seamseeShakeBtn" class="ghost">เขย่ากระบอก</button>
+            <button id="siemseeDrawBtn" class="primary">เสี่ยงเซียมซี (ใช้ 1 สิทธิ์)</button>
+          </div>
+          <p class="note">หมายเหตุ: การเสี่ยงเซียมซี 1 ครั้ง ใช้สิทธิ์ 1 ครั้ง</p>
+        </div>
+
+        <div class="siemsee-zone">
+          <div class="siemsee-visual">
+            <div id="siemseeCylinder" class="siemsee-cylinder"></div>
+          </div>
+          <div id="siemseeResult" class="results-list"></div>
+        </div>
       </div>
     </section>
 
