@@ -636,6 +636,45 @@ function imageUrl(card) {
   const fname = `${suitName}${num}.jpg`;
   return `https://commons.wikimedia.org/wiki/Special:FilePath/${fname}`;
 }
+function cardCategoryMeaning(card, orientation) {
+  const isRev = orientation === "reversed";
+  const base = isRev ? (card.reversed || "") : (card.upright || "");
+  const suit = card.arcana === "Major" ? "Major" : (card.suit || "");
+  const n = card.number;
+
+  const out = { love: "", work: "", money: "", health: "" };
+
+  if (suit === "Cups") {
+    out.love = isRev ? "ความรู้สึกสั่นไหว ต้องคุยตรงๆและดูแลใจ" : "หัวใจเปิดรับ ความสัมพันธ์อบอุ่น";
+    out.work = isRev ? "อารมณ์กระทบงาน ระวังการตัดสินใจจากความรู้สึก" : "งานเดินด้วยความเข้าใจทีมและความเมตตา";
+    out.money = isRev ? "ใช้เงินปลอบใจ ระวังฟุ่มเฟือย" : "ช่วยเหลือ-ให้รับอย่างพอดี";
+    out.health = isRev ? "ดูแลสุขภาพใจ ลดความเครียด" : "ใจสงบ สุขภาพดีขึ้นจากการพักผ่อน";
+  } else if (suit === "Wands") {
+    out.love = isRev ? "ใจร้อนในรัก ชะลอการตัดสินใจ" : "ไฟแห่งแพสชัน ความมั่นใจดึงดูด";
+    out.work = isRev ? "พลังแกว่ง วางแผนให้ชัดก่อนลุย" : "กล้าลงมือ โครงการคืบหน้า";
+    out.money = isRev ? "เสี่ยงเกินพอดี ลดการลงทุนรีบเร่ง" : "โอกาสใหม่ทางรายได้จากการลงมือทำ";
+    out.health = isRev ? "เหนื่อยล้า พักให้พอ" : "พลังดี มีไฟในการดูแลตนเอง";
+  } else if (suit === "Swords") {
+    out.love = isRev ? "สื่อสารติดขัด ใจเย็นและฟังกัน" : "เปิดใจคุยความจริงอย่างอ่อนโยน";
+    out.work = isRev ? "ข้อมูลสับสน ตรวจทานให้ชัด" : "ความชัดเจนทำให้งานเดินหน้า";
+    out.money = isRev ? "ระวังข้อผิดพลาดทางสัญญา" : "วิเคราะห์เหตุผลก่อนใช้/ลงทุน";
+    out.health = isRev ? "เครียดสะสม ผ่อนคลายและพัก" : "ชัดเจนกับวินัย ส่งผลดีต่อสุขภาพ";
+  } else if (suit === "Pentacles") {
+    out.love = isRev ? "ยึดติดวัตถุในความรัก ลดเงื่อนไข" : "มั่นคง ดูแลกันอย่างเป็นรูปธรรม";
+    out.work = isRev ? "ช้า ติดกรอบ ปรับวิธีให้ยืดหยุ่น" : "ทำงานละเอียด วางฐานให้มั่นคง";
+    out.money = isRev ? "ใช้จ่ายเกินตัว ระวังภาระ" : "การเงินมั่นคง เก็บออม ลงทุนพอดี";
+    out.health = isRev ? "ละเลยสุขภาพกาย ควรตรวจเช็ก" : "สุขภาพกายดีขึ้นจากวินัย";
+  } else {
+    // Major Arcana
+    out.love = base ? `${base} (ด้านความรัก: ฟังหัวใจและความจริง)` : "บทเรียนความรัก ใช้สติและความเมตตา";
+    out.work = base ? `${base} (ด้านงาน: ตัดสินใจตามคุณค่า/โครงสร้างที่ดี)` : "บทเรียนงาน วางแผนอย่างมีระบบ";
+    out.money = base ? `${base} (ด้านการเงิน: สมดุลและรับผิดชอบ)` : "บทเรียนการเงิน วางฐานให้มั่นคง";
+    out.health = base ? `${base} (ด้านสุขภาพ: ดูแลใจและกายอย่างพอดี)` : "บทเรียนสุขภาพ เน้นสมดุลและพักผ่อน";
+  }
+
+  return out;
+}
+
 function createFace(card, orientation) {
   const wrap = document.createElement("div");
   wrap.className = "tarot-card";
@@ -676,10 +715,30 @@ function createFace(card, orientation) {
   meaning.className = "card-meaning";
   meaning.textContent = orientation === "reversed" ? card.reversed : card.upright;
 
+  // Detailed meanings per topic
+  const details = cardCategoryMeaning(card, orientation);
+  const detailWrap = document.createElement("div");
+  detailWrap.className = "card-details";
+  const ul = document.createElement("ul");
+  ul.className = "detail-list";
+  const items = [
+    { k: "love", label: "ความรัก" },
+    { k: "work", label: "การงาน" },
+    { k: "money", label: "การเงิน" },
+    { k: "health", label: "สุขภาพ" },
+  ];
+  items.forEach(it => {
+    const li = document.createElement("li");
+    li.innerHTML = `<strong>${it.label}:</strong> ${details[it.k]}`;
+    ul.appendChild(li);
+  });
+  detailWrap.appendChild(ul);
+
   front.appendChild(img);
   front.appendChild(tag);
   front.appendChild(name);
   front.appendChild(meaning);
+  front.appendChild(detailWrap);
 
   inner.appendChild(back);
   inner.appendChild(front);
@@ -833,47 +892,95 @@ function siemseeShake() {
   el.siemseeCylinder.classList.add("shaking");
   setTimeout(() => el.siemseeCylinder.classList.remove("shaking"), 1800);
 }
-function siemseeFortune(no, luckLabel) {
-  const labels = {
+function siemseeFortune(no, luckLabel, temple) {
+  const templeLabel = {
+    standard: "แบบวัดทั่วไป",
+    watpho: "วัดโพธิ์",
+    lpPhat: "วัดหลวงพ่อพัฒน์",
+    pungThaoKong: "ศาลเจ้าปุงเถากง",
+    watPochaiPhraSai: "วัดโพธิ์ชัย หนองคาย (หลวงพ่อพระใส)",
+    limKorNiao: "ศาลเจ้าแม่ลิ้มก่อเหนี่ยว",
+    usaMatewi: "วัดเทพพระแม่อุษามาเทวี",
+  }[temple] || "แบบวัดทั่วไป";
+
+  const base = {
     "โชคดีมาก": {
-      general: "ดวงเปิดทาง ชัยชนะและความสำเร็จมาเร็ว แผนที่ตั้งใจจะเห็นผลเป็นรูปธรรม",
-      love: "ความรักสดใส คนโสดมีเกณฑ์เจอคนเข้ากันดี",
-      work: "งานเดินหน้า ผู้ใหญ่สนับสนุน โอกาสใหม่ชัดเจน",
-      money: "การเงินคล่องตัว พบช่องทางรายได้ใหม่",
-      health: "แข็งแรง หากดูแลตัวเองต่อเนื่องผลลัพธ์ดี"
+      general: "ดวงเปิดทาง สำเร็จมาเร็ว แผนจะเห็นผล",
+      love: "รักสดใส คนโสดเจอคนเข้ากัน",
+      work: "งานเดินหน้า ผู้ใหญ่สนับสนุน",
+      money: "การเงินคล่อง พบช่องทางใหม่",
+      health: "แข็งแรง หากมีวินัย"
     },
     "โชคดี": {
-      general: "โชคดีพอดี ผลสำเร็จค่อยๆปรากฏ ขยันและสม่ำเสมอ",
-      love: "สัมพันธ์ดี ต้องคุยกันให้มากขึ้น",
-      work: "ก้าวหน้าอย่างพอดี รายละเอียดต้องใส่ใจ",
-      money: "เก็บออมเพิ่มขึ้น ระวังรายจ่ายฟุ่มเฟือย",
-      health: "ดีโดยรวม พักผ่อนให้พอ"
+      general: "โชคดีพอดี ผลค่อยๆปรากฏ",
+      love: "สัมพันธ์ดี ต้องคุยกันมากขึ้น",
+      work: "ก้าวหน้าอย่างพอดี ใส่ใจรายละเอียด",
+      money: "เก็บออมเพิ่ม ระวังฟุ่มเฟือย",
+      health: "ดีโดยรวม พักให้พอ"
     },
     "เสมอตัว": {
-      general: "เสมอตัว เน้นความพอดี โฟกัสที่ควบคุมได้",
+      general: "เน้นความพอดี โฟกัสสิ่งควบคุมได้",
       love: "คุยกันเยอะขึ้น ปรับความเข้าใจ",
-      work: "ตั้งใจและวางแผนให้ชัด ลดการผัดวัน",
+      work: "ตั้งใจและวางแผนชัด ลดผัดวัน",
       money: "รับ-จ่ายสมดุล ไม่เสี่ยงสูง",
-      health: "ดูแลพื้นฐาน อาหาร นอน ออกกำลัง"
+      health: "ดูแลพื้นฐานให้ครบ"
     },
     "ระวัง": {
-      general: "ชะลอเรื่องใหญ่ ระวังอารมณ์และคำพูด",
-      love: "อาจเกิดความไม่เข้าใจ ใจเย็นและรับฟัง",
-      work: "มีอุปสรรค ต้องอดทนและแก้เป็นจุดๆ",
-      money: "ระวังรายจ่ายบาน งดเสี่ยง",
-      health: "ระวังออฟฟิศซินโดรม/พักผ่อนไม่พอ"
+      general: "ชะลอเรื่องใหญ่ ระวังคำพูดและอารมณ์",
+      love: "อาจไม่เข้าใจ ใจเย็นและรับฟัง",
+      work: "มีอุปสรรค แก้เป็นจุดๆ",
+      money: "รายจ่ายบาน งดเสี่ยง",
+      health: "พักผ่อนให้พอ"
     },
     "ร้าย": {
-      general: "ให้หยุดพักและทบทวน งดตัดสินใจใหญ่ ระวังคำพูด",
-      love: "ใจเย็น หลีกเลี่ยงการปะทะ ถอยหนึ่งก้าว",
-      work: "เลื่อนแผน ตรวจงานให้ละเอียด อย่าฝืน",
-      money: "งดใช้จ่ายฟุ่มเฟือย หลีกเลี่ยงความเสี่ยง",
-      health: "ถ้ามีอาการผิดปกติพบแพทย์"
+      general: "หยุดพัก ทบทวน งดตัดสินใจใหญ่",
+      love: "หลีกเลี่ยงปะทะ ถอยหนึ่งก้าว",
+      work: "เลื่อนแผน ตรวจงานละเอียด",
+      money: "งดฟุ่มเฟือย หลีกเสี่ยง",
+      health: "ผิดปกติควรพบแพทย์"
     }
   };
-  const tpl = labels[luckLabel] || labels["เสมอตัว"];
-  const msg = `ดวงโดยรวม: ${tpl.general} ความรัก: ${tpl.love} การงาน: ${tpl.work} การเงิน: ${tpl.money} สุขภาพ: ${tpl.health}`;
-  return { no, title: `ใบที่ ${no} — ${luckLabel}`, message: msg };
+
+  const templeTune = {
+    standard: (tpl) => tpl,
+    watpho: (tpl) => ({
+      ...tpl,
+      general: `${tpl.general} ได้รับพลังปัญญาและสมาธิ`,
+      work: `${tpl.work} ตั้งมั่นในปัญญาและความจริง`,
+    }),
+    lpPhat: (tpl) => ({
+      ...tpl,
+      general: `${tpl.general} รับเมตตาหลวงพ่อ เสริมโชคลาภ`,
+      money: `${tpl.money} โชคลาภและทรัพย์เพิ่มพูนเมื่อทำดี`,
+    }),
+    pungThaoKong: (tpl) => ({
+      ...tpl,
+      general: `${tpl.general} สิ่งศักดิ์สิทธิ์คุ้มครอง`,
+      work: `${tpl.work} เสริมธุรกิจ การค้าขายเจริญ`,
+      money: `${tpl.money} โชคลาภการค้าและความซื่อสัตย์`,
+    }),
+    watPochaiPhraSai: (tpl) => ({
+      ...tpl,
+      general: `${tpl.general} ใจสงบ สว่างใสดังพระใส`,
+      love: `${tpl.love} เมตตาและความเข้าใจเพิ่มขึ้น`,
+    }),
+    limKorNiao: (tpl) => ({
+      ...tpl,
+      general: `${tpl.general} อธิษฐานจิตแน่วแน่ ความสำเร็จเป็นไปได้`,
+      work: `${tpl.work} เดินหน้าด้วยความกล้าหาญและศรัทธา`,
+    }),
+    usaMatewi: (tpl) => ({
+      ...tpl,
+      general: `${tpl.general} เริ่มต้นใหม่ รับแสงรุ่งอรุณ`,
+      work: `${tpl.work} ส่งเสริมงานสร้างสรรค์และศิลป์`,
+    }),
+  };
+
+  const tplBase = base[luckLabel] || base["เสมอตัว"];
+  const tuned = (templeTune[temple] || templeTune.standard)(tplBase);
+
+  const msg = `ดวงโดยรวม: ${tuned.general} ความรัก: ${tuned.love} การงาน: ${tuned.work} การเงิน: ${tuned.money} สุขภาพ: ${tuned.health}`;
+  return { no, title: `ใบที่ ${no} — ${luckLabel} (${templeLabel})`, message: msg };
 }
 async function siemseeDraw() {
   if (!(await requireCreditOrTopup())) return;
@@ -901,10 +1008,10 @@ async function siemseeDraw() {
     el.siemseeCylinder.appendChild(stick);
 
     setTimeout(() => {
-      const f = siemseeFortune(no, luckLabel);
+      const temple = el.siemseeTemple?.value || "standard";
+      const f = siemseeFortune(no, luckLabel, temple);
       // show result
-      el.siemseeResult.innerHTML = "";
-      const item = document.createElement("div");
+      elment("div");
       item.className = "result-item";
       const t = document.createElement("div");
       t.className = "title";
