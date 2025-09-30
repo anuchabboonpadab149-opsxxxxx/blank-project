@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <title>Preview - Production-ready Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Deployment Preview</h1>
+      <p>หน้านี้เป็นตัวอย่างที่ปรับใช้ได้ทันที โดยแสดงการเรียก API และการจัดการข้อผิดพลาดเครือข่าย</p>
+
+      <section class="card">
+        <h2>สถานะเครือข่าย</h2>
+        <div id="net-status" class="status"></div>
+      </section>
+
+      <section class="card">
+        <h2>ทดสอบเรียก API (สาธิต)</h2>
+        <div class="row">
+          <button id="btn-health">เรียก /api/health (ถ้ามี)</button>
+          <button id="btn-sample">เรียกตัวอย่างสาธารณะ</button>
+        </div>
+        <pre id="output" class="output">// รอผลลัพธ์...</pre>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

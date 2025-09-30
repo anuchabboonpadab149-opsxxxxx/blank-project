@@ -12,10 +12,12 @@ const app = express();
 
 // Config
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:3000,http://localhost:4173')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
+// If ALLOWED_ORIGINS is empty or '*', allow all origins (useful for preview environments)
+const rawOrigins = (process.env.ALLOWED_ORIGINS || '').trim();
+const allowAllOrigins = rawOrigins === '' || rawOrigins === '*';
+const allowedOrigins = allowAllOrigins
+  ? []
+  : rawOrigins.split(',').map(s => s.trim()).filter(Boolean);
 
 // Middlewares
 app.use(morgan('combined'));
@@ -38,6 +40,7 @@ app.use(limiter);
 // CORS
 app.use(cors({
   origin(origin, cb) {
+    if (allowAllOrigins) return cb(null, true);
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
     return cb(new Error('Not allowed by CORS'));
   },
@@ -106,5 +109,9 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
-  console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
+  console.log(
+    allowAllOrigins
+      ? 'Allowed origins: ALL (preview mode)'
+      : `Allowed origins: ${allowedOrigins.join(', ')}`
+  );
 });
