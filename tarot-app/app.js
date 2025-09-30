@@ -1036,7 +1036,7 @@ async function siemseeDraw() {
       const temple = el.siemseeTemple?.value || "standard";
       const f = siemseeFortune(no, luckLabel, temple);
       // show result
-      const item = document.createElement("div");
+      elment("div");
       item.className = "result-item";
       const t = document.createElement("div");
       t.className = "title";
