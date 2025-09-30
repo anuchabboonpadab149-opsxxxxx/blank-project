@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>สั่งเติมเพชรผ่านตัวแทน (ไม่มีการชำระเงิน)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #fafafa; }
+    .card { max-width: 560px; margin: auto; padding: 18px; border: 1px solid #ddd; border-radius: 12px; background: #fff; }
+    label { display:block; margin: 12px 0 6px; font-weight: 600; }
+    input, select, button { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .hint { font-size: 12px; color: #666; }
+    .error { color: #b00020; font-size: 13px; margin-top: 6px; display:none; }
+    .success { color: #0b7a0b; font-size: 14px; display:none; }
+    .packages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+    .pkg { padding: 10px; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; text-align: center; background: #f7f7f7; }
+    .pkg.selected { border-color: #4a90e2; background: #eef5ff; }
+    a.btn { display:inline-block; margin-top: 12px; padding:10px 12px; background:#4a90e2; color:#fff; border-radius:8px; text-decoration:none }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>สั่งเติมเพชรผ่านตัวแทน</h2>
+    <p class="hint">ระบบเดโม่นี้ไม่มีการชำระเงินอัตโนมัติ การเติมจริงดำเนินการโดยตัวแทนผ่าน bigo.tv</p>
+
+    <div id="packages" class="packages"></div>
+
+    <form id="topupForm">
+      <label for="bigoId">Bigo ID (ตัวเลข)</label>
+      <input id="bigoId" name="bigoId" inputmode="numeric" pattern="^[0-9]{5,15}$" required placeholder="เช่น 12345678">
+      <div class="hint">กรุณากรอกเป็นตัวเลข 5–15 หลัก ไม่ใช่ชื่อผู้ใช้</div>
+
+      <div class="row">
+        <div>
+          <label for="customAmount">หรือกรอกจำนวนเพชรเอง</label>
+          <input id="customAmount" name="customAmount" type="number" min="1" max="200000" placeholder="เช่น 1000">
+          <div class="hint">สูงสุด 200,000 ต่อคำสั่งซื้อ</div>
+        </div>
+        <div>
+          <label for="note">หมายเหตุ (ถ้ามี)</label>
+          <input id="note" name="note" maxlength="100" placeholder="ระบุเพิ่มเติม">
+        </div>
+      </div>
+
+      <button type="submit" style="margin-top:14px;">ส่งคำสั่งเติม</button>
+      <div id="error" class="error"></div>
+      <div id="ok" class="success">ส่งคำสั่งเติมเรียบร้อย เรากำลังสร้างออเดอร์…</div>
+    </form>
+
+    <p class="hint">สำหรับตัวแทน: ไปที่หน้าแดชบอร์ด <a class="btn" href="/agent">Agent Dashboard</a></p>
+  </div>
+
+  <script>
+    const packageList = [28, 71, 144, 288, 725, 1825, 4410, 7400, 15000, 76500, 155000];
+    const container = document.getElementById('packages');
+    let selected = null;
+
+    function renderPackages() {
+      container.innerHTML = '';
+      packageList.forEach(n => {
+        const div = document.createElement('div');
+        div.className = 'pkg' + (selected === n ? ' selected' : '');
+        div.textContent = `${n} เพชร`;
+        div.onclick = () => { selected = n; document.getElementById('customAmount').value=''; renderPackages(); };
+        container.appendChild(div);
+      });
+    }
+    renderPackages();
+
+    const form = document.getElementById('topupForm');
+    const err = document.getElementById('error');
+    const ok = document.getElementById('ok');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.style.display = 'none';
+      ok.style.display = 'none';
+
+      const bigoId = document.getElementById('bigoId').value.trim();
+      const customAmount = document.getElementById('customAmount').value.trim();
+      const note = document.getElementById('note').value.trim();
+
+      // validate bigoId numeric 5–15 digits
+      if (!/^[0-9]{5,15}$/.test(bigoId)) {
+        err.textContent = 'กรุณากรอก Bigo ID เป็นตัวเลข 5–15 หลัก';
+        err.style.display = 'block';
+        return;
+      }
+
+      // choose amount
+      let diamonds = 0;
+      if (customAmount) {
+        diamonds = parseInt(customAmount, 10);
+        if (isNaN(diamonds) || diamonds < 1 || diamonds > 200000) {
+          err.textContent = 'จำนวนเพชรไม่ถูกต้อง (1–200,000)';
+          err.style.display = 'block';
+          return;
+        }
+      } else if (selected) {
+        diamonds = parseInt(selected, 10);
+      } else {
+        err.textContent = 'กรุณาเลือกแพ็กเกจหรือกรอกจำนวนเพชร';
+        err.style.display = 'block';
+        return;
+      }
+
+      ok.style.display = 'block';
+
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bigoId, diamonds, note })
+        });
+        if (!res.ok) throw new Error('order failed');
+        const data = await res.json();
+        window.location.href = `/order/${data.id}`;
+      } catch (e) {
+        ok.style.display = 'none';
+        err.textContent = 'ไม่สามารถสร้างออเดอร์ได้ โปรดลองใหม่';
+        err.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>
