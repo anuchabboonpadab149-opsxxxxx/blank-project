@@ -1,8 +1,14 @@
 const $, $ = (sel, ctx = document) => ctx.querySelector(sel), (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
+/* Supabase */
+let supabase = null;
+if (window.APP_CONFIG?.SUPABASE_URL && window.APP_CONFIG?.SUPABASE_ANON_KEY && window.supabase) {
+  supabase = window.supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY);
+}
+
 /* State */
 const state = {
-  user: null, // {email}
+  user: null, // {id, email}
 };
 
 /* Persisted OpenAI key */
@@ -25,7 +31,7 @@ const state = {
   });
 })();
 
-/* Auth (demo - localStorage only) */
+/* Auth - Supabase */
 (() => {
   const authStatus = $('#auth-status');
   const btnLogin = $('#btn-login');
@@ -34,55 +40,56 @@ const state = {
   const modalLogin = $('#modal-login');
   const modalRegister = $('#modal-register');
 
-  const savedUser = localStorage.getItem('user');
-  if (savedUser) {
-    state.user = JSON.parse(savedUser);
+  if (!supabase) {
+    authStatus.textContent = 'ต้องตั้งค่า Supabase (config.js)';
+    return;
   }
-  renderAuth();
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    if (session?.user) {
+      state.user = { id: session.user.id, email: session.user.email };
+    } else {
+      state.user = null;
+    }
+    renderAuth();
+  });
+
+  (async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) state.user = { id: user.id, email: user.email };
+    renderAuth();
+  })();
 
   btnLogin?.addEventListener('click', () => modalLogin.hidden = false);
   btnRegister?.addEventListener('click', () => modalRegister.hidden = false);
   $('[data-close="login"]')?.addEventListener('click', () => modalLogin.hidden = true);
   $('[data-close="register"]')?.addEventListener('click', () => modalRegister.hidden = true);
 
-  $('#do-login')?.addEventListener('click', () => {
+  $('#do-login')?.addEventListener('click', async () => {
     const email = $('#login-email').value.trim().toLowerCase();
     const pass = $('#login-password').value;
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    if (users[email] && users[email].pass === pass) {
-      state.user = { email };
-      localStorage.setItem('user', JSON.stringify(state.user));
-      modalLogin.hidden = true;
-      renderAuth();
-    } else {
-      alert('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (error) alert(error.message);
+    else modalLogin.hidden = true;
   });
 
-  $('#do-register')?.addEventListener('click', () => {
+  $('#do-register')?.addEventListener('click', async () => {
     const email = $('#reg-email').value.trim().toLowerCase();
     const pass = $('#reg-password').value;
     if (!email || !pass || pass.length < 8) {
       alert('กรอกอีเมลและรหัสผ่านอย่างน้อย 8 ตัว');
       return;
     }
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    if (users[email]) {
-      alert('อีเมลนี้ถูกใช้แล้ว');
-      return;
+    const { error } = await supabase.auth.signUp({ email, password: pass });
+    if (error) alert(error.message);
+    else {
+      alert('สมัครสำเร็จ โปรดเข้าสู่ระบบ');
+      modalRegister.hidden = true;
     }
-    users[email] = { pass };
-    localStorage.setItem('users', JSON.stringify(users));
-    state.user = { email };
-    localStorage.setItem('user', JSON.stringify(state.user));
-    $('#modal-register').hidden = true;
-    renderAuth();
   });
 
-  btnLogout?.addEventListener('click', () => {
-    state.user = null;
-    localStorage.removeItem('user');
-    renderAuth();
+  btnLogout?.addEventListener('click', async () => {
+    await supabase.auth.signOut();
   });
 
   function renderAuth() {
@@ -91,11 +98,13 @@ const state = {
       btnLogin.style.display = 'none';
       btnRegister.style.display = 'none';
       btnLogout.style.display = 'inline-flex';
+      renderHistory(); // refresh with server-backed history soon
     } else {
       authStatus.textContent = 'ยังไม่ได้เข้าสู่ระบบ';
       btnLogin.style.display = 'inline-flex';
       btnRegister.style.display = 'inline-flex';
       btnLogout.style.display = 'none';
+      renderHistory();
     }
   }
 })();
@@ -133,37 +142,43 @@ const DREAM_PRESETS = {
   healing: 'โฟกัสการเยียวยา การเติบโต และสติ',
 };
 
-/* History */
-function pushHistory(item) {
-  // Gate history for logged-in users only
-  const user = JSON.parse(localStorage.getItem('user') || 'null');
-  if (!user) return;
-  const key = `history:${user.email}`;
-  const list = JSON.parse(localStorage.getItem(key) || '[]');
-  list.unshift({ ...item, ts: Date.now() });
-  localStorage.setItem(key, JSON.stringify(list.slice(0, 100)));
+/* History via API */
+async function authHeader() {
+  if (!supabase) return {};
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+async function pushHistory(item) {
+  // server handles history when AI returns; client history used for non-AI results only
   renderHistory();
 }
-function renderHistory() {
+async function renderHistory() {
   const container = $('#history-list');
   if (!container) return;
-  const user = JSON.parse(localStorage.getItem('user') || 'null');
-  if (!user) { container.innerHTML = '<p class="small">กรุณาเข้าสู่ระบบเพื่อดูประวัติ</p>'; return; }
-  const key = `history:${user.email}`;
-  const list = JSON.parse(localStorage.getItem(key) || '[]');
-  if (!list.length) { container.innerHTML = '<p class="small">ยังไม่มีประวัติ</p>'; return; }
-  container.innerHTML = list.map(it => {
-    const dt = new Date(it.ts).toLocaleString('th-TH');
-    return `<div class="card" style="margin:8px 0;">
-      <div class="small">${dt} • ประเภท: ${it.type}</div>
-      <div>${it.html}</div>
-    </div>`;
-  }).join('');
+  if (!state.user) { container.innerHTML = '<p class="small">กรุณาเข้าสู่ระบบเพื่อดูประวัติ</p>'; return; }
+  try {
+    const headers = { 'Content-Type': 'application/json', ...(await authHeader()) };
+    const res = await fetch('/api/history', { headers });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    if (!data.items.length) { container.innerHTML = '<p class="small">ยังไม่มีประวัติ</p>'; return; }
+    container.innerHTML = data.items.map(it => {
+      const dt = new Date(it.created_at).toLocaleString('th-TH');
+      const type = it.type || '-';
+      return `<div class="card" style="margin:8px 0;">
+        <div class="small">${dt} • ประเภท: ${type}</div>
+        <div>${it.result || ''}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    container.innerHTML = `<p class="small">โหลดประวัติไม่ได้</p>`;
+  }
 }
-$('#clear-history')?.addEventListener('click', () => {
-  const user = JSON.parse(localStorage.getItem('user') || 'null');
-  if (!user) return;
-  localStorage.removeItem(`history:${user.email}`);
+$('#clear-history')?.addEventListener('click', async () => {
+  if (!state.user) return;
+  const headers = { 'Content-Type': 'application/json', ...(await authHeader()) };
+  await fetch('/api/history', { method: 'DELETE', headers });
   renderHistory();
 });
 renderHistory();
@@ -523,12 +538,12 @@ async function askOpenAI(key, prompt) {
 
 /* OpenAI helper - serverless proxy */
 async function askOpenAIProxy(prompt) {
+  const headers = { 'Content-Type': 'application/json', ...(await authHeader()) };
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ prompt }),
   });
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
+  if (!res.ok) data = await res.json();
   return data.text || '';
 }
