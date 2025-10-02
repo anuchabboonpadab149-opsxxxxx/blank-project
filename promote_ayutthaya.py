@@ -1,8 +1,9 @@
+
 import os
 import sys
 import json
 import logging
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, List
 
 import requests
 from requests_oauthlib import OAuth1
@@ -23,12 +24,14 @@ class Config:
         self.CONSUMER_SECRET = os.getenv("TW_CONSUMER_SECRET")
         self.ACCESS_TOKEN = os.getenv("TW_ACCESS_TOKEN")
         self.ACCESS_TOKEN_SECRET = os.getenv("TW_ACCESS_TOKEN_SECRET")
+        self.BEARER = os.getenv("TW_BEARER_TOKEN", "")
         # Ads account
         self.ADS_ACCOUNT_ID = os.getenv("ADS_ACCOUNT_ID")
         self.FUNDING_INSTRUMENT_ID = os.getenv("FUNDING_INSTRUMENT_ID")
         self.CAMPAIGN_ID = os.getenv("CAMPAIGN_ID") or None
-        # Tweet content
+        # Tweet content or file-based rotation
         self.TWEET_TEXT = os.getenv("TWEET_TEXT")
+        self.TWEETS_FILE = os.getenv("TWEETS_FILE", "tweets.txt")
         # Budget/bid
         self.DAILY_BUDGET_MICRO = int(os.getenv("DAILY_BUDGET_MICRO", "5000000"))
         self.TOTAL_BUDGET_MICRO = int(os.getenv("TOTAL_BUDGET_MICRO", str(self.DAILY_BUDGET_MICRO * 7)))
@@ -44,7 +47,6 @@ class Config:
             "TW_ACCESS_TOKEN_SECRET": self.ACCESS_TOKEN_SECRET,
             "ADS_ACCOUNT_ID": self.ADS_ACCOUNT_ID,
             "FUNDING_INSTRUMENT_ID": self.FUNDING_INSTRUMENT_ID,
-            "TWEET_TEXT": self.TWEET_TEXT,
         }
         missing = [k for k, v in required.items() if not v or str(v).strip() == ""]
         if missing:
@@ -131,63 +133,128 @@ def promote_tweet(auth: OAuth1, account_id: str, line_item_id: str, tweet_id: st
 
 
 def run_once(cfg: Config) -> Dict[str, Any]:
+    # Legacy: post cfg.TWEET_TEXT and promote
     cfg.validate()
     _auth = oauth(cfg)
-
-    log.info("Posting tweet")
-    tweet_id = post_tweet(_auth, cfg.TWEET_TEXT)
-    log.info(f"Tweet ID: {tweet_id}")
-
+    text = cfg.TWEET_TEXT
+    if not text:
+        raise SystemExit("TWEET_TEXT is empty; use file-based posting via post_one_from_file.")
+    tweet_id = post_tweet(_auth, text)
     if cfg.CAMPAIGN_ID:
         campaign_id = cfg.CAMPAIGN_ID
-        log.info(f"Using existing campaign: {campaign_id}")
     else:
-        log.info("Creating campaign")
-        campaign_id = create_campaign(
-            _auth,
-            cfg.ADS_ACCOUNT_ID,
-            cfg.FUNDING_INSTRUMENT_ID,
-            "Ayutthaya Reach Campaign",
-            cfg.DAILY_BUDGET_MICRO,
-            cfg.TOTAL_BUDGET_MICRO,
-        )
-        log.info(f"Campaign ID: {campaign_id}")
-
-    log.info("Creating line item")
-    line_item_id = create_line_item(
-        _auth,
-        cfg.ADS_ACCOUNT_ID,
-        campaign_id,
-        "Ayutthaya LI",
-        cfg.PLACEMENT,
-        cfg.OBJECTIVE,
-        cfg.BID_AMOUNT_MICRO,
-    )
-    log.info(f"Line Item ID: {line_item_id}")
-
-    log.info("Finding Ayutthaya location")
+        campaign_id = create_campaign(_auth, cfg.ADS_ACCOUNT_ID, cfg.FUNDING_INSTRUMENT_ID, "Ayutthaya Reach Campaign", cfg.DAILY_BUDGET_MICRO, cfg.TOTAL_BUDGET_MICRO)
+    line_item_id = create_line_item(_auth, cfg.ADS_ACCOUNT_ID, campaign_id, "Ayutthaya LI", cfg.PLACEMENT, cfg.OBJECTIVE, cfg.BID_AMOUNT_MICRO)
     location_id, loc_meta = find_ayutthaya_location_id(_auth, cfg.ADS_ACCOUNT_ID)
-    log.info(f"Targeting Ayutthaya: {loc_meta.get('name')} ({location_id})")
-
-    log.info("Adding geo targeting")
     tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
-    log.info(f"Targeting criteria ID: {tc_id}")
-
-    log.info("Promoting tweet")
     promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
-    log.info(f"Promoted Tweet ID: {promoted_id}")
+    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": text}
 
-    return {
-        "tweet_id": tweet_id,
-        "campaign_id": campaign_id,
-        "line_item_id": line_item_id,
-        "targeting_criteria_id": tc_id,
-        "promoted_tweet_id": promoted_id,
-        "location": loc_meta,
-    }
+
+# ===== File rotation and metrics =====
+
+STATE_FILE = "posted_state.json"
+METRICS_FILE = "metrics.json"
+
+
+def _load_json(path: str) -> Dict[str, Any]:
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_json(path: str, data: Dict[str, Any]) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def load_tweets(path: str) -> List[str]:
+    tweets: List[str] = []
+    if not os.path.exists(path):
+        return tweets
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            t = line.strip()
+            if t:
+                tweets.append(t)
+    return tweets
+
+
+def get_next_tweet(tweets: List[str]) -> str:
+    state = _load_json(STATE_FILE)
+    used = set(state.get("used_texts", []))
+    for t in tweets:
+        if t not in used:
+            return t
+    # Reset when all used
+    if tweets:
+        _save_json(STATE_FILE, {"used_texts": [], "posted": state.get("posted", [])})
+        return tweets[0]
+    raise SystemExit("No tweets available in tweets file")
+
+
+def mark_used(text: str, tweet_id: str) -> None:
+    state = _load_json(STATE_FILE)
+    used = set(state.get("used_texts", []))
+    used.add(text)
+    posted = state.get("posted", [])
+    posted.append({"text": text, "tweet_id": tweet_id})
+    state["used_texts"] = list(used)
+    state["posted"] = posted
+    _save_json(STATE_FILE, state)
+
+
+def post_one_from_file(cfg: Config) -> Dict[str, Any]:
+    cfg.validate()
+    _auth = oauth(cfg)
+    tweets = load_tweets(cfg.TWEETS_FILE)
+    text = get_next_tweet(tweets)
+    log.info(f"Posting tweet from file: {text}")
+    tweet_id = post_tweet(_auth, text)
+    mark_used(text, tweet_id)
+    # Promote
+    if cfg.CAMPAIGN_ID:
+        campaign_id = cfg.CAMPAIGN_ID
+    else:
+        campaign_id = create_campaign(_auth, cfg.ADS_ACCOUNT_ID, cfg.FUNDING_INSTRUMENT_ID, "Ayutthaya Reach Campaign", cfg.DAILY_BUDGET_MICRO, cfg.TOTAL_BUDGET_MICRO)
+    line_item_id = create_line_item(_auth, cfg.ADS_ACCOUNT_ID, campaign_id, "Ayutthaya LI", cfg.PLACEMENT, cfg.OBJECTIVE, cfg.BID_AMOUNT_MICRO)
+    location_id, loc_meta = find_ayutthaya_location_id(_auth, cfg.ADS_ACCOUNT_ID)
+    tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
+    promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
+    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": text}
+
+
+def collect_metrics(cfg: Config, max_items: int = 50) -> Dict[str, Any]:
+    state = _load_json(STATE_FILE)
+    posted = state.get("posted", [])
+    ids = [p["tweet_id"] for p in posted[-max_items:] if "tweet_id" in p]
+    res = {"count": 0, "items": []}
+    if not ids or not cfg.BEARER:
+        return res
+    url = "https://api.twitter.com/2/tweets"
+    params = {"ids": ",".join(ids), "tweet.fields": "created_at,public_metrics"}
+    headers = {"Authorization": f"Bearer {cfg.BEARER}"}
+    resp = requests.get(url, params=params, headers=headers)
+    resp.raise_for_status()
+    data = resp.json()
+    items = data.get("data", [])
+    res["count"] = len(items)
+    res["items"] = items
+    existing = _load_json(METRICS_FILE)
+    existing.setdefault("runs", [])
+    existing["runs"].append({"items": items})
+    _save_json(METRICS_FILE, existing)
+    return res
 
 
 if __name__ == "__main__":
     cfg = Config()
-    result = run_once(cfg)
-    print(json.dumps(result, ensure_ascii=False))
+    # Default: post from file then collect metrics
+    posted = post_one_from_file(cfg)
+    print(json.dumps(posted, ensure_ascii=False))
+    metrics = collect_metrics(cfg)
+    print(json.dumps(metrics, ensure_ascii=False))
