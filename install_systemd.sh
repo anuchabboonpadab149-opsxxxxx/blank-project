@@ -29,7 +29,7 @@ Environment=TIMEZONE=Asia/Bangkok
 Environment=GENERATE_CONTENT=true
 Environment=SENDER_NAME=Bee&Bell
 Environment=ENABLE_ADS=true
-Environment=ADS_SIMULATION=true
+Environment=ADS_SIMULATION=false
 Environment=POST_INTERVAL_SECONDS=60
 Environment=COLLECT_INTERVAL_MINUTES=5
 Environment=PROVIDERS=twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok

@@ -11,9 +11,9 @@ Environment=TIMEZONE=Asia/Bangkok
 # Content generator
 Environment=GENERATE_CONTENT=true
 Environment=SENDER_NAME=Bee&Bell
-# Ads: enabled but simulated (no cost) — set ADS_SIMULATION=false when budgets are ready
+# Ads: enabled (real) — set ADS_SIMULATION=true for dry-run without cost
 Environment=ENABLE_ADS=true
-Environment=ADS_SIMULATION=true
+Environment=ADS_SIMULATION=false
 # Posting triggers
 Environment=POST_INTERVAL_SECONDS=60
 # Collecting triggers

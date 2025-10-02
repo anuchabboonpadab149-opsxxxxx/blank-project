@@ -16,10 +16,11 @@ class DiscordProvider:
             return {"provider": self.name, "status": "skipped", "detail": {"reason": "DISCORD_WEBHOOK_URL missing"}}
         try:
             payload = {"content": text}
-            resp = requests.post(self.webhook_url, json=payload, timeout=15)
+            resp = requests.post(self.webhook_url, json=payload, timeout=20)
             if 200 <= resp.status_code < 300:
                 return {"provider": self.name, "status": "ok", "detail": {"status_code": resp.status_code}}
-            return {"provider": self.name, "status": "error", "detail": {"status_code": resp.status_code, "text": resp.text}}
+            else:
+                return {"provider": self.name, "status": "error", "detail": {"status_code": resp.status_code, "text": resp.text}}
         except Exception as e:
             log.error(f"Discord post failed: {e}", exc_info=True)
             return {"provider": self.name, "status": "error", "detail": {"error": str(e)}}

@@ -30,6 +30,7 @@ class Config:
         self.ADS_ACCOUNT_ID = os.getenv("ADS_ACCOUNT_ID")
         self.FUNDING_INSTRUMENT_ID = os.getenv("FUNDING_INSTRUMENT_ID")
         self.CAMPAIGN_ID = os.getenv("CAMPAIGN_ID") or None
+        self.LINE_ITEM_ID = os.getenv("LINE_ITEM_ID") or None
         # Tweet content or file-based rotation
         self.TWEET_TEXT = os.getenv("TWEET_TEXT")
         self.TWEETS_FILE = os.getenv("TWEETS_FILE", "tweets.txt")
@@ -39,7 +40,11 @@ class Config:
         self.GENERATE_CONTENT = os.getenv("GENERATE_CONTENT", "").lower() in {"1", "true", "yes"}
         self.SENDER_NAME = os.getenv("SENDER_NAME", "Bee&Bell")
         self.ENABLE_ADS = os.getenv("ENABLE_ADS", "false").lower() in {"1", "true", "yes"}
-        self.ADS_SIMULATION = os.getenv("ADS_SIMULATION", "true").lower() in {"1", "true", "yes"}
+        self.ADS_SIMULATION = os.getenv("ADS_SIMULATION", "false").lower() in {"1", "true", "yes"}
+        # Geo targeting
+        self.GEO_COUNTRY_CODE = os.getenv("GEO_COUNTRY_CODE", "TH")
+        self.GEO_ALL_REGIONS = (os.getenv("GEO_ALL_REGIONS", "true").lower() in {"1", "true", "yes"})
+        self.GEO_REGION_QUERY = os.getenv("GEO_REGION_QUERY", "")
         # Budget/bid
         self.DAILY_BUDGET_MICRO = int(os.getenv("DAILY_BUDGET_MICRO", "5000000"))
         self.TOTAL_BUDGET_MICRO = int(os.getenv("TOTAL_BUDGET_MICRO", str(self.DAILY_BUDGET_MICRO * 7)))
@@ -48,17 +53,26 @@ class Config:
         self.PLACEMENT = os.getenv("PLACEMENT", "ALL_ON_TWITTER")
 
     def validate(self) -> None:
-        required = {
+        # Always require Twitter user API keys for posting
+        tw_required = {
             "TW_CONSUMER_KEY": self.CONSUMER_KEY,
             "TW_CONSUMER_SECRET": self.CONSUMER_SECRET,
             "TW_ACCESS_TOKEN": self.ACCESS_TOKEN,
             "TW_ACCESS_TOKEN_SECRET": self.ACCESS_TOKEN_SECRET,
-            "ADS_ACCOUNT_ID": self.ADS_ACCOUNT_ID,
-            "FUNDING_INSTRUMENT_ID": self.FUNDING_INSTRUMENT_ID,
         }
-        missing = [k for k, v in required.items() if not v or str(v).strip() == ""]
-        if missing:
-            raise SystemExit(f"Missing required env vars: {', '.join(missing)}")
+        missing_tw = [k for k, v in tw_required.items() if not v or str(v).strip() == ""]
+        if missing_tw:
+            raise SystemExit(f"Missing required Twitter env vars: {', '.join(missing_tw)}")
+
+        # Require Ads credentials only when Ads are enabled and not simulating
+        if self.ENABLE_ADS and not self.ADS_SIMULATION:
+            ads_required = {
+                "ADS_ACCOUNT_ID": self.ADS_ACCOUNT_ID,
+                "FUNDING_INSTRUMENT_ID": self.FUNDING_INSTRUMENT_ID,
+            }
+            missing_ads = [k for k, v in ads_required.items() if not v or str(v).strip() == ""]
+            if missing_ads:
+                raise SystemExit(f"Missing required Ads env vars: {', '.join(missing_ads)}")
 
 
 def oauth(config: Config) -> OAuth1:
@@ -130,6 +144,54 @@ def add_geo_targeting(auth: OAuth1, account_id: str, line_item_id: str, location
     resp = requests.post(url, auth=auth, json=payload)
     resp.raise_for_status()
     return resp.json()["data"]["id"]
+
+
+def list_targeting_criteria(auth: OAuth1, account_id: str, line_item_id: str) -> List[Dict[str, Any]]:
+    url = f"{BASE_ADS}/accounts/{account_id}/targeting_criteria"
+    params = {"line_item_id": line_item_id}
+    resp = requests.get(url, auth=auth, params=params)
+    resp.raise_for_status()
+    return resp.json().get("data", [])
+
+
+def list_regions_in_country(auth: OAuth1, account_id: str, country_code: str) -> List[Dict[str, Any]]:
+    url = f"{BASE_ADS}/accounts/{account_id}/targeting_criteria/locations"
+    params = {"location_type": "REGION", "country_code": country_code}
+    resp = requests.get(url, auth=auth, params=params)
+    resp.raise_for_status()
+    return resp.json().get("data", [])
+
+
+def find_location_by_query(auth: OAuth1, account_id: str, country_code: str, query: str) -> Tuple[str, Dict[str, Any]]:
+    url = f"{BASE_ADS}/accounts/{account_id}/targeting_criteria/locations"
+    params = {"location_type": "REGION", "country_code": country_code, "q": query}
+    resp = requests.get(url, auth=auth, params=params)
+    resp.raise_for_status()
+    data = resp.json().get("data", [])
+    if not data and country_code.upper() == "TH" and query.lower() == "ayutthaya":
+        params["q"] = "Phra Nakhon Si Ayutthaya"
+        resp = requests.get(url, auth=auth, params=params)
+        resp.raise_for_status()
+        data = resp.json().get("data", [])
+    if not data:
+        raise RuntimeError(f"Region not found for query '{query}' in country '{country_code}'.")
+    loc = data[0]
+    return loc["targeting_value"], loc
+
+
+def add_geo_targets_bulk(auth: OAuth1, account_id: str, line_item_id: str, location_ids: List[str]) -> List[str]:
+    existing = list_targeting_criteria(auth, account_id, line_item_id)
+    existing_vals = {c.get("targeting_value") for c in existing if c.get("targeting_type") == "LOCATION"}
+    created_ids: List[str] = []
+    for loc in location_ids:
+        if loc in existing_vals:
+            continue
+        try:
+            tc_id = add_geo_targeting(auth, account_id, line_item_id, loc)
+            created_ids.append(tc_id)
+        except Exception as e:
+            log.error(f"Failed adding location {loc}: {e}", exc_info=True)
+    return created_ids
 
 
 def promote_tweet(auth: OAuth1, account_id: str, line_item_id: str, tweet_id: str) -> str:
@@ -254,11 +316,27 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
         campaign_id = cfg.CAMPAIGN_ID
     else:
         campaign_id = create_campaign(_auth, cfg.ADS_ACCOUNT_ID, cfg.FUNDING_INSTRUMENT_ID, "Ayutthaya Reach Campaign", cfg.DAILY_BUDGET_MICRO, cfg.TOTAL_BUDGET_MICRO)
-    line_item_id = create_line_item(_auth, cfg.ADS_ACCOUNT_ID, campaign_id, "Ayutthaya LI", cfg.PLACEMENT, cfg.OBJECTIVE, cfg.BID_AMOUNT_MICRO)
-    location_id, loc_meta = find_ayutthaya_location_id(_auth, cfg.ADS_ACCOUNT_ID)
-    tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
+    # Use existing LINE_ITEM_ID if provided; otherwise create new
+    line_item_id = cfg.LINE_ITEM_ID or create_line_item(_auth, cfg.ADS_ACCOUNT_ID, campaign_id, "TH LI", cfg.PLACEMENT, cfg.OBJECTIVE, cfg.BID_AMOUNT_MICRO)
+
+    # Geo targeting: all regions nationwide or specific region; fallback to Ayutthaya
+    tc_id = None
+    loc_meta: Dict[str, Any] = {}
+    if cfg.GEO_ALL_REGIONS:
+        regions = list_regions_in_country(_auth, cfg.ADS_ACCOUNT_ID, cfg.GEO_COUNTRY_CODE)
+        loc_ids = [r["targeting_value"] for r in regions]
+        add_geo_targets_bulk(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, loc_ids)
+        loc_meta = {"mode": "ALL_REGIONS", "count": len(loc_ids)}
+    elif cfg.GEO_REGION_QUERY:
+        location_id, loc_meta = find_location_by_query(_auth, cfg.ADS_ACCOUNT_ID, cfg.GEO_COUNTRY_CODE, cfg.GEO_REGION_QUERY)
+        tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
+    else:
+        location_id, loc_meta = find_ayutthaya_location_id(_auth, cfg.ADS_ACCOUNT_ID)
+        tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
+
     promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
     return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": t_codeexnewt</}
+</}
 
 
 def collect_metrics(cfg: Config, max_items: int = 50) -> Dict[str, Any]:
