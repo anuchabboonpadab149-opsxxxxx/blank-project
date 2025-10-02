@@ -1,0 +1,29 @@
+[Unit]
+Description=Social distribution daemon (24/7) for multi-platform posting and analytics
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/promote-ayutthaya
+Environment=PYTHONUNBUFFERED=1
+Environment=RUN_MODE=daemon
+Environment=TIMEZONE=Asia/Bangkok
+# Content generator
+Environment=GENERATE_CONTENT=true
+Environment=SENDER_NAME=Bee&Bell
+# Ads: enabled (real) — set ADS_SIMULATION=true for dry-run without cost
+Environment=ENABLE_ADS=true
+Environment=ADS_SIMULATION=false
+# Posting triggers
+Environment=POST_INTERVAL_SECONDS=60
+# Collecting triggers
+Environment=COLLECT_INTERVAL_MINUTES=5
+# Providers to enable
+Environment=PROVIDERS=twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok
+ExecStart=/usr/bin/python3 /opt/promote-ayutthaya/cli.py
+Restart=always
+RestartSec=10
+User=ubuntu
+
+[Install]
+WantedBy=multi-user.target
