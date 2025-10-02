@@ -1,5 +1,5 @@
 [Unit]
-Description=Promote Tweet to Ayutthaya (daemon 24/7)
+Description=Social distribution daemon (24/7) for multi-platform posting and analytics
 After=network.target
 
 [Service]
@@ -7,8 +7,15 @@ Type=simple
 WorkingDirectory=%h/promote-ayutthaya
 Environment=PYTHONUNBUFFERED=1
 Environment=RUN_MODE=daemon
-# Use interval for 24/7 continuous operation; adjust seconds as needed
-Environment=INTERVAL_SECONDS=1800
+Environment=TIMEZONE=Asia/Bangkok
+# Posting triggers
+Environment=POST_INTERVAL_SECONDS=1
+Environment=POST_CRON=*/1 * * * * *
+# Collecting triggers
+Environment=COLLECT_INTERVAL_MINUTES=1
+Environment=COLLECT_CRON=0 * * * * *
+# Providers to enable
+Environment=PROVIDERS=twitter,facebook,linkedin,line,telegram,discord
 ExecStart=/usr/bin/python3 %h/promote-ayutthaya/cli.py
 Restart=always
 RestartSec=10

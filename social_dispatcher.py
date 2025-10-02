@@ -7,6 +7,10 @@ from promote_ayutthaya import Config, post_one_from_file
 from providers.twitter import TwitterProvider
 from providers.facebook import FacebookProvider
 from providers.linkedin import LinkedInProvider
+from providers.line import LineProvider
+from providers.telegram import TelegramProvider
+from providers.discord import DiscordProvider
+from providers.mastodon import MastodonProvider
 
 log = logging.getLogger("social_dispatcher")
 
@@ -22,6 +26,14 @@ def _build_providers(cfg: Config) -> List:
             providers.append(FacebookProvider())
         elif n == "linkedin":
             providers.append(LinkedInProvider())
+        elif n == "line":
+            providers.append(LineProvider())
+        elif n == "telegram":
+            providers.append(TelegramProvider())
+        elif n == "discord":
+            providers.append(DiscordProvider())
+        elif n == "mastodon":
+            providers.append(MastodonProvider())
         else:
             log.warning(f"Unknown provider '{n}' — skipping")
     return providers
@@ -29,8 +41,8 @@ def _build_providers(cfg: Config) -> List:
 
 def distribute_once() -> Dict[str, Any]:
     """
-    Pull next text (via tweets.txt rotation) and distribute to all configured providers.
-    For Twitter, we also run the promotion flow (Ayutthaya targeting).
+    Pull next text (via tweets.txt or external import rotation) and distribute to all configured providers.
+    For Twitter, we also run the promotion flow (geo targeting per config).
     """
     cfg = Config()
     res = post_one_from_file(cfg)  # posts + promotes on Twitter
