@@ -218,7 +218,7 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
     log.info(f"Posting tweet from file: {text}")
     tweet_id = post_tweet(_auth, text)
     mark_used(text, tweet_id)
-    # Promote
+    # Promote on X Ads
     if cfg.CAMPAIGN_ID:
         campaign_id = cfg.CAMPAIGN_ID
     else:
@@ -227,7 +227,25 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
     location_id, loc_meta = find_ayutthaya_location_id(_auth, cfg.ADS_ACCOUNT_ID)
     tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
     promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
-    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": text}
+
+    # Cross-post to other platforms
+    try:
+        from dispatcher import cross_post
+        cross = cross_post(text)
+    except Exception as e:
+        log.error(f"Cross-post failed: {e}", exc_info=True)
+        cross = {"error": str(e)}
+
+    return {
+        "tweet_id": tweet_id,
+        "campaign_id": campaign_id,
+        "line_item_id": line_item_id,
+        "targeting_criteria_id": tc_id,
+        "promoted_tweet_id": promoted_id,
+        "location": loc_meta,
+        "text": text,
+        "cross_post": cross
+    }
 
 
 def collect_metrics(cfg: Config, max_items: int = 50) -> Dict[str, Any]:
