@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  promote-ayutthaya:
+    build: .
+    container_name: promote-ayutthaya
+    restart: always
+    env_file:
+      - .env
+    environment:
+      # Fallbacks if .env not provided for some vars
+      - RUN_MODE=daemon
+      - INTERVAL_SECONDS=${INTERVAL_SECONDS:-1800}
+      - TIMEZONE=${TIMEZONE:-Asia/Bangkok}
+    # If you want to mount code for live edits, uncomment volumes:
+    # volumes:
+    #   - .:/app
