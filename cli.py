@@ -6,11 +6,10 @@ import logging
 from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 import pytz
 
-from promote_ayutthaya import Config, run_once
-
-log = logging.getLogger("promote_cli")
+from promoter("promote_cli")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 

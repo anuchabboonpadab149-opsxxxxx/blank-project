@@ -1,0 +1,18 @@
+[Unit]
+Description=Promote Tweet to Ayutthaya (daemon 24/7)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/promote-ayutthaya
+Environment=PYTHONUNBUFFERED=1
+Environment=RUN_MODE=daemon
+# Use interval for 24/7 continuous operation; adjust seconds as needed
+Environment=INTERVAL_SECONDS=1800
+ExecStart=/usr/bin/python3 %h/promote-ayutthaya/cli.py
+Restart=always
+RestartSec=10
+User=%i
+
+[Install]
+WantedBy=multi-user.target
