@@ -1,0 +1,3 @@
+# Put Ads entity IDs here, one per line.
+# Example: line item IDs or promoted_tweet IDs
+# 123456789012345678

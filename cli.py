@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 import pytz
 
-from promote_ayutthaya import Config, run_once, post_one_from_file, collect_metrics
+from promote_ayutthaya import Config, post_one_from_file, collect_metrics, collect_ads_analytics
 
 log = logging.getLogger("promote_cli")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -51,7 +51,9 @@ def main():
         res = post_one_from_file(cfg)
         log.info(f"Posted and promoted: {res}")
         met = collect_metrics(cfg)
-        log.info(f"Collected metrics: {met}")
+        log.info(f"Collected organic metrics: {met}")
+        ads = collect_ads_analytics(cfg)
+        log.info(f"Collected ads analytics: {ads}")
         return
 
     scheduler = BlockingScheduler(timezone=pytz.timezone(tz))
@@ -79,7 +81,9 @@ def main():
         try:
             cfg = Config()
             met = collect_metrics(cfg)
-            log.info(f"Collect job result: {met}")
+            log.info(f"Collect organic metrics result: {met}")
+            ads = collect_ads_analytics(cfg)
+            log.info(f"Collect ads analytics result: {ads}")
         except Exception as e:
             log.error(f"Collect job failed: {e}", exc_info=True)
         finally:

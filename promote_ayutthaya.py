@@ -1,4 +1,5 @@
 
+
 import os
 import sys
 import json
@@ -155,6 +156,7 @@ def run_once(cfg: Config) -> Dict[str, Any]:
 
 STATE_FILE = "posted_state.json"
 METRICS_FILE = "metrics.json"
+ADS_METRICS_FILE = "ads_metrics.json"
 
 
 def _load_json(path: str) -> Dict[str, Any]:
@@ -251,10 +253,69 @@ def collect_metrics(cfg: Config, max_items: int = 50) -> Dict[str, Any]:
     return res
 
 
+def _load_entity_ids() -> List[str]:
+    ids_env = os.getenv("ADS_ENTITY_IDS", "")
+    ids: List[str] = []
+    if ids_env.strip():
+        ids = [x.strip() for x in ids_env.split(",") if x.strip()]
+    else:
+        path = os.getenv("ADS_ENTITY_FILE", "ads_entities.txt")
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    t = line.strip()
+                    if t:
+                        ids.append(t)
+    return ids
+
+
+def collect_ads_analytics(cfg: Config) -> Dict[str, Any]:
+    """
+    Collect Ads analytics via Ads API v11 synchronous stats endpoint.
+    Returns impressions, engagements, etc. depending on metric_groups.
+    """
+    entity = os.getenv("ADS_ENTITY_TYPE", "LINE_ITEM")  # LINE_ITEM, PROMOTED_TWEET, CAMPAIGN
+    granularity = os.getenv("ADS_GRANULARITY", "HOUR")  # HOUR or DAY
+    start_time = os.getenv("ADS_START_TIME")            # ISO8601 e.g. 2025-10-01T00:00:00Z
+    end_time = os.getenv("ADS_END_TIME")                # ISO8601
+    metric_groups = os.getenv("ADS_METRIC_GROUPS", "ENGAGEMENT")  # e.g., ENGAGEMENT,BILLING,MEDIA
+
+    ids = _load_entity_ids()
+    if not ids:
+        return {"error": "No Ads entity IDs provided."}
+
+    auth = oauth(cfg)
+    url = f"{BASE_ADS}/stats/accounts/{cfg.ADS_ACCOUNT_ID}"
+    params = {
+        "entity": entity,
+        "entity_ids": ",".join(ids),
+        "granularity": granularity,
+        "metric_groups": metric_groups,
+    }
+    if start_time:
+        params["start_time"] = start_time
+    if end_time:
+        params["end_time"] = end_time
+
+    resp = requests.get(url, auth=auth, params=params)
+    resp.raise_for_status()
+    data = resp.json()
+
+    # Persist
+    existing = _load_json(ADS_METRICS_FILE)
+    existing.setdefault("runs", [])
+    existing["runs"].append(data)
+    _save_json(ADS_METRICS_FILE, existing)
+
+    return {"status": "ok", "count": len(data.get("data", []))}
+
+
 if __name__ == "__main__":
     cfg = Config()
-    # Default: post from file then collect metrics
+    # Default: post from file then collect metrics (organic + ads)
     posted = post_one_from_file(cfg)
     print(json.dumps(posted, ensure_ascii=False))
     metrics = collect_metrics(cfg)
     print(json.dumps(metrics, ensure_ascii=False))
+    ads = collect_ads_analytics(cfg)
+    print(json.dumps(ads, ensure_ascii=False))
