@@ -39,6 +39,7 @@ class Config:
         self.GENERATE_CONTENT = os.getenv("GENERATE_CONTENT", "").lower() in {"1", "true", "yes"}
         self.SENDER_NAME = os.getenv("SENDER_NAME", "Bee&Bell")
         self.ENABLE_ADS = os.getenv("ENABLE_ADS", "false").lower() in {"1", "true", "yes"}
+        self.ADS_SIMULATION = os.getenv("ADS_SIMULATION", "true").lower() in {"1", "true", "yes"}
         # Budget/bid
         self.DAILY_BUDGET_MICRO = int(os.getenv("DAILY_BUDGET_MICRO", "5000000"))
         self.TOTAL_BUDGET_MICRO = int(os.getenv("TOTAL_BUDGET_MICRO", str(self.DAILY_BUDGET_MICRO * 7)))
@@ -246,6 +247,9 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
         return {"tweet_id": tweet_id, "text": text, "promotion_skipped": True}
 
     # Promote via Ads if enabled
+    if cfg.ADS_SIMULATION:
+        # Simulate promotion without hitting Ads API (no cost)
+        return {"tweet_id": tweet_id, "text": text, "ads_simulated": True}
     if cfg.CAMPAIGN_ID:
         campaign_id = cfg.CAMPAIGN_ID
     else:
@@ -254,7 +258,7 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
     location_id, loc_meta = find_ayutthaya_location_id(_auth, cfg.ADS_ACCOUNT_ID)
     tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
     promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
-    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": text}
+    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": t_codeexnewt</}
 
 
 def collect_metrics(cfg: Config, max_items: int = 50) -> Dict[str, Any]:
