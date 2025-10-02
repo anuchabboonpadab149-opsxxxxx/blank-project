@@ -2,22 +2,17 @@ import os
 import sys
 import json
 import logging
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any
 
 import requests
 from requests_oauthlib import OAuth1
 from dotenv import load_dotenv
 
-# Optional scheduler imports are done in cli.py to avoid forcing daemon mode here.
-
 BASE_ADS = "https://ads-api.twitter.com/11"
 BASE_TW = "https://api.twitter.com/1.1"
 
 log = logging.getLogger("promote_ayutthaya")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 
 class Config:
@@ -57,12 +52,7 @@ class Config:
 
 
 def oauth(config: Config) -> OAuth1:
-    return OAuth1(
-        config.CONSUMER_KEY,
-        config.CONSUMER_SECRET,
-        config.ACCESS_TOKEN,
-        config.ACCESS_TOKEN_SECRET,
-    )
+    return OAuth1(config.CONSUMER_KEY, config.CONSUMER_SECRET, config.ACCESS_TOKEN, config.ACCESS_TOKEN_SECRET)
 
 
 def post_tweet(auth: OAuth1, text: str) -> str:
@@ -73,13 +63,13 @@ def post_tweet(auth: OAuth1, text: str) -> str:
     return data["id_str"]
 
 
-def create_campaign(auth: OAuth1, account_id: str, funding_instrument_id: str, name: str) -> str:
+def create_campaign(auth: OAuth1, account_id: str, funding_instrument_id: str, name: str, daily_budget_micro: int, total_budget_micro: int) -> str:
     url = f"{BASE_ADS}/accounts/{account_id}/campaigns"
     payload = {
         "funding_instrument_id": funding_instrument_id,
         "name": name,
-        "daily_budget_amount_local_micro": str(cfg.DAILY_BUDGET_MICRO),
-        "total_budget_amount_local_micro": str(cfg.TOTAL_BUDGET_MICRO),
+        "daily_budget_amount_local_micro": str(daily_budget_micro),
+        "total_budget_amount_local_micro": str(total_budget_micro),
         "paused": False,
     }
     resp = requests.post(url, auth=auth, data=payload)
@@ -153,11 +143,26 @@ def run_once(cfg: Config) -> Dict[str, Any]:
         log.info(f"Using existing campaign: {campaign_id}")
     else:
         log.info("Creating campaign")
-        campaign_id = create_campaign(_auth, cfg.ADS_ACCOUNT_ID, cfg.FUNDING_INSTRUMENT_ID, "Ayutthaya Reach Campaign")
+        campaign_id = create_campaign(
+            _auth,
+            cfg.ADS_ACCOUNT_ID,
+            cfg.FUNDING_INSTRUMENT_ID,
+            "Ayutthaya Reach Campaign",
+            cfg.DAILY_BUDGET_MICRO,
+            cfg.TOTAL_BUDGET_MICRO,
+        )
         log.info(f"Campaign ID: {campaign_id}")
 
     log.info("Creating line item")
-    line_item_id = create_line_item(_auth, cfg.ADS_ACCOUNT_ID, campaign_id, "Ayutthaya LI", cfg.PLACEMENT, cfg.OBJECTIVE, cfg.BID_AMOUNT_MICRO)
+    line_item_id = create_line_item(
+        _auth,
+        cfg.ADS_ACCOUNT_ID,
+        campaign_id,
+        "Ayutthaya LI",
+        cfg.PLACEMENT,
+        cfg.OBJECTIVE,
+        cfg.BID_AMOUNT_MICRO,
+    )
     log.info(f"Line Item ID: {line_item_id}")
 
     log.info("Finding Ayutthaya location")
@@ -183,7 +188,6 @@ def run_once(cfg: Config) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    # Direct run does a one-shot promotion
     cfg = Config()
     result = run_once(cfg)
     print(json.dumps(result, ensure_ascii=False))
