@@ -8,6 +8,9 @@ WorkingDirectory=%h/promote-ayutthaya
 Environment=PYTHONUNBUFFERED=1
 Environment=RUN_MODE=daemon
 Environment=TIMEZONE=Asia/Bangkok
+# Content generator
+Environment=GENERATE_CONTENT=true
+Environment=SENDER_NAME=Bee&Bell
 # Posting triggers
 Environment=POST_INTERVAL_SECONDS=1
 Environment=POST_CRON=*/1 * * * * *

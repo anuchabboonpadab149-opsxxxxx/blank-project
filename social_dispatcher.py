@@ -3,14 +3,13 @@ import json
 import logging
 from typing import List, Dict, Any
 
-from promote_ayutthaya import Config, post_one_from_file
+from promote_ayutthaya import Config, post_one_auto
 from providers.twitter import TwitterProvider
 from providers.facebook import FacebookProvider
 from providers.linkedin import LinkedInProvider
 from providers.line import LineProvider
 from providers.telegram import TelegramProvider
 from providers.discord import DiscordProvider
-from providers.mastodon import MastodonProvider
 
 log = logging.getLogger("social_dispatcher")
 
@@ -32,8 +31,6 @@ def _build_providers(cfg: Config) -> List:
             providers.append(TelegramProvider())
         elif n == "discord":
             providers.append(DiscordProvider())
-        elif n == "mastodon":
-            providers.append(MastodonProvider())
         else:
             log.warning(f"Unknown provider '{n}' — skipping")
     return providers
@@ -41,17 +38,16 @@ def _build_providers(cfg: Config) -> List:
 
 def distribute_once() -> Dict[str, Any]:
     """
-    Pull next text (via tweets.txt or external import rotation) and distribute to all configured providers.
-    For Twitter, we also run the promotion flow (geo targeting per config).
+    Pull next text (tweets.txt/import/generator) and distribute to providers.
+    Twitter is posted/promoted; others receive the same text.
     """
     cfg = Config()
-    res = post_one_from_file(cfg)  # posts + promotes on Twitter
+    res = post_one_auto(cfg)  # posts + promotes on Twitter
     text = res.get("text")
     providers = _build_providers(cfg)
     statuses = []
     for p in providers:
         if getattr(p, "name", "") == "twitter":
-            # Already posted/promoted by post_one_from_file
             statuses.append({"provider": "twitter", "status": "ok", "detail": {"tweet_id": res.get("tweet_id")}})
         else:
             statuses.append(p.post(text))

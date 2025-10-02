@@ -30,22 +30,20 @@ class Config:
         self.ADS_ACCOUNT_ID = os.getenv("ADS_ACCOUNT_ID")
         self.FUNDING_INSTRUMENT_ID = os.getenv("FUNDING_INSTRUMENT_ID")
         self.CAMPAIGN_ID = os.getenv("CAMPAIGN_ID") or None
-        self.LINE_ITEM_ID = os.getenv("LINE_ITEM_ID") or None
         # Tweet content or file-based rotation
         self.TWEET_TEXT = os.getenv("TWEET_TEXT")
         self.TWEETS_FILE = os.getenv("TWEETS_FILE", "tweets.txt")
-        self.IMPORT_SOURCE_URL = os.getenv("IMPORT_SOURCE_URL", "")
-        self.IMPORT_FORMAT = os.getenv("IMPORT_FORMAT", "lines")
+        self.IMPORT_SOURCE_URL = os.getenv("IMPORT_SOURCE_URL", "").strip()
+        self.IMPORT_FORMAT = os.getenv("IMPORT_FORMAT", "lines").strip()
+        # Content generator
+        self.GENERATE_CONTENT = os.getenv("GENERATE_CONTENT", "").lower() in {"1", "true", "yes"}
+        self.SENDER_NAME = os.getenv("SENDER_NAME", "Bee&Bell")
         # Budget/bid
         self.DAILY_BUDGET_MICRO = int(os.getenv("DAILY_BUDGET_MICRO", "5000000"))
         self.TOTAL_BUDGET_MICRO = int(os.getenv("TOTAL_BUDGET_MICRO", str(self.DAILY_BUDGET_MICRO * 7)))
         self.BID_AMOUNT_MICRO = int(os.getenv("BID_AMOUNT_MICRO", "500000"))
         self.OBJECTIVE = os.getenv("OBJECTIVE", "TWEET_ENGAGEMENTS")
         self.PLACEMENT = os.getenv("PLACEMENT", "ALL_ON_TWITTER")
-        # Geo targeting
-        self.GEO_COUNTRY_CODE = os.getenv("GEO_COUNTRY_CODE", "TH")
-        self.GEO_ALL_REGIONS = (os.getenv("GEO_ALL_REGIONS", "true").lower() in {"1", "true", "yes"})
-        self.GEO_REGION_QUERY = os.getenv("GEO_REGION_QUERY", "")
 
     def validate(self) -> None:
         required = {
@@ -103,37 +101,21 @@ def create_line_item(auth: OAuth1, account_id: str, campaign_id: str, name: str,
     return resp.json()["data"]["id"]
 
 
-def list_targeting_criteria(auth: OAuth1, account_id: str, line_item_id: str) -> List[Dict[str, Any]]:
-    url = f"{BASE_ADS}/accounts/{account_id}/targeting_criteria"
-    params = {"line_item_id": line_item_id}
-    resp = requests.get(url, auth=auth, params=params)
-    resp.raise_for_status()
-    return resp.json().get("data", [])
-
-
-def find_location_by_query(auth: OAuth1, account_id: str, country_code: str, query: str) -> Tuple[str, Dict[str, Any]]:
+def find_ayutthaya_location_id(auth: OAuth1, account_id: str) -> Tuple[str, Dict[str, Any]]:
     url = f"{BASE_ADS}/accounts/{account_id}/targeting_criteria/locations"
-    params = {"location_type": "REGION", "country_code": country_code, "q": query}
+    params = {"location_type": "REGION", "country_code": "TH", "q": "Ayutthaya"}
     resp = requests.get(url, auth=auth, params=params)
     resp.raise_for_status()
     data = resp.json().get("data", [])
-    if not data and country_code.upper() == "TH" and query.lower() == "ayutthaya":
+    if not data:
         params["q"] = "Phra Nakhon Si Ayutthaya"
         resp = requests.get(url, auth=auth, params=params)
         resp.raise_for_status()
         data = resp.json().get("data", [])
     if not data:
-        raise RuntimeError(f"Region not found for query '{query}' in country '{country_code}'.")
+        raise RuntimeError("Ayutthaya region not found in Ads API locations.")
     loc = data[0]
     return loc["targeting_value"], loc
-
-
-def list_regions_in_country(auth: OAuth1, account_id: str, country_code: str) -> List[Dict[str, Any]]:
-    url = f"{BASE_ADS}/accounts/{account_id}/targeting_criteria/locations"
-    params = {"location_type": "REGION", "country_code": country_code}
-    resp = requests.get(url, auth=auth, params=params)
-    resp.raise_for_status()
-    return resp.json().get("data", [])
 
 
 def add_geo_targeting(auth: OAuth1, account_id: str, line_item_id: str, location_id: str) -> str:
@@ -146,21 +128,6 @@ def add_geo_targeting(auth: OAuth1, account_id: str, line_item_id: str, location
     resp = requests.post(url, auth=auth, json=payload)
     resp.raise_for_status()
     return resp.json()["data"]["id"]
-
-
-def add_geo_targets_bulk(auth: OAuth1, account_id: str, line_item_id: str, location_ids: List[str]) -> List[str]:
-    existing = list_targeting_criteria(auth, account_id, line_item_id)
-    existing_vals = {c.get("targeting_value") for c in existing if c.get("targeting_type") == "LOCATION"}
-    created_ids: List[str] = []
-    for loc in location_ids:
-        if loc in existing_vals:
-            continue
-        try:
-            tc_id = add_geo_targeting(auth, account_id, line_item_id, loc)
-            created_ids.append(tc_id)
-        except Exception as e:
-            log.error(f"Failed adding location {loc}: {e}", exc_info=True)
-    return created_ids
 
 
 def promote_tweet(auth: OAuth1, account_id: str, line_item_id: str, tweet_id: str) -> str:
@@ -182,23 +149,10 @@ def run_once(cfg: Config) -> Dict[str, Any]:
     if cfg.CAMPAIGN_ID:
         campaign_id = cfg.CAMPAIGN_ID
     else:
-        campaign_id = create_campaign(_auth, cfg.ADS_ACCOUNT_ID, cfg.FUNDING_INSTRUMENT_ID, "Thailand Reach Campaign", cfg.DAILY_BUDGET_MICRO, cfg.TOTAL_BUDGET_MICRO)
-    line_item_id = cfg.LINE_ITEM_ID or create_line_item(_auth, cfg.ADS_ACCOUNT_ID, campaign_id, "TH LI", cfg.PLACEMENT, cfg.OBJECTIVE, cfg.BID_AMOUNT_MICRO)
-
-    # Geo targeting
-    if cfg.GEO_ALL_REGIONS:
-        regions = list_regions_in_country(_auth, cfg.ADS_ACCOUNT_ID, cfg.GEO_COUNTRY_CODE)
-        loc_ids = [r["targeting_value"] for r in regions]
-        add_geo_targets_bulk(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, loc_ids)
-        loc_meta = {"mode": "ALL_REGIONS", "count": len(loc_ids)}
-        tc_id = None
-    elif cfg.GEO_REGION_QUERY:
-        location_id, loc_meta = find_location_by_query(_auth, cfg.ADS_ACCOUNT_ID, cfg.GEO_COUNTRY_CODE, cfg.GEO_REGION_QUERY)
-        tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
-    else:
-        loc_meta = {"mode": "NONE"}
-        tc_id = None
-
+        campaign_id = create_campaign(_auth, cfg.ADS_ACCOUNT_ID, cfg.FUNDING_INSTRUMENT_ID, "Ayutthaya Reach Campaign", cfg.DAILY_BUDGET_MICRO, cfg.TOTAL_BUDGET_MICRO)
+    line_item_id = create_line_item(_auth, cfg.ADS_ACCOUNT_ID, campaign_id, "Ayutthaya LI", cfg.PLACEMENT, cfg.OBJECTIVE, cfg.BID_AMOUNT_MICRO)
+    location_id, loc_meta = find_ayutthaya_location_id(_auth, cfg.ADS_ACCOUNT_ID)
+    tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
     promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
     return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": text}
 
@@ -226,15 +180,23 @@ def _save_json(path: str, data: Dict[str, Any]) -> None:
 
 
 def load_tweets(path: str, cfg: Config = None) -> List[str]:
-    tweets: List[str] = []
+    # Content generator takes precedence if enabled
+    if cfg and cfg.GENERATE_CONTENT:
+        try:
+            from content_generator import generate_caption
+            text = generate_caption(sender_name=cfg.SENDER_NAME)
+            return [text]
+        except Exception as e:
+            log.error(f"Content generator failed: {e}. Falling back to import/file.", exc_info=True)
+    # If external import source is configured, use it.
     if cfg and cfg.IMPORT_SOURCE_URL:
         try:
             from importer import fetch_texts_from_url
-            tweets = fetch_texts_from_url(cfg.IMPORT_SOURCE_URL, cfg.IMPORT_FORMAT)
-            if tweets:
-                return tweets
+            texts = fetch_texts_from_url(cfg.IMPORT_SOURCE_URL, cfg.IMPORT_FORMAT)
+            return texts
         except Exception as e:
-            log.error(f"External import failed: {e}", exc_info=True)
+            log.error(f"External import failed: {e}. Falling back to file '{path}'", exc_info=True)
+    tweets: List[str] = []
     if not os.path.exists(path):
         return tweets
     with open(path, "r", encoding="utf-8") as f:
@@ -277,28 +239,14 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
     log.info(f"Posting tweet from source: {text}")
     tweet_id = post_tweet(_auth, text)
     mark_used(text, tweet_id)
-
-    # Campaign / Line item reuse
+    # Promote
     if cfg.CAMPAIGN_ID:
         campaign_id = cfg.CAMPAIGN_ID
     else:
-        campaign_id = create_campaign(_auth, cfg.ADS_ACCOUNT_ID, cfg.FUNDING_INSTRUMENT_ID, "Thailand Reach Campaign", cfg.DAILY_BUDGET_MICRO, cfg.TOTAL_BUDGET_MICRO)
-    line_item_id = cfg.LINE_ITEM_ID or create_line_item(_auth, cfg.ADS_ACCOUNT_ID, campaign_id, "TH LI", cfg.PLACEMENT, cfg.OBJECTIVE, cfg.BID_AMOUNT_MICRO)
-
-    # Geo targeting
-    tc_id = None
-    loc_meta: Dict[str, Any] = {}
-    if cfg.GEO_ALL_REGIONS:
-        regions = list_regions_in_country(_auth, cfg.ADS_ACCOUNT_ID, cfg.GEO_COUNTRY_CODE)
-        loc_ids = [r["targeting_value"] for r in regions]
-        add_geo_targets_bulk(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, loc_ids)
-        loc_meta = {"mode": "ALL_REGIONS", "count": len(loc_ids)}
-    elif cfg.GEO_REGION_QUERY:
-        location_id, loc_meta = find_location_by_query(_auth, cfg.ADS_ACCOUNT_ID, cfg.GEO_COUNTRY_CODE, cfg.GEO_REGION_QUERY)
-        tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
-    else:
-        loc_meta = {"mode": "NONE"}
-
+        campaign_id = create_campaign(_auth, cfg.ADS_ACCOUNT_ID, cfg.FUNDING_INSTRUMENT_ID, "Ayutthaya Reach Campaign", cfg.DAILY_BUDGET_MICRO, cfg.TOTAL_BUDGET_MICRO)
+    line_item_id = create_line_item(_auth, cfg.ADS_ACCOUNT_ID, campaign_id, "Ayutthaya LI", cfg.PLACEMENT, cfg.OBJECTIVE, cfg.BID_AMOUNT_MICRO)
+    location_id, loc_meta = find_ayutthaya_location_id(_auth, cfg.ADS_ACCOUNT_ID)
+    tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
     promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
     return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": text}
 
@@ -383,10 +331,66 @@ def collect_ads_analytics(cfg: Config) -> Dict[str, Any]:
     return {"status": "ok", "count": len(data.get("data", []))}
 
 
+def _load_entity_ids() -> List[str]:
+    ids_env = os.getenv("ADS_ENTITY_IDS", "")
+    ids: List[str] = []
+    if ids_env.strip():
+        ids = [x.strip() for x in ids_env.split(",") if x.strip()]
+    else:
+        path = os.getenv("ADS_ENTITY_FILE", "ads_entities.txt")
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    t = line.strip()
+                    if t:
+                        ids.append(t)
+    return ids
+
+
+def collect_ads_analytics(cfg: Config) -> Dict[str, Any]:
+    entity = os.getenv("ADS_ENTITY_TYPE", "LINE_ITEM")
+    granularity = os.getenv("ADS_GRANULARITY", "HOUR")
+    start_time = os.getenv("ADS_START_TIME")
+    end_time = os.getenv("ADS_END_TIME")
+    metric_groups = os.getenv("ADS_METRIC_GROUPS", "ENGAGEMENT")
+
+    ids = _load_entity_ids()
+    if not ids:
+        return {"error": "No Ads entity IDs provided."}
+
+    auth = oauth(cfg)
+    url = f"{BASE_ADS}/stats/accounts/{cfg.ADS_ACCOUNT_ID}"
+    params = {
+        "entity": entity,
+        "entity_ids": ",".join(ids),
+        "granularity": granularity,
+        "metric_groups": metric_groups,
+    }
+    if start_time:
+        params["start_time"] = start_time
+    if end_time:
+        params["end_time"] = end_time
+
+    resp = requests.get(url, auth=auth, params=params)
+    resp.raise_for_status()
+    data = resp.json()
+
+    existing = _load_json(ADS_METRICS_FILE)
+    existing.setdefault("runs", [])
+    existing["runs"].append(data)
+    _save_json(ADS_METRICS_FILE, existing)
+
+    return {"status": "ok", "count": len(data.get("data", []))}
+
+
+def post_one_from_file(cfg: Config) -> Dict[str, Any]:
+    # Backward compatible wrapper
+    return post_one_auto(cfg)
+
+
 if __name__ == "__main__":
     cfg = Config()
-    # Default: post from source then collect metrics (organic + ads)
-    posted = post_one_from_file(cfg)
+    posted = post_one_auto(cfg)
     print(json.dumps(posted, ensure_ascii=False))
     metrics = collect_metrics(cfg)
     print(json.dumps(metrics, ensure_ascii=False))
