@@ -11,13 +11,14 @@ from apscheduler.triggers.interval import IntervalTrigger
 import pytz
 
 from promote_ayutthaya import Config, post_one_from_file, collect_metrics, collect_ads_analytics
+from social_dispatcher import distribute_once
 
 log = logging.getLogger("promote_cli")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Promote a Tweet to Ayutthaya via X Ads API")
+    parser = argparse.ArgumentParser(description="Distribute posts to multiple social platforms and collect metrics")
     parser.add_argument("--mode", choices=["once", "daemon"], help="Run once or daemon (scheduled). Overrides RUN_MODE env.", default=None)
     # Posting triggers
     parser.add_argument("--post-cron", help="Cron for posting (5 or 6 fields). Overrides POST_CRON env.", default=None)
@@ -35,6 +36,7 @@ def main():
 
     mode = args.mode or os.getenv("RUN_MODE", "once").strip()
     tz = args.tz or os.getenv("TIMEZONE", "Asia/Bangkok")
+    distribute_all = os.getenv("DISTRIBUTE_ALL", "true").lower() in {"1", "true", "yes"}
 
     # Posting trigger env
     post_cron = (args.post_cron or os.getenv("POST_CRON", "")).strip()
@@ -47,9 +49,14 @@ def main():
     collect_interval_min = args.collect_interval_min if args.collect_interval_min is not None else (int(collect_interval_min_env) if collect_interval_min_env.isdigit() else None)
 
     if mode == "once":
+        if distribute_all:
+            res = distribute_once()
+            log.info(f"Distributed to providers: {res}")
+        else:
+            cfg = Config()
+            res = post_one_from_file(cfg)
+            log.info(f"Posted and promoted on Twitter: {res}")
         cfg = Config()
-        res = post_one_from_file(cfg)
-        log.info(f"Posted and promoted: {res}")
         met = collect_metrics(cfg)
         log.info(f"Collected organic metrics: {met}")
         ads = collect_ads_analytics(cfg)
@@ -66,9 +73,13 @@ def main():
             log.info("Post job already running; skipping.")
             return
         try:
-            cfg = Config()
-            res = post_one_from_file(cfg)
-            log.info(f"Post job result: {res}")
+            if distribute_all:
+                res = distribute_once()
+                log.info(f"Post job distributed: {res}")
+            else:
+                cfg = Config()
+                res = post_one_from_file(cfg)
+                log.info(f"Post job (Twitter only) result: {res}")
         except Exception as e:
             log.error(f"Post job failed: {e}", exc_info=True)
         finally:
