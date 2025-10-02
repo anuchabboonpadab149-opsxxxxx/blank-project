@@ -39,10 +39,11 @@ class Config:
         # Content generator
         self.GENERATE_CONTENT = os.getenv("GENERATE_CONTENT", "").lower() in {"1", "true", "yes"}
         self.SENDER_NAME = os.getenv("SENDER_NAME", "Bee&Bell")
-        # Live promo
-        self.LIVE_PROMO_MODE = os.getenv("LIVE_PROMO_MODE", "false").lower() in {"1", "true", "yes"}
+        # Live promotion
+        self.LIVE_PROMO = os.getenv("LIVE_PROMO", "false").lower() in {"1", "true", "yes"}
         self.LIVE_LINK = os.getenv("LIVE_LINK", "").strip()
-        # Ads
+        self.LIVE_ADS_OBJECTIVE = os.getenv("LIVE_ADS_OBJECTIVE", "WEBSITE_CLICKS").strip()
+        # Ads control
         self.ENABLE_ADS = os.getenv("ENABLE_ADS", "false").lower() in {"1", "true", "yes"}
         self.ADS_SIMULATION = os.getenv("ADS_SIMULATION", "false").lower() in {"1", "true", "yes"}
         # Geo targeting
@@ -248,19 +249,11 @@ def _save_json(path: str, data: Dict[str, Any]) -> None:
 
 
 def load_tweets(path: str, cfg: Config = None) -> List[str]:
-    # Live promo CTA takes precedence if enabled
-    if cfg and cfg.LIVE_PROMO_MODE and cfg.LIVE_LINK:
-        try:
-            from content_generator import generate_live_caption
-            text = generate_live_caption(sender_name=cfg.SENDER_NAME, live_link=cfg.LIVE_LINK)
-            return [text]
-        except Exception as e:
-            log.error(f"Live generator failed: {e}. Falling back to normal generator/import/file.", exc_info=True)
-    # Content generator takes precedence next
+    # Content generator takes precedence if enabled
     if cfg and cfg.GENERATE_CONTENT:
         try:
             from content_generator import generate_caption
-            text = generate_caption(sender_name=cfg.SENDER_NAME)
+            text = generate_caption(sender_name=cfg.SENDER_NAME, live_link=(cfg.LIVE_LINK if cfg.LIVE_PROMO else ""))
             return [text]
         except Exception as e:
             log.error(f"Content generator failed: {e}. Falling back to import/file.", exc_info=True)
@@ -347,15 +340,7 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
         tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
 
     promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
-    return {
-        "tweet_id": tweet_id,
-        "campaign_id": campaign_id,
-        "line_item_id": line_item_id,
-        "targeting_criteria_id": tc_id,
-        "promoted_tweet_id": promoted_id,
-        "location": loc_meta,
-        "text": text,
-    }
+    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": t_codeexnewt</}
 </}
 
 

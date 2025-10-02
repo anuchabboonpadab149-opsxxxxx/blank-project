@@ -15,9 +15,8 @@ services:
       - COLLECT_INTERVAL_MINUTES=${COLLECT_INTERVAL_MINUTES:-2}
       - GENERATE_CONTENT=${GENERATE_CONTENT:-true}
       - SENDER_NAME=${SENDER_NAME:-Bee&Bell}
-      - LIVE_PROMO=${LIVE_PROMO:-true}
+      - LIVE_PROMO_MODE=${LIVE_PROMO_MODE:-true}
       - LIVE_LINK=${LIVE_LINK:-https://vt.tiktok.com/ZSHWWv19QQTPo-eKZtG/}
-      - LIVE_ADS_OBJECTIVE=${LIVE_ADS_OBJECTIVE:-WEBSITE_CLICKS}
       - ENABLE_ADS=${ENABLE_ADS:-true}
       - ADS_SIMULATION=${ADS_SIMULATION:-false}
       - PROVIDERS=${PROVIDERS:-twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok}
