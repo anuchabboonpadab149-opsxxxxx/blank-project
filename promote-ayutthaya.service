@@ -11,6 +11,7 @@ Environment=TIMEZONE=Asia/Bangkok
 # Content generator
 Environment=GENERATE_CONTENT=true
 Environment=SENDER_NAME=Bee&Bell
+Environment=ENABLE_ADS=false
 # Posting triggers
 Environment=POST_INTERVAL_SECONDS=60
 # Collecting triggers

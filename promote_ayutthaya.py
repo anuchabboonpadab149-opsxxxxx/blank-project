@@ -38,6 +38,7 @@ class Config:
         # Content generator
         self.GENERATE_CONTENT = os.getenv("GENERATE_CONTENT", "").lower() in {"1", "true", "yes"}
         self.SENDER_NAME = os.getenv("SENDER_NAME", "Bee&Bell")
+        self.ENABLE_ADS = os.getenv("ENABLE_ADS", "false").lower() in {"1", "true", "yes"}
         # Budget/bid
         self.DAILY_BUDGET_MICRO = int(os.getenv("DAILY_BUDGET_MICRO", "5000000"))
         self.TOTAL_BUDGET_MICRO = int(os.getenv("TOTAL_BUDGET_MICRO", str(self.DAILY_BUDGET_MICRO * 7)))
@@ -239,7 +240,12 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
     log.info(f"Posting tweet from source: {text}")
     tweet_id = post_tweet(_auth, text)
     mark_used(text, tweet_id)
-    # Promote
+
+    # Zero-cost mode: skip Ads promotion if disabled
+    if not cfg.ENABLE_ADS:
+        return {"tweet_id": tweet_id, "text": text, "promotion_skipped": True}
+
+    # Promote via Ads if enabled
     if cfg.CAMPAIGN_ID:
         campaign_id = cfg.CAMPAIGN_ID
     else:
@@ -295,6 +301,8 @@ def collect_ads_analytics(cfg: Config) -> Dict[str, Any]:
     Collect Ads analytics via Ads API v11 synchronous stats endpoint.
     Returns impressions, engagements, etc. depending on metric_groups.
     """
+    if not cfg.ENABLE_ADS:
+        return {"status": "disabled"}
     entity = os.getenv("ADS_ENTITY_TYPE", "LINE_ITEM")  # LINE_ITEM, PROMOTED_TWEET, CAMPAIGN
     granularity = os.getenv("ADS_GRANULARITY", "HOUR")  # HOUR or DAY
     start_time = os.getenv("ADS_START_TIME")            # ISO8601 e.g. 2025-10-01T00:00:00Z
