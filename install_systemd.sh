@@ -28,10 +28,12 @@ Environment=RUN_MODE=daemon
 Environment=TIMEZONE=Asia/Bangkok
 Environment=GENERATE_CONTENT=true
 Environment=SENDER_NAME=Bee&Bell
+Environment=LIVE_PROMO_MODE=true
+Environment=LIVE_LINK=https://vt.tiktok.com/ZSHWWv19QQTPo-eKZtG/
 Environment=ENABLE_ADS=true
 Environment=ADS_SIMULATION=false
-Environment=POST_INTERVAL_SECONDS=60
-Environment=COLLECT_INTERVAL_MINUTES=5
+Environment=POST_INTERVAL_SECONDS=30
+Environment=COLLECT_INTERVAL_MINUTES=2
 Environment=PROVIDERS=twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok
 ExecStart=${PYTHON} ${TARGET_DIR}/cli.py
 Restart=always

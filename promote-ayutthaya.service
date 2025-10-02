@@ -11,13 +11,16 @@ Environment=TIMEZONE=Asia/Bangkok
 # Content generator
 Environment=GENERATE_CONTENT=true
 Environment=SENDER_NAME=Bee&Bell
+# Live promotion
+Environment=LIVE_PROMO_MODE=true
+Environment=LIVE_LINK=https://vt.tiktok.com/ZSHWWv19QQTPo-eKZtG/
 # Ads: enabled (real) — set ADS_SIMULATION=true for dry-run without cost
 Environment=ENABLE_ADS=true
 Environment=ADS_SIMULATION=false
 # Posting triggers
-Environment=POST_INTERVAL_SECONDS=60
+Environment=POST_INTERVAL_SECONDS=30
 # Collecting triggers
-Environment=COLLECT_INTERVAL_MINUTES=5
+Environment=COLLECT_INTERVAL_MINUTES=2
 # Providers to enable
 Environment=PROVIDERS=twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok
 ExecStart=/usr/bin/python3 /opt/promote-ayutthaya/cli.py

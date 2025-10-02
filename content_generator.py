@@ -5,6 +5,7 @@ EMOJIS_SWEET = ["💖", "💕", "🥰", "😚", "💞", "😍"]
 EMOJIS_FLIRTY = ["😉", "😏", "🤭", "🤤"]
 EMOJIS_PLAYFUL = ["😜", "🙈", "✨", "💫"]
 EMOJIS_LIGHT_SAUCE = ["💦"]  # use sparingly
+EMOJIS_URGENCY = ["⏰", "🚀", "🔥", "📣", "🎯"]
 
 HASHTAGS_BASE = [
     "#BeeBell",
@@ -12,6 +13,14 @@ HASHTAGS_BASE = [
     "#จีบเล่นๆ",
     "#ขำขัน",
     "#หวิวเบาๆ",
+]
+
+HASHTAGS_LIVE = [
+    "#LiveNow",
+    "#TikTokLive",
+    "#เข้ามาดูไลฟ์",
+    "#ทันที",
+    "#กำลังไลฟ์",
 ]
 
 
@@ -44,10 +53,24 @@ PLAYFUL_ADDONS = [
 
 LIGHT_SPICY = [
     "ขอหอมแก้มหนึ่งทีได้ไหม",
-    "ทำเบาๆหน่อย เดี๋ยวใจเราไหวไม่ทัน",
+    "ทำเบาๆหน่อย เดี๋วใจเราไหวไม่ทัน",
     "คืนนี้ดาวอาจไม่พอ... ขอเบลล์แทนได้ไหม",
     "กอดแน่นๆจนเช้าเลยดีไหม",
     "ชอบความละมุน... แต่ขี้เล่นนิดๆนะ",
+]
+
+LIVE_OPENERS = [
+    "กำลังไลฟ์อยู่ตอนนี้!",
+    "เข้ามาเร็ว ไลฟ์เริ่มแล้ว!",
+    "พร้อมมันส์กันหรือยัง ไลฟ์มาแล้ว!",
+    "อยากเจอทุกคนในไลฟ์นะ!",
+]
+
+LIVE_CTA = [
+    "คลิกเข้ามาเดี๋ยวนี้เลย",
+    "ตามลิงก์นี้เข้ามาไวๆ",
+    "ชวนเพื่อนมาดูด้วยนะ",
+    "อย่าพลาด! เข้าไลฟ์ตอนนี้",
 ]
 
 
@@ -55,13 +78,33 @@ def pick(seq):
     return random.choice(seq)
 
 
-def build_hashtags():
-    tags = HASHTAGS_BASE[:]
+def build_hashtags(live=False):
+    tags = (HASHTAGS_LIVE[:] if live else HASHTAGS_BASE[:])
     random.shuffle(tags)
     return " ".join(tags[:random.randint(2, 4)])
 
 
-def generate_caption(sender_name="Bee&Bell"):
+def generate_caption(sender_name="Bee&Bell", live_link: str = ""):
+    if live_link:
+        opener = pick(LIVE_OPENERS)
+        cta = pick(LIVE_CTA)
+        emojis = []
+        emojis += random.sample(EMOJIS_URGENCY, k=2)
+        if random.random() < 0.7:
+            emojis.append(pick(EMOJIS_SWEET))
+        if random.random() < 0.5:
+            emojis.append(pick(EMOJIS_PLAYFUL))
+        parts = [
+            f"{opener} {' '.join(emojis)}",
+            f"{cta}: {live_link}",
+            build_hashtags(live=True),
+            f"— {sender_name}",
+        ]
+        text = " ".join([p for p in parts if p])
+        if len(text) > 270:
+            text = text[:267] + "..."
+        return text
+
     opener = pick(OPENERS)
     core = pick(CORE_LOVE)
     playful = pick(PLAYFUL_ADDONS)
@@ -82,9 +125,7 @@ def generate_caption(sender_name="Bee&Bell"):
         build_hashtags(),
         f"— {sender_name}",
     ]
-    # Remove empty parts and join
     text = " ".join([p for p in parts if p])
-    # Trim to ~270 chars for safety
     if len(text) > 270:
         text = text[:267] + "..."
     return text
