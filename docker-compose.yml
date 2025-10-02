@@ -10,8 +10,11 @@ services:
     environment:
       # Fallbacks if .env not provided for some vars
       - RUN_MODE=daemon
-      - INTERVAL_SECONDS=${INTERVAL_SECONDS:-1800}
       - TIMEZONE=${TIMEZONE:-Asia/Bangkok}
-    # If you want to mount code for live edits, uncomment volumes:
-    # volumes:
-    #   - .:/app
+      - POST_INTERVAL_SECONDS=${POST_INTERVAL_SECONDS:-60}
+      - COLLECT_INTERVAL_MINUTES=${COLLECT_INTERVAL_MINUTES:-5}
+      - GENERATE_CONTENT=${GENERATE_CONTENT:-true}
+      - SENDER_NAME=${SENDER_NAME:-Bee&Bell}
+      - PROVIDERS=${PROVIDERS:-twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok}
+    volumes:
+      - .:/app

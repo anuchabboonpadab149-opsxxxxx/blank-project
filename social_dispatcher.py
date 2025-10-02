@@ -10,6 +10,9 @@ from providers.linkedin import LinkedInProvider
 from providers.line import LineProvider
 from providers.telegram import TelegramProvider
 from providers.discord import DiscordProvider
+from providers.instagram import InstagramProvider
+from providers.reddit import RedditProvider
+from providers.tiktok_ads import TikTokAdsProvider
 
 log = logging.getLogger("social_dispatcher")
 
@@ -31,6 +34,12 @@ def _build_providers(cfg: Config) -> List:
             providers.append(TelegramProvider())
         elif n == "discord":
             providers.append(DiscordProvider())
+        elif n == "instagram":
+            providers.append(InstagramProvider())
+        elif n == "reddit":
+            providers.append(RedditProvider())
+        elif n == "tiktok":
+            providers.append(TikTokAdsProvider())
         else:
             log.warning(f"Unknown provider '{n}' — skipping")
     return providers

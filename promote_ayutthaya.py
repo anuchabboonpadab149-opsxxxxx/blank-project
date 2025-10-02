@@ -331,66 +331,15 @@ def collect_ads_analytics(cfg: Config) -> Dict[str, Any]:
     return {"status": "ok", "count": len(data.get("data", []))}
 
 
-def _load_entity_ids() -> List[str]:
-    ids_env = os.getenv("ADS_ENTITY_IDS", "")
-    ids: List[str] = []
-    if ids_env.strip():
-        ids = [x.strip() for x in ids_env.split(",") if x.strip()]
-    else:
-        path = os.getenv("ADS_ENTITY_FILE", "ads_entities.txt")
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    t = line.strip()
-                    if t:
-                        ids.append(t)
-    return ids
-
-
-def collect_ads_analytics(cfg: Config) -> Dict[str, Any]:
-    entity = os.getenv("ADS_ENTITY_TYPE", "LINE_ITEM")
-    granularity = os.getenv("ADS_GRANULARITY", "HOUR")
-    start_time = os.getenv("ADS_START_TIME")
-    end_time = os.getenv("ADS_END_TIME")
-    metric_groups = os.getenv("ADS_METRIC_GROUPS", "ENGAGEMENT")
-
-    ids = _load_entity_ids()
-    if not ids:
-        return {"error": "No Ads entity IDs provided."}
-
-    auth = oauth(cfg)
-    url = f"{BASE_ADS}/stats/accounts/{cfg.ADS_ACCOUNT_ID}"
-    params = {
-        "entity": entity,
-        "entity_ids": ",".join(ids),
-        "granularity": granularity,
-        "metric_groups": metric_groups,
-    }
-    if start_time:
-        params["start_time"] = start_time
-    if end_time:
-        params["end_time"] = end_time
-
-    resp = requests.get(url, auth=auth, params=params)
-    resp.raise_for_status()
-    data = resp.json()
-
-    existing = _load_json(ADS_METRICS_FILE)
-    existing.setdefault("runs", [])
-    existing["runs"].append(data)
-    _save_json(ADS_METRICS_FILE, existing)
-
-    return {"status": "ok", "count": len(data.get("data", []))}
-
-
-def post_one_from_file(cfg: Config) -> Dict[str, Any]:
-    # Backward compatible wrapper
-    return post_one_auto(cfg)
+def post_one_auto(cfg: Config) -> Dict[str, Any]:
+    # Backward-compatible wrapper used by social_dispatcher
+    return post_one_from_file(cfg)
 
 
 if __name__ == "__main__":
     cfg = Config()
-    posted = post_one_auto(cfg)
+    # Default: post from source then collect metrics (organic + ads)
+    posted = post_one_from_file(cfg)
     print(json.dumps(posted, ensure_ascii=False))
     metrics = collect_metrics(cfg)
     print(json.dumps(metrics, ensure_ascii=False))
