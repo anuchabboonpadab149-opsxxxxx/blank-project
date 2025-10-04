@@ -193,25 +193,71 @@ ${tags} ${emojis}
       logLine("สร้างคอนเทนต์หนึ่งครั้ง (manual)");
     }
 
-    // Try SSE backend
-    (function init() {
+    // Try SSE backend on possible origins (current origin, LAN IPs)
+    (async function init() {
       setMode("checking");
-      let opened = false;
+
+      const isHttps = location.protocol === "https:";
+      const candidates = [location.origin];
+
+      // Known LAN IPs the user shared
+      const lanHosts = ["http://192.168.10.121:8000", "http://10.0.1.246:8000"];
+      // Only try plain http if current page is http (to avoid mixed-content block), but still attempt for non-strict browsers.
+      for (const h of lanHosts) candidates.push(h);
+
+      function withTimeout(p, ms = 2000) {
+        return Promise.race([
+          p,
+          new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms)),
+        ]);
+      }
+
+      async function probe(origin) {
+        try {
+          const r = await withTimeout(fetch(origin + "/healthz", { mode: "cors", cache: "no-store" }), 2500);
+          if (r && r.ok) return true;
+        } catch (e) {}
+        return false;
+      }
+
+      let backend = null;
+      for (const origin of candidates) {
+        const ok = await probe(origin);
+        if (ok) { backend = origin; break; }
+      }
+
+      if (!backend) {
+        logLine("ไม่พบแบ็กเอนด์ที่ /healthz — สลับเป็น DEMO MODE");
+        startDemoLoop();
+        return;
+      }
+
+      // Hook links to backend
       try {
-        const es = new EventSource("/events");
+        document.querySelectorAll("a.mutelink").forEach(a => {
+          const href = a.getAttribute("href");
+          if (href && href.startsWith("/")) a.setAttribute("href", backend + href);
+        });
+      } catch (e) {}
+
+      // Connect SSE
+      try {
+        const es = new EventSource(backend + "/events");
+        let opened = false;
         const timeout = setTimeout(() => {
           if (!opened) {
             es.close();
             logLine("SSE ไม่ตอบในเวลาที่กำหนด — สลับเป็น DEMO MODE");
             startDemoLoop();
           }
-        }, 2500);
+        }, 3000);
 
         es.onopen = () => {
           opened = true;
           clearTimeout(timeout);
           setMode("backend");
-          logLine("SSE เปิดแล้ว");
+          backendState.textContent = "เชื่อมต่อแบ็กเอนด์แล้ว: " + backend;
+          logLine("SSE เปิดแล้วที่ " + backend);
         };
         es.onmessage = (ev) => {
           try {

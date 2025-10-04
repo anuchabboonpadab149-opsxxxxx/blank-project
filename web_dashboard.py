@@ -379,6 +379,23 @@ NODES_HTML = """
 
 app = Flask(__name__)
 
+# CORS: allow cross-origin calls from static dashboards (e.g., cosine.page)
+@app.after_request
+def _add_cors(resp):
+    try:
+        resp.headers["Access-Control-Allow-Origin"] = os.getenv("CORS_ALLOW_ORIGIN", "*")
+        resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = request.headers.get("Access-Control-Request-Headers", "*") or "*"
+        # EventSource does not use credentials; keep simple
+        resp.headers["Access-Control-Allow-Credentials"] = "false"
+    except Exception:
+        pass
+    return resp
+
+@app.route("/__options__", methods=["OPTIONS"])
+def _options_probe():
+    return ("", 204)
+
 
 @app.get("/")
 def index():
