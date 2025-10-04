@@ -46,6 +46,7 @@
       <div>Total events: <span id="count">0</span></div>
       <div>Last update: <span id="last">-</span></div>
       <div>Providers: <span id="providers"></span></div>
+      <div>Visitors: <span id="visitors">0</span></div>
     </div>
   </header>
   <div class="wrap">
@@ -111,6 +112,7 @@
     const lastEl = document.getElementById('last');
     const providersEl = document.getElementById('providers');
     const latestMediaEl = document.getElementById('latest-media');
+    const visitorsEl = document.getElementById('visitors');
 
     const postIntervalInput = document.getElementById('postInterval');
     const collectIntervalInput = document.getElementById('collectInterval');
@@ -187,6 +189,16 @@
       if (Array.isArray(cfg.core_love)) coreLoveInput.value = cfg.core_love.join('\n');
       if (Array.isArray(cfg.playful_addons)) playfulAddonsInput.value = cfg.playfulAddons.join('\n');
       if (Array.isArray(cfg.light_spicy)) lightSpicyInput.value = cfg.light_spicy.join('\n');
+    }
+
+    async function loadMetrics() {
+      try {
+        const r = await fetch('/api/metrics');
+        const m = await r.json();
+        if (visitorsEl && m && typeof m.total_pageviews === 'number') {
+          visitorsEl.textContent = m.total_pageviews;
+        }
+      } catch (e) {}
     }
 
     let count = 0;
@@ -270,6 +282,8 @@
       list.forEach(addEvent);
       connect();
       loadConfig();
+      loadMetrics();
+      setInterval(loadMetrics, 10000);
     });
   </script>
 </body>
