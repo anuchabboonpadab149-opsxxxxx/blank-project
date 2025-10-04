@@ -9,6 +9,7 @@ import node_registry as nreg
 import metrics_store as mstore
 import circuit_breaker as cbreak
 import credentials_store as credstore
+import workflow_store as wstore
 
 # Support PaaS environments (Heroku/Render/Railway) that pass PORT
 WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
@@ -53,6 +54,7 @@ INDEX_HTML = """
       <a href="/about">About</a>
       <a href="/nodes">Nodes</a>
       <a href="/credentials">Credentials</a>
+      <a href="/workflows">Workflows</a>
     </nav>
   </header>
   <div class="wrap">
@@ -420,6 +422,18 @@ def credentials_page():
         return "<html><body><h1>Credentials</h1><p>Use the API at /api/credentials to GET/POST values.</p></body></html>"
 
 
+@app.get("/workflows")
+def workflows_page():
+    try:
+        mstore.pageview("workflows")
+    except Exception:
+        pass
+    try:
+        return render_template("workflows.html")
+    except Exception:
+        return "<html><body><h1>Workflows</h1><p>Use the API at /api/workflows to view summary.</p></body></html>"
+
+
 @app.get("/api/recent")
 def api_recent():
     return jsonify(bus.recent(100))
@@ -476,6 +490,23 @@ def api_metrics():
 def api_circuit_states():
     try:
         return jsonify(cbreak.states())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/workflows")
+def api_workflows_summary():
+    try:
+        return jsonify(wstore.summary())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/workflows/reset")
+def api_workflows_reset():
+    try:
+        wstore.reset()
+        return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

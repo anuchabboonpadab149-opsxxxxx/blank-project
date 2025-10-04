@@ -1,6 +1,30 @@
 import os
 import json
 import logging
+import time
+from typing import List, Dict, Any, Callable
+
+from promote_ayutthaya import Config, post_one_auto
+from providers.twitter import TwitterProvider
+from providers.facebook import FacebookProvider
+from providers.linkedin import LinkedInProvider
+from providers.line import LineProvider
+from providers.telegram import TelegramProvider
+from providers.discord import DiscordProvider
+from providers.instagram import InstagramProvider
+from providers.reddit import RedditProvider
+from providers.tiktok_ads import TikTokAdsProvider
+from providers.mastodon import MastodonProvider
+
+from circuit_breaker import call_with_circuit
+
+log = logging.getLogger("social_dispatcher")
+
+# Default to real API mode unless explicitly enabled to simulate
+SIMULATE_ALL = os.getenv("SIMULATE_ALL_PROVIDERS", "false").lower() in {"1", "true", "yes", "on"}
+SIMULATE_ON_ERROR = os.getenv("SIMULATE_ON_ERROR", "false").lower() in {"1", "true", "yes", "on"}
+import json
+import logging
 import uuid
 from typing import List, Dict, Any, Callable, Optional
 

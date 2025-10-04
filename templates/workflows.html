@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>Workflows — จัสมินชอบกินแซลมอน</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background:#111; color:#eee; }
+    a { color:#85d0ff; text-decoration:none; }
+    header { padding: 16px 24px; background:#181818; border-bottom:1px solid #2a2a2a; display:flex; align-items:center; gap: 16px; }
+    h1 { margin:0; font-size:20px; }
+    .wrap { padding: 16px 24px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    .panel { background:#181818; border:1px solid #2a2a2a; border-radius:10px; padding:12px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #2a2a2a; font-size: 14px; }
+    .small { color:#aaa; font-size:12px; }
+    .ok { color:#a7f3d0; }
+    .err { color:#fecaca; }
+    @media (max-width: 1024px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Workflows — จัสมินชอบกินแซลมอน</h1>
+    <a href="/">กลับสู่แดชบอร์ด</a>
+  </header>
+  <div class="wrap">
+    <div class="grid">
+      <div class="panel">
+        <div style="font-weight:600; margin-bottom:6px;">สรุป</div>
+        <div id="summary" class="small">Loading...</div>
+        <button id="reset">รีเซ็ตประวัติ</button>
+      </div>
+      <div class="panel">
+        <div style="font-weight:600; margin-bottom:6px;">กำลังทำงานอยู่</div>
+        <table>
+          <thead><tr><th>id</th><th>ชื่อ</th><th>เริ่ม</th></tr></thead>
+          <tbody id="running"></tbody>
+        </table>
+      </div>
+      <div class="panel" style="grid-column: 1 / -1;">
+        <div style="font-weight:600; margin-bottom:6px;">รายการล่าสุด</div>
+        <table>
+          <thead><tr><th>ชื่อ</th><th>สถานะ</th><th>ระยะเวลา (s)</th><th>สิ้นสุด</th></tr></thead>
+          <tbody id="last"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <script>
+    function fmt(ts) { return new Date((ts||0) * 1000).toLocaleString(); }
+
+    async function load() {
+      const r = await fetch('/api/workflows', {cache:'no-store'});
+      const data = await r.json();
+
+      // summary
+      let s = 'Total runs: ' + (data.total_runs || 0) + ', Running: ' + (data.running_count || 0);
+      if (Array.isArray(data.aggregate)) {
+        s += '<br>Per workflow: ';
+        s += data.aggregate.map(a => a.name + ' [ok:' + a.ok + ', err:' + a.error + ']').join(' | ');
+      }
+      document.getElementById('summary').innerHTML = s;
+
+      // running
+      const tbRun = document.getElementById('running');
+      tbRun.innerHTML = '';
+      for (const r of (data.running || [])) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>'+ (r.id || '-') +'</td><td>'+ (r.name || '-') +'</td><td>'+ fmt(r.start_ts) +'</td>';
+        tbRun.appendChild(tr);
+      }
+
+      // last
+      const tbLast = document.getElementById('last');
+      tbLast.innerHTML = '';
+      for (const r of (data.last_runs || [])) {
+        const st = r.status === 'ok' ? '<span class="ok">ok</span>' : '<span class="err">error</span>';
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>'+ (r.name||'-') +'</td><td>'+ st +'</td><td>'+ (r.duration_sec||0).toFixed ? (r.duration_sec||0).toFixed(2) : r.duration_sec +'</td><td>'+ fmt(r.end_ts) +'</td>';
+        tbLast.appendChild(tr);
+      }
+    }
+
+    document.getElementById('reset').onclick = async () => {
+      await fetch('/api/workflows/reset', {method:'POST'});
+      load();
+    };
+
+    setInterval(load, 5000);
+    load();
+  </script>
+</body>
+</html>

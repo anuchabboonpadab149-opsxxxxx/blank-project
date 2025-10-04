@@ -3,7 +3,6 @@ import sys
 import argparse
 import logging
 import threading
-import time
 
 from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -14,9 +13,11 @@ import pytz
 from promote_ayutthaya import Config, post_one_from_file, collect_metrics, collect_ads_analytics
 from social_dispatcher import distribute_once
 
-import realtime_bus as bus
-import media_generator as media
-import metrics_store as mstore
+# Optional workflow tracking
+try:
+    import workflow_store as wstore
+except Exception:
+    wstore = None  # type: ignore
 
 log = logging.getLogger("promote_cli")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -94,7 +95,10 @@ def main():
         if not post_lock.acquire(blocking=False):
             log.info("Post job already running; skipping.")
             return
+        wid = None
         try:
+            if wstore:
+                wid = wstore.start("post", meta={})
             if distribute_all:
                 res = distribute_once()
                 log.info(f"Post job distributed: {res}")
@@ -102,8 +106,14 @@ def main():
                 cfg = Config()
                 res = post_one_from_file(cfg)
                 log.info(f"Post job (Twitter only) result: {res}")
+            if wstore and wid:
+                # record providers summary if available
+                meta = {"providers": (res.get("providers") if isinstance(res, dict) else None)}
+                wstore.end(wid, result=meta)
         except Exception as e:
             log.error(f"Post job failed: {e}", exc_info=True)
+            if wstore and wid:
+                wstore.fail(wid, error=str(e))
         finally:
             post_lock.release()
 
@@ -111,14 +121,21 @@ def main():
         if not collect_lock.acquire(blocking=False):
             log.info("Collect job already running; skipping.")
             return
+        wid = None
         try:
+            if wstore:
+                wid = wstore.start("collect", meta={})
             cfg = Config()
             met = collect_metrics(cfg)
             log.info(f"Collect organic metrics result: {met}")
             ads = collect_ads_analytics(cfg)
             log.info(f"Collect ads analytics result: {ads}")
+            if wstore and wid:
+                wstore.end(wid, result={"organic": met, "ads": ads})
         except Exception as e:
             log.error(f"Collect job failed: {e}", exc_info=True)
+            if wstore and wid:
+                wstore.fail(wid, error=str(e))
         finally:
             collect_lock.release()
 
