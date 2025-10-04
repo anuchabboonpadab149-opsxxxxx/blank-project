@@ -13,13 +13,25 @@ from providers.discord import DiscordProvider
 from providers.instagram import InstagramProvider
 from providers.reddit import RedditProvider
 from providers.tiktok_ads import TikTokAdsProvider
+from providers.mastodon import MastodonProvider
 
 log = logging.getLogger("social_dispatcher")
 
 
+def _provider_names() -> List[str]:
+    try:
+        import config_store
+        names_cfg = config_store.get("providers")
+        if isinstance(names_cfg, list) and names_cfg:
+            return [str(x).strip().lower() for x in names_cfg if str(x).strip()]
+    except Exception:
+        pass
+    names_env = os.getenv("PROVIDERS", "twitter")
+    return [n.strip().lower() for n in names_env.split(",") if n.strip()]
+
+
 def _build_providers(cfg: Config) -> List:
-    names = os.getenv("PROVIDERS", "twitter").lower().split(",")
-    names = [n.strip() for n in names if n.strip()]
+    names = _provider_names()
     providers = []
     for n in names:
         if n == "twitter":
@@ -40,6 +52,8 @@ def _build_providers(cfg: Config) -> List:
             providers.append(RedditProvider())
         elif n == "tiktok":
             providers.append(TikTokAdsProvider())
+        elif n == "mastodon":
+            providers.append(MastodonProvider())
         else:
             log.warning(f"Unknown provider '{n}' — skipping")
     return providers

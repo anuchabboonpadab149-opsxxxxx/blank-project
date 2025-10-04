@@ -22,15 +22,21 @@ INDEX_HTML = """
     h1 { margin: 0; font-size: 20px; }
     .stats { display: flex; gap: 16px; margin-top: 8px; font-size: 14px; color: #bbb; }
     .wrap { padding: 16px 24px; }
-    .grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; }
     .panel { background: #181818; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px; }
-    #events { max-height: calc(100vh - 160px); overflow: auto; }
+    #events { max-height: calc(100vh - 260px); overflow: auto; }
     .e { border-bottom: 1px dashed #2f2f2f; padding: 10px 4px; }
     .e:last-child { border-bottom: 0; }
     .time { color: #aaa; font-size: 12px; }
     .text { font-size: 15px; margin: 6px 0; color: #f3f3f3; }
     .media a { color: #85d0ff; text-decoration: none; margin-right: 10px; }
     .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #262626; color: #ddd; font-size: 12px; margin-right: 6px; }
+    label { display: block; font-size: 12px; color: #bbb; margin-top: 8px; }
+    input[type="text"], input[type="number"], select, textarea { width: 100%; background: #121212; border: 1px solid #2a2a2a; color: #eaeaea; border-radius: 6px; padding: 6px 8px; }
+    textarea { min-height: 60px; }
+    .btn { display: inline-block; background: #2a6bff; color: #fff; border: 0; padding: 6px 10px; border-radius: 6px; cursor: pointer; margin-top: 8px; margin-right: 6px; }
+    .btn.alt { background: #444; }
+    small { color: #888; }
   </style>
 </head>
 <body>
@@ -49,6 +55,52 @@ INDEX_HTML = """
       <div class="panel">
         <div style="font-weight: 600; margin-bottom: 6px;">Latest Media</div>
         <div id="latest-media"></div>
+        <hr style="border-color:#2a2a2a; margin:12px 0;">
+        <div style="font-weight: 600; margin-bottom: 6px;">Settings</div>
+        <label>Post interval (seconds)</label>
+        <input id="postInterval" type="number" min="1" placeholder="1" />
+        <label>Collect interval (minutes)</label>
+        <input id="collectInterval" type="number" min="1" placeholder="1" />
+        <label>Providers (comma-separated)</label>
+        <input id="providersInput" type="text" placeholder="twitter,facebook,..." />
+        <label>Sender name</label>
+        <input id="senderName" type="text" placeholder="จัสมิน" />
+        <label>TTS language</label>
+        <input id="ttsLang" type="text" placeholder="th" />
+        <label>Content mode</label>
+        <select id="contentMode">
+          <option value="">auto</option>
+          <option value="generate">generate</option>
+          <option value="file">file</option>
+          <option value="import">import</option>
+        </select>
+        <label>Import source URL</label>
+        <input id="importUrl" type="text" placeholder="https://example.com/posts.txt" />
+        <label>Import format</label>
+        <select id="importFormat">
+          <option value="lines">lines</option>
+          <option value="json">json</option>
+        </select>
+        <label>Hashtags (comma-separated)</label>
+        <input id="hashtagsBase" type="text" placeholder="#จัสมิน,#ความรัก,..." />
+        <label>Openers (one per line)</label>
+        <textarea id="openers"></textarea>
+        <label>Core love lines (one per line)</label>
+        <textarea id="coreLove"></textarea>
+        <label>Playful addons (one per line)</label>
+        <textarea id="playfulAddons"></textarea>
+        <label>Light spicy (one per line)</label>
+        <textarea id="lightSpicy"></textarea>
+        <div style="margin-top:6px;">
+          <button class="btn" id="saveCfg">Save</button>
+          <button class="btn alt" id="reloadSch">Reload schedule</button>
+          <button class="btn" id="postNow">Post now</button>
+        </div>
+        <hr style="border-color:#2a2a2a; margin:12px 0;">
+        <div style="font-weight: 600; margin-bottom: 6px;">Add line to tweets.txt</div>
+        <textarea id="newLine" placeholder="พิมพ์บรรทัดคอนเทนต์ที่ต้องการเพิ่ม..."></textarea>
+        <button class="btn" id="addLine">Append</button>
+        <div id="msg" style="margin-top:6px; font-size:12px; color:#9ad;"></div>
       </div>
     </div>
   </div>
@@ -60,6 +112,83 @@ INDEX_HTML = """
     const lastEl = document.getElementById('last');
     const providersEl = document.getElementById('providers');
     const latestMediaEl = document.getElementById('latest-media');
+
+    const postIntervalInput = document.getElementById('postInterval');
+    const collectIntervalInput = document.getElementById('collectInterval');
+    const providersInput = document.getElementById('providersInput');
+    const senderInput = document.getElementById('senderName');
+    const ttsLangInput = document.getElementById('ttsLang');
+    const contentModeSel = document.getElementById('contentMode');
+    const hashtagsBaseInput = document.getElementById('hashtagsBase');
+    const openersInput = document.getElementById('openers');
+    const coreLoveInput = document.getElementById('coreLove');
+    const playfulAddonsInput = document.getElementById('playfulAddons');
+    const lightSpicyInput = document.getElementById('lightSpicy');
+    const importUrlInput = document.getElementById('importUrl');
+    const importFmtSel = document.getElementById('importFormat');
+    const msgEl = document.getElementById('msg');
+
+    document.getElementById('saveCfg').onclick = async () => {
+      const payload = {
+        post_interval_seconds: Number(postIntervalInput.value) || null,
+        collect_interval_minutes: Number(collectIntervalInput.value) || null,
+        providers: providersInput.value ? providersInput.value.split(',').map(x => x.trim()).filter(Boolean) : null,
+        sender_name: senderInput.value || null,
+        tts_lang: ttsLangInput.value || 'th',
+        content_mode: contentModeSel.value || null,
+        import_source_url: importUrlInput.value || null,
+        import_format: importFmtSel.value || 'lines',
+        hashtags_base: hashtagsBaseInput.value ? hashtagsBaseInput.value.split(',').map(x => x.trim()).filter(Boolean) : null,
+        openers: openersInput.value ? openersInput.value.split('\n').map(x => x.trim()).filter(Boolean) : null,
+        core_love: coreLoveInput.value ? coreLoveInput.value.split('\n').map(x => x.trim()).filter(Boolean) : null,
+        playful_addons: playfulAddonsInput.value ? playfulAddonsInput.value.split('\n').map(x => x.trim()).filter(Boolean) : null,
+        light_spicy: lightSpicyInput.value ? lightSpicyInput.value.split('\n').map(x => x.trim()).filter(Boolean) : null,
+      };
+      const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const data = await r.json();
+      msgEl.textContent = 'Saved.';
+      setTimeout(() => msgEl.textContent = '', 1500);
+    };
+
+    document.getElementById('reloadSch').onclick = async () => {
+      await fetch('/api/reload-schedule', {method:'POST'});
+      msgEl.textContent = 'Scheduler reloaded.';
+      setTimeout(() => msgEl.textContent = '', 1500);
+    };
+
+    document.getElementById('postNow').onclick = async () => {
+      await fetch('/api/post-now', {method:'POST'});
+      msgEl.textContent = 'Posting initiated.';
+      setTimeout(() => msgEl.textContent = '', 1500);
+    };
+
+    document.getElementById('addLine').onclick = async () => {
+      const line = document.getElementById('newLine').value.trim();
+      if (!line) return;
+      const r = await fetch('/api/tweets', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({line})});
+      const data = await r.json();
+      document.getElementById('newLine').value = '';
+      msgEl.textContent = 'Appended.';
+      setTimeout(() => msgEl.textContent = '', 1500);
+    };
+
+    async function loadConfig() {
+      const r = await fetch('/api/config');
+      const cfg = await r.json();
+      if (cfg.post_interval_seconds != null) postIntervalInput.value = cfg.post_interval_seconds;
+      if (cfg.collect_interval_minutes != null) collectIntervalInput.value = cfg.collect_interval_minutes;
+      if (Array.isArray(cfg.providers)) providersInput.value = cfg.providers.join(',');
+      if (cfg.sender_name) senderInput.value = cfg.sender_name;
+      if (cfg.tts_lang) ttsLangInput.value = cfg.tts_lang;
+      if (cfg.content_mode) contentModeSel.value = cfg.content_mode;
+      if (cfg.import_source_url) importUrlInput.value = cfg.import_source_url;
+      if (cfg.import_format) importFmtSel.value = cfg.import_format;
+      if (Array.isArray(cfg.hashtags_base)) hashtagsBaseInput.value = cfg.hashtags_base.join(',');
+      if (Array.isArray(cfg.openers)) openersInput.value = cfg.openers.join('\n');
+      if (Array.isArray(cfg.core_love)) coreLoveInput.value = cfg.core_love.join('\n');
+      if (Array.isArray(cfg.playful_addons)) playfulAddonsInput.value = cfg.playful_addons.join('\n');
+      if (Array.isArray(cfg.light_spicy)) lightSpicyInput.value = cfg.light_spicy.join('\n');
+    }
 
     let count = 0;
     function fmtTs(ts) {
@@ -128,6 +257,7 @@ INDEX_HTML = """
     fetch('/api/recent').then(r => r.json()).then(list => {
       list.forEach(addEvent);
       connect();
+      loadConfig();
     });
   </script>
 </body>
@@ -163,6 +293,106 @@ def media(subpath: str):
     # security: prevent path traversal
     subpath = subpath.replace("..", "").lstrip("/")
     return send_from_directory(directory, subpath, as_attachment=False)
+
+
+@app.get("/api/config")
+def api_get_config():
+    try:
+        import config_store
+        return jsonify(config_store.get_config())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/config")
+def api_set_config():
+    try:
+        patch = request.get_json(force=True, silent=True) or {}
+        import config_store
+        cfg = config_store.update_config(patch)
+        # Optionally reschedule if intervals provided
+        try:
+            import scheduler_control
+            scheduler_control.reschedule(
+                post_interval_seconds=cfg.get("post_interval_seconds"),
+                collect_interval_minutes=cfg.get("collect_interval_minutes"),
+            )
+        except Exception:
+            pass
+        return jsonify(cfg)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/reload-schedule")
+def api_reload_schedule():
+    try:
+        import config_store
+        import scheduler_control
+        cfg = config_store.get_config()
+        ok = scheduler_control.reschedule(
+            post_interval_seconds=cfg.get("post_interval_seconds"),
+            collect_interval_minutes=cfg.get("collect_interval_minutes"),
+        )
+        return jsonify({"ok": bool(ok)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/post-now")
+def api_post_now():
+    try:
+        import scheduler_control
+        ok = scheduler_control.trigger_post_now()
+        return jsonify({"ok": bool(ok)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/tweets")
+def api_tweets_list():
+    try:
+        from promote_ayutthaya import Config
+        path = None
+        try:
+            import config_store
+            path = config_store.get("tweets_file")
+        except Exception:
+            pass
+        path = path or Config().TWEETS_FILE or "tweets.txt"
+        lines = []
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    t = line.strip()
+                    if t:
+                        lines.append(t)
+        return jsonify({"path": path, "count": len(lines), "lines": lines[:100]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/tweets")
+def api_tweets_append():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        line = str(payload.get("line", "")).strip()
+        if not line:
+            return jsonify({"error": "line is required"}), 400
+        from promote_ayutthaya import Config
+        path = None
+        try:
+            import config_store
+            path = config_store.get("tweets_file")
+        except Exception:
+            pass
+        path = path or Config().TWEETS_FILE or "tweets.txt"
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+        return jsonify({"ok": True, "path": path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 def start_web():

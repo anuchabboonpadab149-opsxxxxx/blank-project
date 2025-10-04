@@ -111,12 +111,12 @@ def compose_video(image_path: str, audio_path: Optional[str]) -> Optional[str]:
         return None
 
 
-def generate_all(text: str, sender: str = "") -> Dict[str, Optional[str]]:
+def generate_all(text: str, sender: str = "", tts_lang: str = "th") -> Dict[str, Optional[str]]:
     """
     Generates mp3, png, and mp4 for the given text.
     Returns dict with absolute paths (or None when failed).
     """
-    audio = text_to_speech(text)
+    audio = text_to_speech(text, lang=tts_lang)
     image = render_quote_card(text, sender=sender)
     video = compose_video(image, audio) if image else None
     return {"audio": audio, "image": image, "video": video}

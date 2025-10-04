@@ -1,4 +1,10 @@
 import random
+from typing import List, Optional
+
+try:
+    import config_store
+except Exception:
+    config_store = None
 
 
 EMOJIS_SWEET = ["💖", "💕", "🥰", "😚", "💞", "😍"]
@@ -51,21 +57,39 @@ LIGHT_SPICY = [
 ]
 
 
-def pick(seq):
+def pick(seq: List[str]) -> str:
     return random.choice(seq)
 
 
+def _override_list(name: str, default: List[str]) -> List[str]:
+    if config_store:
+        val = config_store.get(name)
+        if isinstance(val, list) and val:
+            return [str(x) for x in val if str(x).strip()]
+    return default
+
+
 def build_hashtags():
-    tags = HASHTAGS_BASE[:]
+    tags = _override_list("hashtags_base", HASHTAGS_BASE)[:]
     random.shuffle(tags)
     return " ".join(tags[:random.randint(2, 4)])
 
 
-def generate_caption(sender_name="Bee&Bell"):
-    opener = pick(OPENERS)
-    core = pick(CORE_LOVE)
-    playful = pick(PLAYFUL_ADDONS)
-    spicy = pick(LIGHT_SPICY) if random.random() < 0.7 else ""
+def generate_caption(sender_name: Optional[str] = None) -> str:
+    if config_store and not sender_name:
+        sender_name = config_store.get("sender_name") or "Bee&Bell"
+    elif not sender_name:
+        sender_name = "Bee&Bell"
+
+    openers = _override_list("openers", OPENERS)
+    core_love = _override_list("core_love", CORE_LOVE)
+    playful_addons = _override_list("playful_addons", PLAYFUL_ADDONS)
+    light_spicy = _override_list("light_spicy", LIGHT_SPICY)
+
+    opener = pick(openers)
+    core = pick(core_love)
+    playful = pick(playful_addons)
+    spicy = pick(light_spicy) if random.random() < 0.7 else ""
     emojis = []
     emojis += random.sample(EMOJIS_SWEET, k=2)
     if random.random() < 0.8:
@@ -82,9 +106,7 @@ def generate_caption(sender_name="Bee&Bell"):
         build_hashtags(),
         f"— {sender_name}",
     ]
-    # Remove empty parts and join
     text = " ".join([p for p in parts if p])
-    # Trim to ~270 chars for safety
     if len(text) > 270:
         text = text[:267] + "..."
     return text

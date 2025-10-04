@@ -50,8 +50,21 @@ def main():
     collect_interval_min_env = os.getenv("COLLECT_INTERVAL_MINUTES", "").strip()
     collect_interval_min = args.collect_interval_min if args.collect_interval_min is not None else (int(collect_interval_min_env) if collect_interval_min_env.isdigit() else None)
 
+    # Runtime overrides via config_store
+    try:
+        import config_store
+        post_int_override = config_store.get("post_interval_seconds")
+        if isinstance(post_int_override, int) and post_int_override > 0:
+            post_interval = post_int_override
+            post_cron = ""
+        collect_int_override = config_store.get("collect_interval_minutes")
+        if isinstance(collect_int_override, int) and collect_int_override > 0:
+            collect_interval_min = collect_int_override
+            collect_cron = ""
+    except Exception:
+        pass
+
     if mode == "once":
-        # One-shot post + metrics + media + event
         text_for_event = None
         post_result = None
         try:
@@ -66,15 +79,23 @@ def main():
                 log.info(f"Posted and promoted on Twitter: {post_result}")
         except Exception as e:
             log.error(f"Post once failed: {e}", exc_info=True)
-        # Media + event publish
         try:
             from content_generator import generate_caption
             from media_generator import generate_all
             import realtime_bus as bus
+            # Prefer runtime sender/tts config
+            sender_name = None
+            tts_lang = "th"
+            try:
+                import config_store
+                sender_name = config_store.get("sender_name")
+                tts_lang = config_store.get("tts_lang", "th")
+            except Exception:
+                pass
             if not text_for_event:
                 cfg2 = Config()
-                text_for_event = generate_caption(sender_name=cfg2.SENDER_NAME)
-            media = generate_all(text_for_event)
+                text_for_event = generate_caption(sender_name=sender_name or cfg2.SENDER_NAME)
+            media = generate_all(text_for_event, sender=(sender_name or ""), tts_lang=tts_lang)
             bus.publish({"type": "post", "text": text_for_event, "providers": (post_result or {}).get("providers"), "twitter_detail": (post_result or {}).get("twitter_detail"), "media": media})
         except Exception as e:
             log.error(f"Media generation/event publish failed: {e}", exc_info=True)
@@ -91,7 +112,6 @@ def main():
             pass
         return
 
-    # Scheduler selection
     SchedulerCls = BackgroundScheduler if web_enabled else BlockingScheduler
     scheduler = SchedulerCls(timezone=pytz.timezone(tz))
 
@@ -121,22 +141,33 @@ def main():
                 except Exception as e:
                     log.error(f"Post job (Twitter) failed: {e}", exc_info=True)
 
-            # Fallback text generation if posting failed or returned no text
             if not text_for_event:
                 try:
                     from content_generator import generate_caption
+                    sender_name = None
+                    try:
+                        import config_store
+                        sender_name = config_store.get("sender_name")
+                    except Exception:
+                        pass
                     cfg_local2 = Config()
-                    text_for_event = generate_caption(sender_name=cfg_local2.SENDER_NAME)
+                    text_for_event = generate_caption(sender_name=sender_name or cfg_local2.SENDER_NAME)
                 except Exception as e:
                     log.error(f"Fallback content generation failed: {e}", exc_info=True)
                     text_for_event = ""
 
-            # Generate media and publish event
             try:
                 from media_generator import generate_all
                 import realtime_bus as bus
-                cfg_local3 = Config()
-                media = generate_all(text_for_event, sender=cfg_local3.SENDER_NAME)
+                sender_name = ""
+                tts_lang = "th"
+                try:
+                    import config_store
+                    sender_name = config_store.get("sender_name") or ""
+                    tts_lang = config_store.get("tts_lang", "th")
+                except Exception:
+                    pass
+                media = generate_all(text_for_event, sender=sender_name, tts_lang=tts_lang)
                 bus.publish({"type": "post", "text": text_for_event, "providers": (result or {}).get("providers"), "twitter_detail": (result or {}).get("twitter_detail"), "media": media})
             except Exception as e:
                 log.error(f"Media generation or event publish failed: {e}", exc_info=True)
@@ -168,9 +199,15 @@ def main():
 
     tzinfo = pytz.timezone(tz)
 
+    # Register scheduler and jobs for web control
+    try:
+        import scheduler_control
+        scheduler_control.register_scheduler(scheduler, tzinfo, post_job_fn=post_job, collect_job_fn=collect_job)
+    except Exception:
+        pass
+
     added = 0
 
-    # Posting triggers
     if post_interval and post_interval > 0:
         log.info(f"Adding posting interval every {post_interval}s")
         scheduler.add_job(post_job, IntervalTrigger(seconds=post_interval, timezone=tzinfo),
@@ -191,7 +228,6 @@ def main():
         scheduler.add_job(post_job, trigger, id="post_cron", replace_existing=True, max_instances=1, coalesce=True)
         added += 1
 
-    # Collecting triggers
     if collect_interval_min and collect_interval_min > 0:
         log.info(f"Adding collect interval every {collect_interval_min} minutes")
         scheduler.add_job(collect_job, IntervalTrigger(minutes=collect_interval_min, timezone=tzinfo),
@@ -211,7 +247,6 @@ def main():
         scheduler.add_job(collect_job, trigger, id="collect_cron", replace_existing=True, max_instances=1, coalesce=True)
 
     if added == 0:
-        # sensible defaults: post every 1 second; collect every 1 minute
         log.info("No posting trigger specified; defaulting to every 1 second.")
         scheduler.add_job(post_job, IntervalTrigger(seconds=1, timezone=tzinfo),
                           id="post_default", replace_existing=True, max_instances=1, coalesce=True)
@@ -224,7 +259,7 @@ def main():
         scheduler.start()
         try:
             from web_dashboard import start_web
-            start_web()  # blocks
+            start_web()
         except (KeyboardInterrupt, SystemExit):
             log.info("Web server stopped.")
         finally:
