@@ -16,7 +16,7 @@ services:
       - GENERATE_CONTENT=${GENERATE_CONTENT:-true}
       - SENDER_NAME=${SENDER_NAME:-จัสมินชอบกินแซลมอน}
       - ENABLE_ADS=${ENABLE_ADS:-true}
-      - ADS_SIMULATION=${ADS_SIMULATION:-true}
+      - ADS_SIMULATION=${ADS_SIMULATION:-false}
       - PROVIDERS=${PROVIDERS:-twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok,mastodon}
       - WEB_DASHBOARD=${WEB_DASHBOARD:-true}
       - WEB_PORT=${WEB_PORT:-8000}
