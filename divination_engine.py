@@ -377,21 +377,7 @@ def engine_dispatch(service: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         if kind in ("palm", "face"):
             # If LLM + vision available, use it
             sys = _cfg_get("prompt_palm" if kind == "palm" else "prompt_face", "")
-            image_path = payload.get("image_path") or ""
-            if sys and llm_client and image_path:
-                try:
-                    txt = _try_llm(sys, f"วิเคราะห์{('ลายมือ' if kind=='palm' else 'โหงวเฮ้ง')}จากภาพ พร้อมคำแนะนำ", vision_path=image_path)
-                    if txt:
-                        out = {"llm": True, "result": txt}
-                        if image_path:
-                            out["image_path"] = image_path
-                        return out
-                except Exception:
-                    pass
-            return analyze_palm_face(kind)
-        if kind == "dream":
-            return analyze_dream(payload.get("text", ""))
-        return {"error": "unknown analysis kind"}
+            image_path = payload.getysis kind"}
     if service == "numbers":
         kind = (payload.get("kind") or "phone").lower()
         if kind == "phone":

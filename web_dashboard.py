@@ -64,6 +64,8 @@ INDEX_HTML = """
       <a href="/nodes">Nodes</a>
       <a href="/credentials">Credentials</a>
       <a href="/workflows">Workflows</a>
+      <a href="/tony">Tony</a>
+      <a href="/tony-site">Tony Site</a>
     </nav>
   </header>
   <div class="wrap">
@@ -793,6 +795,14 @@ def tony_home():
     except Exception:
         pass
     return render_template("tony.html")
+
+@app.get("/tony-site")
+def tony_site():
+    try:
+        mstore.pageview("tony_site")
+    except Exception:
+        pass
+    return render_template("tony_site.html")
 
 @app.get("/api/tony/session")
 def tony_session():
