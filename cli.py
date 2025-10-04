@@ -3,6 +3,7 @@ import sys
 import argparse
 import logging
 import threading
+import time
 
 from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -18,6 +19,12 @@ try:
     import workflow_store as wstore
 except Exception:
     wstore = None  # type: ignore
+
+# Realtime event bus
+try:
+    import realtime_bus as bus
+except Exception:
+    bus = None  # type: ignore
 
 log = logging.getLogger("promote_cli")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -41,6 +48,14 @@ def _bool_env(name: str, default: bool = False) -> bool:
     if v is None:
         return default
     return str(v).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _publish_event(event: dict) -> None:
+    try:
+        if bus:
+            bus.publish(event)
+    except Exception:
+        pass
 
 
 def main():
@@ -75,15 +90,18 @@ def main():
         if distribute_all:
             res = distribute_once()
             log.info(f"Distributed to providers: {res}")
+            _publish_event({"type": "post", "ts": time.time(), "text": (res.get("text") if isinstance(res, dict) else None), "providers": (res.get("providers") if isinstance(res, dict) else None)})
         else:
             cfg = Config()
             res = post_one_from_file(cfg)
             log.info(f"Posted and promoted on Twitter: {res}")
+            _publish_event({"type": "post", "ts": time.time(), "text": res.get("text") if isinstance(res, dict) else None, "providers": [{"provider": "twitter", "status": "ok"}]})
         cfg = Config()
         met = collect_metrics(cfg)
         log.info(f"Collected organic metrics: {met}")
         ads = collect_ads_analytics(cfg)
         log.info(f"Collected ads analytics: {ads}")
+        _publish_event({"type": "collect", "ts": time.time(), "organic_count": (met.get("count") if isinstance(met, dict) else None), "ads_status": (ads.get("status") if isinstance(ads, dict) else None)})
         return
 
     scheduler = BlockingScheduler(timezone=pytz.timezone(tz))
@@ -106,6 +124,13 @@ def main():
                 cfg = Config()
                 res = post_one_from_file(cfg)
                 log.info(f"Post job (Twitter only) result: {res}")
+            # Publish event
+            try:
+                text = res.get("text") if isinstance(res, dict) else None
+                providers = res.get("providers") if isinstance(res, dict) else None
+                _publish_event({"type": "post", "ts": time.time(), "text": text, "providers": providers})
+            except Exception:
+                pass
             if wstore and wid:
                 # record providers summary if available
                 meta = {"providers": (res.get("providers") if isinstance(res, dict) else None)}
@@ -130,6 +155,11 @@ def main():
             log.info(f"Collect organic metrics result: {met}")
             ads = collect_ads_analytics(cfg)
             log.info(f"Collect ads analytics result: {ads}")
+            # Publish collect event
+            try:
+                _publish_event({"type": "collect", "ts": time.time(), "organic_count": (met.get("count") if isinstance(met, dict) else None), "ads_status": (ads.get("status") if isinstance(ads, dict) else None)})
+            except Exception:
+                pass
             if wstore and wid:
                 wstore.end(wid, result={"organic": met, "ads": ads})
         except Exception as e:
@@ -176,7 +206,6 @@ def main():
                 except Exception as e:
                     log.warning(f"Heartbeat error: {e}")
                 # default 10s heartbeat
-                import time
                 time.sleep(int(os.getenv("NODE_HEARTBEAT_SECONDS", "10")))
         except Exception as e:
             log.warning(f"Node self-register disabled: {e}")

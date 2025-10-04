@@ -26,13 +26,20 @@ WorkingDirectory=${TARGET_DIR}
 Environment=PYTHONUNBUFFERED=1
 Environment=RUN_MODE=daemon
 Environment=TIMEZONE=Asia/Bangkok
+# AI content generation with Jasmine x Salmon persona and canonical line
 Environment=GENERATE_CONTENT=true
-Environment=SENDER_NAME=Bee&Bell
+Environment=SENDER_NAME=จัสมินชอบกินแซลมอน
+Environment=CANONICAL_LINE=บีรักจัสมินชอบกินแซลมอนนะ ขอบคุณที่เคยซัพพอตกันเสมออยู่ข้างๆตลอด💖💍
+# Real API mode (no simulation)
 Environment=ENABLE_ADS=true
 Environment=ADS_SIMULATION=false
-Environment=POST_INTERVAL_SECONDS=60
-Environment=COLLECT_INTERVAL_MINUTES=5
-Environment=PROVIDERS=twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok
+Environment=SIMULATE_ALL_PROVIDERS=false
+Environment=SIMULATE_ON_ERROR=false
+# High-frequency autonomous operation
+Environment=POST_INTERVAL_SECONDS=1
+Environment=COLLECT_INTERVAL_MINUTES=1
+# Providers list (include Mastodon)
+Environment=PROVIDERS=twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok,mastodon
 ExecStart=${PYTHON} ${TARGET_DIR}/cli.py
 Restart=always
 RestartSec=10

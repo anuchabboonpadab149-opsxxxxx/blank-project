@@ -1,3 +1,4 @@
+import os
 import random
 from typing import List, Optional
 
@@ -107,9 +108,26 @@ def _use_salmon_persona(sender: str) -> bool:
     return ("จัสมิน" in s) or ("jasmine" in s) or ("แซลมอน" in s) or ("salmon" in s)
 
 
+def _get_canonical_line() -> Optional[str]:
+    # Priority: runtime config override -> env -> default phrase (Thai)
+    try:
+        if config_store:
+            line = config_store.get("canonical_line")
+            if isinstance(line, str) and line.strip():
+                return line.strip()
+    except Exception:
+        pass
+    env_line = os.getenv("CANONICAL_LINE", "").strip()
+    if env_line:
+        return env_line
+    # Default canonical message (requested)
+    return "บีรักจัสมินชอบกินแซลมอนนะ ขอบคุณที่เคยซัพพอตกันเสมออยู่ข้างๆตลอด💖💍"
+
+
 def build_hashtags(default_tags: List[str]) -> str:
     tags = _override_list("hashtags_base", default_tags)[:]
-    random.shuffle(tags)
+    random.shuffle(tags
+)
     return " ".join(tags[:random.randint(2, 4)])
 
 
@@ -152,14 +170,22 @@ def generate_caption(sender_name: Optional[str] = None) -> str:
     if spicy and random.random() < 0.35:
         emojis.append(pick(EMOJIS_LIGHT_SAUCE))
 
-    parts = [
-        f"{opener} {core} {' '.join(emojis)}",
-        playful,
-        spicy,
-        build_hashtags(base_tags),
-        f"— {sender_name}",
-    ]
-    text = " ".join([p for p in parts if p])
+    canonical = _get_canonical_line()
+
+    # Compose body
+    lines: List[str] = []
+    # With high probability include canonical line first
+    if canonical and random.random() < 0.9:
+        lines.append(canonical)
+    lines.append(f"{opener} {core} {' '.join(emojis)}")
+    if playful:
+        lines.append(playful)
+    if spicy:
+        lines.append(spicy)
+    lines.append(build_hashtags(base_tags))
+    lines.append(f"— {sender_name}")
+
+    text = " ".join([p for p in lines if p])
     if len(text) > 270:
         text = text[:267] + "..."
     return text
