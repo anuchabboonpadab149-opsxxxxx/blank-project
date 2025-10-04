@@ -796,6 +796,14 @@ def tony_home():
         pass
     return render_template("tony.html")
 
+@app.get("/app")
+def member_app():
+    try:
+        mstore.pageview("member_app")
+    except Exception:
+        pass
+    return render_template("member.html")
+
 @app.get("/tony-site")
 def tony_site():
     try:
