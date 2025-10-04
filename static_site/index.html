@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>อ.โทนี่สะท้อนกรรม — เว็บไซต์ทางการ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background:#0f1115; color:#eaeaf1; }
+    a { color:#8ecbff; text-decoration:none; }
+    header { padding: 24px; position: sticky; top:0; background: rgba(16,18,24,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid #1f2430; display:flex; align-items:center; justify-content:space-between; }
+    .brand { font-weight:700; letter-spacing:0.2px; }
+    .nav a { margin-left:14px; font-size:14px; }
+    .hero { padding: 56px 24px; text-align:center; background: linear-gradient(180deg, #121621 0%, #0f1115 60%); }
+    .hero h1 { margin:0; font-size: 32px; }
+    .hero p { color:#a8b0c0; max-width: 760px; margin: 10px auto 0 auto; line-height:1.8; }
+    .cta { margin-top:18px; }
+    .btn { display:inline-block; background:#2a6bff; color:#fff; padding:10px 16px; border-radius:8px; font-weight:600; }
+    .btn.alt { background:#2a3344; color:#eaeaf1; }
+    .section { padding: 36px 24px; max-width: 1080px; margin: 0 auto; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
+    .card { background:#151a24; border:1px solid #232a3a; border-radius:12px; padding:16px; }
+    .muted { color:#9aa3b2; }
+    .list li { margin: 6px 0; }
+    .pkg { background:#121722; border:1px dashed #2b3348; padding:10px; border-radius:10px; margin:8px 0; }
+    .foot { text-align:center; color:#7f8896; padding: 28px 24px; border-top: 1px solid #1f2430; }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">อ.โทนี่สะท้อนกรรม</div>
+    <div class="nav">
+      <a href="#features">จุดเด่น</a>
+      <a href="#pricing">แพ็กเกจ</a>
+      <a href="#admin">ผู้ดูแล</a>
+      <a href="#get-started">เริ่มต้น</a>
+    </div>
+  </header>
+
+  <div class="hero">
+    <h1>แพลตฟอร์มดูดวงพรีเมียม ครบทุกศาสตร์ พร้อมระบบเครดิต</h1>
+    <p>รองรับโหราศาสตร์ ไพ่ยิปซี ลูกเต๋า เซียมซี ไพ่ป๊อก วิเคราะห์ลายมือ/โหงวเฮ้ง/ความฝัน รวมถึงตัวเลข—เบอร์โทร/ทะเบียนรถ/ชื่อ-นามสกุล ด้วย AI (OpenAI/Gemini) และ Vision Pipeline พร้อมระบบสิทธิ์แบบเครดิต</p>
+    <div class="cta" id="get-started">
+      <a class="btn" href="/tony" target="_blank" rel="noopener">เริ่มใช้งานทันที</a>
+      <a class="btn alt" href="/tony#topup" target="_blank" rel="noopener">เติมสิทธิ์</a>
+    </div>
+  </div>
+
+  <div class="section" id="features">
+    <div class="grid">
+      <div class="card">
+        <h3>จุดเด่น</h3>
+        <ul class="list">
+          <li>LLM แท้ (OpenAI/Gemini) + Prompt แยกต่อศาสตร์</li>
+          <li>Vision วิเคราะห์ลายมือ/โหงวเฮ้ง จากภาพจริง</li>
+          <li>ระบบเครดิต: หัก 1 สิทธิ์ต่อการทำนาย 1 ครั้ง</li>
+          <li>บันทึกประวัติการดูดวงของผู้ใช้</li>
+          <li>แดชบอร์ดแอดมินอนุมัติท็อปอัปแบบ Manual</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>การตั้งค่า LLM</h3>
+        <p class="muted">เปิดหน้า <code>/credentials</code> แล้วกำหนด:</p>
+        <ul class="list">
+          <li>LLM_PROVIDER: openai หรือ gemini</li>
+          <li>OPENAI_API_KEY / OPENAI_MODEL (เช่น gpt-4o-mini)</li>
+          <li>หรือ GEMINI_API_KEY / GEMINI_MODEL (เช่น gemini-1.5-flash)</li>
+          <li>ปรับ Prompt Templates ต่อศาสตร์ในหน้าเดียวกัน</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="pricing">
+    <div class="grid">
+      <div class="card">
+        <h3>เติมสิทธิ์ (Top-up)</h3>
+        <p class="muted">โอนเงิน/สแกน QR แล้วอัปโหลดสลิปจากหน้า <code>/tony</code></p>
+        <div class="pkg">แพ็ก 100฿ → 10 สิทธิ์</div>
+        <div class="pkg">แพ็ก 300฿ → 35 สิทธิ์</div>
+        <div class="pkg">แพ็ก 500฿ → 60 สิทธิ์</div>
+        <p class="muted">บัญชีชำระ: SCB 8162785073 — พิรุฬห์วัฒน์ ชยมาฒย์</p>
+      </div>
+      <div class="card" id="admin">
+        <h3>ผู้ดูแลระบบ</h3>
+        <p class="muted">ใช้ ADMIN_SECRET เพื่ออนุมัติคำขอเติมสิทธิ์</p>
+        <ul class="list">
+          <li>ตั้งค่า .env: ADMIN_SECRET=...</li>
+          <li>เปิดหน้า: <code>/tony/admin</code> และ <code>/admin</code></li>
+          <li>โหลดรายการ “ค้างอนุมัติ” และกดอนุมัติ</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="grid">
+      <div class="card">
+        <h3>ศาสตร์ที่รองรับ</h3>
+        <ul class="list">
+          <li>โหราศาสตร์ (วัน/เวลาเกิด + คำถาม)</li>
+          <li>ไพ่ยิปซี / ลูกเต๋า / เซียมซี / ไพ่ป๊อก</li>
+          <li>ลายมือ / โหงวเฮ้ง / ทำนายฝัน</li>
+          <li>เบอร์โทร / เลขทะเบียนรถ / ชื่อ-นามสกุล</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>เริ่มต้นใช้งาน</h3>
+        <ol class="list">
+          <li>สมัคร/เข้าสู่ระบบที่ <code>/tony</code></li>
+          <li>เติมสิทธิ์ด้วยการอัปโหลดสลิป</li>
+          <li>เลือกศาสตร์ที่ต้องการ ระบบหัก 1 สิทธิ์/ครั้ง</li>
+          <li>ดูผลและบันทึกในประวัติของคุณ</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    © อ.โทนี่สะท้อนกรรม — สงวนลิขสิทธิ์
+  </div>
+</body>
+</html>
