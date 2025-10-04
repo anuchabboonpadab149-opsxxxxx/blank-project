@@ -824,4 +824,197 @@ def api_payment_notify():
             bus.publish({"type": "payment", "user": user, "amount": amount, "credits_added": credits, "ts": time.time()})
         except Exception:
             pass
+        return jsonify({"ok": True, "credits_added": credits, "credits": newv})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===== Divination API (calls AI or mocked) =====
+@app.post("/api/divination")
+def api_divination():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        user = str(payload.get("user", "guest")).strip() or "guest"
+        div_type = str(payload.get("type", "general")).strip() or "general"
+        text = str(payload.get("text", "")).strip()
+        if not text:
+            return jsonify({"error": "text is required"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    # Consume credit first
+    try:
+        import credits_store as cstore
+        left = cstore.use(user)
+        if left is None:
+            return jsonify({"error": "insufficient_credits"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    # Generate via AI provider (Gemini) or fallback
+    try:
+        from providers.ai_divination import generate_divination
+        result = generate_divination(user, div_type, text)
+    except Exception:
+        # fallback as last resort
+        try:
+            import content_generator as cg
+            base = cg.make_text(sender=os.getenv("SENDER_NAME", "อ.โทนี่สะท้อนกรรม"))
+            result = f"({div_type}) ผลคำทำนายจำลอง:\n{base}"
+        except Exception:
+            result = f"({div_type}) ผลคำทำนายจำลองสำหรับ: \"{text}\" — โปรดเชื่อมต่อโมเดล AI จริง"
+
+    # Save history
+    try:
+        import divination_store as dstore
+        item = dstore.append(user_id=user, div_type=div_type, input_text=text, result_text=result)
+        try:
+            bus.publish({"type": "divination", "user": user, "div_type": div_type, "ts": time.time(), "text": result[:140]})
+        except Exception:
+            pass
+        return jsonify({"ok": True, "credits_left": left, "item": item})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/divination/history")
+def api_divination_history():
+    try:
+        user = request.args.get("user", default=None)
+    except Exception:
+        user = None
+    try:
+        import divination_store as dstore
+        hist = dstore.recent(50)
+        if user:
+            hist = [h for h in hist if h.get("user_id") == user]
+        return jsonify(hist)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def start_web():
+    app.run(host="0.0.0.0", port=WEB_PORT, debug=False, threaded=True)
+def api_post_now():
+    try:
+        import scheduler_control
+        ok = scheduler_control.trigger_post_now()
+        return jsonify({"ok": bool(ok)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/tweets")
+def api_tweets_list():
+    try:
+        from promote_ayutthaya import Config
+        path = None
+        try:
+            import config_store
+            path = config_store.get("tweets_file")
+        except Exception:
+            pass
+        path = path or Config().TWEETS_FILE or "tweets.txt"
+        lines = []
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    t = line.strip()
+                    if t:
+                        lines.append(t)
+        return jsonify({"path": path, "count": len(lines), "lines": lines[:100]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/tweets")
+def api_tweets_append():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        line = str(payload.get("line", "")).strip()
+        if not line:
+            return jsonify({"error": "line is required"}), 400
+        from promote_ayutthaya import Config
+        path = None
+        try:
+            import config_store
+            path = config_store.get("tweets_file")
+        except Exception:
+            pass
+        path = path or Config().TWEETS_FILE or "tweets.txt"
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+        return jsonify({"ok": True, "path": path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===== Credits APIs =====
+@app.get("/api/credits")
+def api_get_credits():
+    try:
+        user = request.args.get("user", default="guest")
+    except Exception:
+        user = "guest"
+    try:
+        import credits_store as cstore
+        return jsonify({"user": user, "credits": cstore.get(user)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/credits/use")
+def api_use_credit():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        user = str(payload.get("user", "guest")).strip() or "guest"
+    except Exception:
+        user = "guest"
+    try:
+        import credits_store as cstore
+        left = cstore.use(user)
+        if left is None:
+            return jsonify({"ok": False, "error": "insufficient_credits"}), 400
+        return jsonify({"ok": True, "credits_left": left})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/credits/add")
+def api_add_credit():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        user = str(payload.get("user", "guest")).strip() or "guest"
+        delta = int(payload.get("delta", 0))
+    except Exception:
+        user = "guest"
+        delta = 0
+    try:
+        import credits_store as cstore
+        newv = cstore.add(user, delta)
+        return jsonify({"ok": True, "credits": newv})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===== Payment notify (mock webhook) =====
+@app.post("/api/payment/notify")
+def api_payment_notify():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        user = str(payload.get("user", "guest")).strip() or "guest"
+        amount = float(payload.get("amount", 0))
+        # simple mapping: 100 THB -> 5 credits
+        credits = 0
+        if amount >= 100:
+            credits = 5
+        elif amount >= 50:
+            credits = 2
+        import credits_store as cstore
+        newv = cstore.add(user, credits)
+        try:
+            bus.publish({"type": "payment", "user": user, "amount": amount, "credits_added": credits, "ts": time.time()})
+        except Exception:
+            pass
         return jsonify({"ue)
