@@ -804,6 +804,63 @@ def tony_site():
         pass
     return render_template("tony_site.html")
 
+@app.get("/admin")
+def admin_console():
+    try:
+        mstore.pageview("admin_console")
+    except Exception:
+        pass
+    return render_template("admin_console.html")
+
+# --- Admin APIs (require ADMIN_SECRET in request) ---
+
+def _check_admin_secret(secret: str) -> bool:
+    return bool(secret) and secret == os.getenv("ADMIN_SECRET", "")
+
+@app.get("/api/tony/admin/users")
+def tony_admin_users():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    secret = request.args.get("secret") or request.headers.get("X-Admin-Secret") or ""
+    if not _check_admin_secret(secret):
+        return jsonify({"error": "forbidden"}), 403
+    users = ustore.list_users()
+    # strip sensitive fields
+    for u in users:
+        u.pop("pw_hash", None)
+        u.pop("salt", None)
+    return jsonify({"items": users})
+
+@app.get("/api/tony/admin/topups")
+def tony_admin_topups_all():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    secret = request.args.get("secret") or request.headers.get("X-Admin-Secret") or ""
+    if not _check_admin_secret(secret):
+        return jsonify({"error": "forbidden"}), 403
+    status = request.args.get("status") or None
+    items = ustore.list_topups(status=status)
+    users = {u.get("id"): u.get("username") for u in (ustore.list_users() if ustore else [])}
+    for it in items:
+        it["username"] = users.get(it.get("user_id"))
+    return jsonify({"items": items})
+
+@app.get("/api/tony/admin/user-history")
+def tony_admin_user_history():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    secret = request.args.get("secret") or request.headers.get("X-Admin-Secret") or ""
+    if not _check_admin_secret(secret):
+        return jsonify({"error": "forbidden"}), 403
+    user_id = request.args.get("user_id") or ""
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    items = ustore.list_history(user_id=user_id, limit=200)
+    return jsonify({"items": items})
+
 @app.get("/api/tony/session")
 def tony_session():
     ok, err = _ensure_tony_ready()

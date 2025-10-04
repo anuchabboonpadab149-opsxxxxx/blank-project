@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>Admin Console — อ.โทนี่สะท้อนกรรม</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif; margin:0; padding:0; background:#0f1115; color:#eaeaf1; }
+    a { color:#8ecbff; text-decoration:none; }
+    header { padding: 16px 24px; background:#151a24; border-bottom:1px solid #1f2430; display:flex; align-items:center; gap:16px; }
+    h1 { margin:0; font-size:20px; }
+    .wrap { padding: 16px 24px; }
+    .grid { display:grid; grid-template-columns: 2fr 1fr; gap:16px; }
+    .panel { background:#151a24; border:1px solid #232a3a; border-radius:10px; padding:12px; }
+    label { display:block; font-size:12px; color:#9aa3b2; margin-top:8px; }
+    input[type="text"], input[type="password"] { width:100%; background:#11151f; border:1px solid #2b3348; color:#eaeaf1; border-radius:6px; padding:6px 8px; }
+    .btn { display:inline-block; background:#2a6bff; color:#fff; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; margin-top:8px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:8px 10px; border-bottom:1px solid #232a3a; font-size:13px; }
+    .small { color:#9aa3b2; font-size:12px; }
+    .muted { color:#9aa3b2; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#1e2738; color:#cde3ff; font-size:11px; }
+    @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Admin Console — อ.โทนี่สะท้อนกรรม</h1>
+    <a href="/">หน้าหลัก</a>
+    <a href="/tony">โทนี่</a>
+    <a href="/tony/admin">อนุมัติท็อปอัป</a>
+    <a href="/credentials">คีย์/ตั้งค่า</a>
+  </header>
+  <div class="wrap">
+    <div class="grid">
+      <div class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-weight:600;">ผู้ใช้</div>
+          <div class="small">
+            Admin Secret: <input id="sec" type="password" placeholder="ADMIN_SECRET" style="width:200px;">
+            <button class="btn" id="btnLoadAll">โหลดข้อมูล</button>
+          </div>
+        </div>
+        <table id="tblUsers">
+          <thead><tr><th>username</th><th>credits</th><th>created</th><th>ดูประวัติ</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="userHist" class="small" style="margin-top:10px;"></div>
+      </div>
+      <div class="panel">
+        <div style="font-weight:600;">รายการเติมสิทธิ์</div>
+        <label>สถานะ</label>
+        <select id="status">
+          <option value="">ทั้งหมด</option>
+          <option value="pending">pending</option>
+          <option value="approved">approved</option>
+        </select>
+        <button class="btn" id="btnLoadTopups">โหลด</button>
+        <div id="topups" class="small" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadUsers() {
+      const sec = document.getElementById('sec').value.trim();
+      const r = await fetch('/api/tony/admin/users?secret=' + encodeURIComponent(sec));
+      const d = await r.json();
+      const tb = document.querySelector('#tblUsers tbody');
+      tb.innerHTML = '';
+      (d.items || []).forEach(u => {
+        const tr = document.createElement('tr');
+        const created = u.created_ts ? new Date(u.created_ts*1000).toLocaleString() : '-';
+        tr.innerHTML = '<td>'+ (u.username||'') +'</td>'+
+                       '<td>'+ (u.credits||0) +'</td>'+
+                       '<td>'+ created +'</td>'+
+                       '<td><button class="btn" data-id="'+u.id+'">ดู</button></td>';
+        tb.appendChild(tr);
+      });
+      tb.querySelectorAll('button').forEach(btn => {
+        btn.onclick = () => loadUserHistory(btn.getAttribute('data-id'));
+      });
+    }
+
+    async function loadUserHistory(userId) {
+      const sec = document.getElementById('sec').value.trim();
+      const r = await fetch('/api/tony/admin/user-history?secret=' + encodeURIComponent(sec) + '&user_id=' + encodeURIComponent(userId));
+      const d = await r.json();
+      const box = document.getElementById('userHist');
+      if (!d.items || !d.items.length) { box.textContent = 'ไม่มีประวัติของผู้ใช้นี้'; return; }
+      box.innerHTML = d.items.map(x => {
+        const ts = new Date((x.ts||0)*1000).toLocaleString();
+        return '<div><span class="badge">['+x.service+']</span> ' + ts + '</div>';
+      }).join('');
+    }
+
+    async function loadTopups() {
+      const sec = document.getElementById('sec').value.trim();
+      const st = document.getElementById('status').value;
+      const r = await fetch('/api/tony/admin/topups?secret=' + encodeURIComponent(sec) + '&status=' + encodeURIComponent(st));
+      const d = await r.json();
+      const box = document.getElementById('topups');
+      if (!d.items || !d.items.length) { box.textContent = 'ไม่มีรายการ'; return; }
+      box.innerHTML = '<table><thead><tr><th>เวลา</th><th>ผู้ใช้</th><th>แพ็กเกจ</th><th>ยอด</th><th>สลิป</th><th>สถานะ</th></tr></thead><tbody>' +
+        d.items.map(t => {
+          const ts = new Date((t.created_ts||0)*1000).toLocaleString();
+          const slip = t.slip_path ? ('<a href="/media/' + t.slip_path.replace(/^outputs\//,'') + '" target="_blank">ดูสลิป</a>') : '-';
+          return '<tr>'+
+            '<td>'+ ts +'</td>'+
+            '<td>'+ (t.username || t.user_id) +'</td>'+
+            '<td>'+ t.package_id +'</td>'+
+            '<td>'+ t.price +'฿ ('+ t.credits_on_approve +' สิทธิ์)</td>'+
+            '<td>'+ slip +'</td>'+
+            '<td>'+ t.status +'</td>'+
+          '</tr>';
+        }).join('') + '</tbody></table>';
+    }
+
+    document.getElementById('btnLoadAll').onclick = () => { loadUsers(); loadTopups(); };
+    document.getElementById('btnLoadTopups').onclick = loadTopups;
+  </script>
+</body>
+</html>
