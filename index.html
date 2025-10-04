@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>จัสมินชอบกินแซลมอน — Live</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121821;
+      --text: #e7f0fa;
+      --muted: #8aa1b4;
+      --accent: #ff4fb7;
+      --ok: #19c37d;
+      --warn: #ffb020;
+      --err: #ff5a5a;
+    }
+    html, body { background: var(--bg); color: var(--text); margin: 0; font-family: system-ui, -apple-system, "Noto Sans Thai", Tahoma, sans-serif; }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .sub { color: var(--muted); margin-bottom: 18px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 920px) { .grid { grid-template-columns: 1.6fr 1fr; } }
+    .card { background: var(--panel); border: 1px solid #1e2633; border-radius: 12px; padding: 14px; }
+    .title { margin: 0 0 12px; font-size: 15px; color: var(--muted); letter-spacing: .3px; }
+    .content { white-space: pre-wrap; word-break: break-word; line-height: 1.5; font-size: 15px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .pill { background: #0f1520; border: 1px solid #1e2633; color: var(--muted); padding: 6px 10px; border-radius: 999px; font-size: 12px; }
+    .btn { background: #1d2330; border: 1px solid #2c3648; color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    .btn:hover { filter: brightness(1.05); }
+    .input { width: 100%; background: #0f1520; border: 1px solid #273041; color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+    .small { font-size: 12px; color: var(--muted); }
+    .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--err); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .kbd { padding: 2px 6px; border: 1px solid #2c3648; border-bottom-width: 3px; border-radius: 6px; background: #0f1520; }
+    a { color: #7cc3ff; text-decoration: none; }
+    .mutelink { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>จัสมินชอบกินแซลมอน — Live</h1>
+    <div class="sub">
+      โหมดอัตโนมัติ 24/7 สร้างคอนเทนต์ใหม่ทุกวินาที
+      <span id="backendState" class="pill">ตรวจสอบการเชื่อมต่อแบ็กเอนด์...</span>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">คอนเทนต์ล่าสุด</div>
+        <div id="latest" class="content">รอข้อมูล...</div>
+        <div class="row" style="margin-top:10px;">
+          <span class="small">อัปเดตล่าสุด: <span id="ts" class="mono">—</span></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">การตั้งค่า (ฝั่งเบราว์เซอร์: DEMO MODE)</div>
+        <div class="row" style="margin-bottom:8px;">
+          <label class="small" style="min-width:120px;">ช่วงเวลา (วินาที)</label>
+          <input id="interval" type="number" min="1" value="1" class="input" style="max-width:120px;" />
+          <button class="btn" onclick="applyInterval()">ปรับใช้</button>
+          <button class="btn" onclick="tickOnce()">สร้างทันที</button>
+        </div>
+        <div class="row" style="gap:8px; margin-bottom:6px;">
+          <span class="small">สถานะ:</span>
+          <span id="modePill" class="pill">กำลังตรวจสอบแบ็กเอนด์...</span>
+        </div>
+        <div class="small">
+          ลิงก์ระบบ (ถ้ามีแบ็กเอนด์): 
+          <a class="mutelink" href="/healthz" target="_blank">/healthz</a> ·
+          <a class="mutelink" href="/events" target="_blank">/events</a> ·
+          <a class="mutelink" href="/api/recent" target="_blank">/api/recent</a> ·
+          <a class="mutelink" href="/api/feed" target="_blank">/api/feed</a> ·
+          <a class="mutelink" href="/credentials" target="_blank">/credentials</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="title">บันทึกสถานะ</div>
+      <pre id="log" class="content mono" style="background:#0f1520; border-radius:8px; padding:10px; max-height:280px; overflow:auto;"></pre>
+    </div>
+  </div>
+
+  <script>
+    // ===== Persona: Jasmine x Salmon (client-side DEMO) =====
+    const SALMON_TAGS = ["#จัสมินชอบกินแซลมอน","#ซาชิมิ","#วาซาบิ","#ปลาดิบอุ่นใจ","#BeeรักJasmine","#รักทุกคำที่มีแซลมอน"];
+    const OPENERS = [
+      "คืนนี้ว่างไหมคะ? แซลมอนละลายในใจหนูอีกแล้ว",
+      "ทุกคำที่ได้กิน เหมือนได้กอดคุณแน่นๆ",
+      "จะพาไปกินซาชิมิ แล้วจบที่ไอติมมั้ยคะ",
+      "รักที่ดีเหมือนข้าวญี่ปุ่น—นุ่ม อุ่น และแน่นหัวใจ",
+      "ระหว่างวาซาบิเผ็ดจี๊ด กับคุณที่ทำใจเต้นแรง หนูเลือกทั้งคู่"
+    ];
+    const CORE = [
+      "บีรักจัสมินชอบกินแซลมอนนะ ขอบคุณที่เคยซัพพอตกันเสมออยู่ข้างๆตลอด💖💍",
+      "รักจะหวานขึ้น 99% เมื่อมีแซลมอนอยู่ตรงหน้า",
+      "ถ้าใจเราซอฟท์ แซลมอนก็ละลายเหมือนกัน",
+      "คืนนี้ฝากหัวใจไว้ในโชยุหน่อยนะคะ",
+      "ให้หนูเป็นเหตุผลที่คุณอยากกลับบ้านไวๆ"
+    ];
+    const PLAYFUL = [
+      "พร้อมสั่ง Omakase ใส่ใจให้คุณค่ะ",
+      "จุ๊บวาซาบิหนึ่งที = ฮีลทันที",
+      "เลือกเราไม่แพง เทียบกับชุดซาชิมิพรีเมียมก็ยังคุ้ม",
+      "ป้อนกันไปป้อนกันมา จนใจเต้นแทบหลุด",
+      "ควงกันไปตลาดปลาไหมคะ"
+    ];
+    const SPICY = [
+      "เผ็ดวาซาบิหรือเผ็ดใจเรา ลองมั้ยคะ 😉",
+      "ถ้าไม่ชอบเผ็ด เดี๋ยวหนูปรับให้หวานแทน",
+      "คำต่อไป—ปากหรือปลา เลือกเลยค่ะ",
+      "อยากโดนคุณคีบ ใส่หัวใจหน่อย",
+      "ขอจองตักคุณไว้ทั้งคืน"
+    ];
+    const EMO = ["🍣","🧡","💖","🔥","✨","🥢","😘","🎧","🎬","🫶"];
+
+    function makeText(sender="จัสมินชอบกินแซลมอน") {
+      const now = new Date().toLocaleString("th-TH");
+      const pick = (arr)=>arr[Math.floor(Math.random()*arr.length)];
+      const rands = (arr, n)=>arr.slice().sort(()=>Math.random()-0.5).slice(0,n);
+      const opener = pick(OPENERS);
+      const core = pick(CORE);
+      const playful = pick(PLAYFUL);
+      const spicy = pick(SPICY);
+      const tags = rands(SALMON_TAGS, 3).join(" ");
+      const emojis = rands(EMO, 3).join("");
+      return `${opener}
+${core}
+${playful} ${spicy}
+${tags} ${emojis}
+— ${sender} | ${now}`;
+    }
+
+    // ===== UI + Backend detection =====
+    const latestEl = document.getElementById("latest");
+    const tsEl = document.getElementById("ts");
+    const logEl = document.getElementById("log");
+    const modePill = document.getElementById("modePill");
+    const backendState = document.getElementById("backendState");
+    const intervalEl = document.getElementById("interval");
+
+    let demoTimer = null;
+    let mode = "checking"; // checking | backend | demo
+
+    function logLine(s) {
+      const ts = new Date().toISOString();
+      logEl.textContent = `[${ts}] ${s}\n` + logEl.textContent;
+    }
+
+    function setMode(m) {
+      mode = m;
+      if (m === "backend") {
+        modePill.textContent = "เชื่อมต่อแบ็กเอนด์แล้ว (SSE)";
+        modePill.classList.remove("warn"); modePill.classList.add("ok");
+        backendState.textContent = "เชื่อมต่อแบ็กเอนด์แล้ว";
+        backendState.classList.add("ok");
+      } else if (m === "demo") {
+        modePill.textContent = "DEMO MODE (ฝั่งเบราว์เซอร์)";
+        modePill.classList.remove("ok"); modePill.classList.add("warn");
+        backendState.textContent = "ไม่มีแบ็กเอนด์ — ทำงานแบบ DEMO ในเบราว์เซอร์";
+        backendState.classList.remove("ok"); backendState.classList.add("warn");
+      } else {
+        modePill.textContent = "กำลังตรวจสอบแบ็กเอนด์...";
+        backendState.textContent = "กำลังตรวจสอบการเชื่อมต่อแบ็กเอนด์...";
+      }
+    }
+
+    function updateLatest(txt) {
+      latestEl.textContent = txt;
+      tsEl.textContent = new Date().toLocaleTimeString("th-TH");
+    }
+
+    function startDemoLoop() {
+      if (demoTimer) clearInterval(demoTimer);
+      const iv = Math.max(1, parseInt(intervalEl.value || "1", 10));
+      updateLatest(makeText());
+      demoTimer = setInterval(()=> updateLatest(makeText()), iv * 1000);
+      setMode("demo");
+      logLine("เริ่ม DEMO MODE: สร้างคอนเทนต์ฝั่งเบราว์เซอร์ทุก " + iv + " วินาที");
+    }
+
+    function applyInterval() {
+      if (mode === "demo") {
+        startDemoLoop();
+      }
+      logLine("ปรับช่วงเวลาเป็น " + intervalEl.value + " วินาที");
+    }
+
+    function tickOnce() {
+      updateLatest(makeText());
+      logLine("สร้างคอนเทนต์หนึ่งครั้ง (manual)");
+    }
+
+    // Try SSE backend
+    (function init() {
+      setMode("checking");
+      let opened = false;
+      try {
+        const es = new EventSource("/events");
+        const timeout = setTimeout(() => {
+          if (!opened) {
+            es.close();
+            logLine("SSE ไม่ตอบในเวลาที่กำหนด — สลับเป็น DEMO MODE");
+            startDemoLoop();
+          }
+        }, 2500);
+
+        es.onopen = () => {
+          opened = true;
+          clearTimeout(timeout);
+          setMode("backend");
+          logLine("SSE เปิดแล้ว");
+        };
+        es.onmessage = (ev) => {
+          try {
+            const data = JSON.parse(ev.data);
+            if (data && data.type === "post" && data.item && data.item.text) {
+              updateLatest(data.item.text);
+            }
+          } catch (e) {}
+        };
+        es.onerror = () => {
+          if (!opened) {
+            clearTimeout(timeout);
+            logLine("เชื่อมต่อ SSE ล้มเหลว — ทำงาน DEMO MODE");
+            startDemoLoop();
+          }
+        };
+      } catch (e) {
+        logLine("เบราว์เซอร์ไม่รองรับ SSE หรือเกิดข้อผิดพลาด — DEMO MODE");
+        startDemoLoop();
+      }
+    })();
+  </script>
+</body>
+</html>
