@@ -1,301 +1,131 @@
 import json
 import os
-from typing import Generator
 
-from flask import Flask, Response, jsonify, render_template, render_template_string, send_from_directory, request, session, redirect, url_for
+from flask import Flask, jsonify, render_template, request, redirect, url_for
 
 import realtime_bus as bus
-import node_registry as nreg
 import metrics_store as mstore
-import circuit_breaker as cbreak
-import credentials_store as credstore
-import workflow_store as wstore
 
 # Support PaaS environments (Heroku/Render/Railway) that pass PORT
 WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
-AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "1").lower() in {"1", "true", "yes"}
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 
-# Minimal inline template to avoid external files
-INDEX_HTML = """
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="utf-8" />
-  <title>Real-time Content Export Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin: 0; padding: 0; background: #111; color: #eee; }
-    header { padding: 16px 24px; background: #181818; position: sticky; top: 0; border-bottom: 1px solid #2a2a2a; display:flex; align-items:center; gap:16px; }
-    h1 { margin: 0; font-size: 20px; }
-    nav a { color:#85d0ff; text-decoration:none; margin-right:10px; font-size:14px; }
-    .stats { display: flex; gap: 16px; margin-top: 8px; font-size: 14px; color: #bbb; }
-    .wrap { padding: 16px 24px; }
-    .grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; }
-    .panel { background: #181818; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px; }
-    #events { max-height: calc(100vh - 260px); overflow: auto; }
-    .e { border-bottom: 1px dashed #2f2f2f; padding: 10px 4px; }
-    .e:last-child { border-bottom: 0; }
-    .time { color: #aaa; font-size: 12px; }
-    .text { font-size: 15px; margin: 6px 0; color: #f3f3f3; }
-    .media a { color: #85d0ff; text-decoration: none; margin-right: 10px; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #262626; color: #ddd; font-size: 12px; margin-right: 6px; }
-    label { display: block; font-size: 12px; color: #bbb; margin-top: 8px; }
-    input[type="text"], input[type="number"], select, textarea { width: 100%; background: #121212; border: 1px solid #2a2a2a; color: #eaeaea; border-radius: 6px; padding: 6px 8px; }
-    textarea { min-height: 60px; }
-    .btn { display: inline-block; background: #2a6bff; color: #fff; border: 0; padding: 6px 10px; border-radius: 6px; cursor: pointer; margin-top: 8px; margin-right: 6px; }
-    .btn.alt { background: #444; }
-    small { color: #888; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Real-time Content Export Dashboard</h1>
-    <nav>
-      <a href="/">Home</a>
-      <a href="/about">About</a>
-      <a href="/nodes">Nodes</a>
-      <a href="/credentials">Credentials</a>
-      <a href="/workflows">Workflows</a>
-      <a href="/qr">QR</a>
-      <span style="margin-left:8px;color:#888;">{{ 'เข้าสู่ระบบแล้ว: ' + (user or '') if user else '' }}</span>
-      {% if user %}<a href="/logout" style="margin-left:12px;">Logout</a>{% else %}<a href="/login" style="margin-left:12px;">Login</a>{% endif %}
-    </nav>
-  </header>
-  <div class="wrap">
-    <div class="stats">
-      <div>Status: <span id="status">Connecting...</span></div>
-      <div>Total events: <span id="count">0</span></div>
-      <div>Last update: <span id="last">-</span></div>
-      <div>Providers: <span id="providers"></span></div>
-      <div>Visitors: <span id="visitors">0</span></div>
-    </div>
-    <div class="grid" style="margin-top:12px;">
-      <div class="panel" id="events"></div>
-      <div class="panel">
-        <div style="font-weight: 600; margin-bottom: 6px;">Latest Media</div>
-        <div id="latest-media"></div>
-        <hr style="border-color:#2a2a2a; margin:12px 0;">
-        <div style="font-weight: 600; margin-bottom: 6px;">Settings</div>
-        <label>Post interval (seconds)</label>
-        <input id="postInterval" type="number" min="1" placeholder="1" />
-        <label>Collect interval (minutes)</label>
-        <input id="collectInterval" type="number" min="1" placeholder="1" />
-        <label>Providers (comma-separated)</label>
-        <input id="providersInput" type="text" placeholder="twitter,facebook,..." />
-        <label>Sender name</label>
-        <input id="senderName" type="text" placeholder="จัสมิน" />
-        <label>TTS language</label>
-        <input id="ttsLang" type="text" placeholder="th" />
-        <label>Content mode</label>
-        <select id="contentMode">
-          <option value="">auto</option>
-          <option value="generate">generate</option>
-          <option value="file">file</option>
-          <option value="import">import</option>
-        </select>
-        <label>Import source URL</label>
-        <input id="importUrl" type="text" placeholder="https://example.com/posts.txt" />
-        <label>Import format</label>
-        <select id="importFormat">
-          <option value="lines">lines</option>
-          <option value="json">json</option>
-        </select>
-        <label>Hashtags (comma-separated)</label>
-        <input id="hashtagsBase" type="text" placeholder="#จัสมิน,#ความรัก,..." />
-        <label>Openers (one per line)</label>
-        <textarea id="openers"></textarea>
-        <label>Core love lines (one per line)</label>
-        <textarea id="coreLove"></textarea>
-        <label>Playful addons (one per line)</label>
-        <textarea id="playfulAddons"></textarea>
-        <label>Light spicy (one per line)</label>
-        <textarea id="lightSpicy"></textarea>
-        <div style="margin-top:6px;">
-          <button class="btn" id="saveCfg">Save</button>
-          <button class="btn alt" id="reloadSch">Reload schedule</button>
-          <button class="btn" id="postNow">Post now</button>
-        </div>
-        <hr style="border-color:#2a2a2a; margin:12px 0;">
-        <div style="font-weight: 600; margin-bottom: 6px;">Add line to tweets.txt</div>
-        <textarea id="newLine" placeholder="พิมพ์บรรทัดคอนเทนต์ที่ต้องการเพิ่ม..."></textarea>
-        <button class="btn" id="addLine">Append</button>
-        <div id="msg" style="margin-top:6px; font-size:12px; color:#9ad;"></div>
-      </div>
-    </div>
-  </div>
+app = Flask(__name__)
 
-  <script>
-    const eventsEl = document.getElementById('events');
-    const statusEl = document.getElementById('status');
-    const countEl = document.getElementById('count');
-    const lastEl = document.getElementById('last');
-    const providersEl = document.getElementById('providers');
-    const latestMediaEl = document.getElementById('latest-media');
-    const visitorsEl = document.getElementById('visitors');
+# CORS: allow cross-origin calls (optional)
+@app.after_request
+def _add_cors(resp):
+    try:
+        resp.headers["Access-Control-Allow-Origin"] = os.getenv("CORS_ALLOW_ORIGIN", "*")
+        resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = request.headers.get("Access-Control-Request-Headers", "*") or "*"
+        resp.headers["Access-Control-Allow-Credentials"] = "false"
+    except Exception:
+        pass
+    return resp
 
-    const postIntervalInput = document.getElementById('postInterval');
-    const collectIntervalInput = document.getElementById('collectInterval');
-    const providersInput = document.getElementById('providersInput');
-    const senderInput = document.getElementById('senderName');
-    const ttsLangInput = document.getElementById('ttsLang');
-    const contentModeSel = document.getElementById('contentMode');
-    const importUrlInput = document.getElementById('importUrl');
-    const importFmtSel = document.getElementById('importFormat');
-    const hashtagsBaseInput = document.getElementById('hashtagsBase');
-    const openersInput = document.getElementById('openers');
-    const coreLoveInput = document.getElementById('coreLove');
-    const playfulAddonsInput = document.getElementById('playfulAddons');
-    const lightSpicyInput = document.getElementById('lightSpicy');
-    const msgEl = document.getElementById('msg');
+@app.route("/__options__", methods=["OPTIONS"])
+def _options_probe():
+    return ("", 204)
 
-    document.getElementById('saveCfg').onclick = async () => {
-      const payload = {
-        post_interval_seconds: Number(postIntervalInput.value) || null,
-        collect_interval_minutes: Number(collectIntervalInput.value) || null,
-        providers: providersInput.value ? providersInput.value.split(',').map(x => x.trim()).filter(Boolean) : null,
-        sender_name: senderInput.value || null,
-        tts_lang: ttsLangInput.value || 'th',
-        content_mode: contentModeSel.value || null,
-        import_source_url: importUrlInput.value || null,
-        import_format: importFmtSel.value || 'lines',
-        hashtags_base: hashtagsBaseInput.value ? hashtagsBaseInput.value.split(',').map(x => x.trim()).filter(Boolean) : null,
-        openers: openersInput.value ? openersInput.value.split('\\n').map(x => x.trim()).filter(Boolean) : null,
-        core_love: coreLoveInput.value ? coreLoveInput.value.split('\\n').map(x => x.trim()).filter(Boolean) : null,
-        playful_addons: playfulAddonsInput.value ? playfulAddonsInput.value.split('\\n').map(x => x.trim()).filter(Boolean) : null,
-        light_spicy: lightSpicyInput.value ? lightSpicyInput.value.split('\\n').map(x => x.trim()).filter(Boolean) : null,
-      };
-      const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-      const data = await r.json();
-      msgEl.textContent = 'Saved.';
-      setTimeout(() => msgEl.textContent = '', 1500);
-    };
+# Homepage: redirect to fortune
+@app.get("/")
+def index():
+    try:
+        mstore.pageview("index")
+    except Exception:
+        pass
+    return redirect(url_for("fortune_page"))
 
-    document.getElementById('reloadSch').onclick = async () => {
-      await fetch('/api/reload-schedule', {method:'POST'});
-      msgEl.textContent = 'Scheduler reloaded.';
-      setTimeout(() => msgEl.textContent = '', 1500);
-    };
+# Fortune (ดูดวง)
+@app.get("/fortune")
+def fortune_page():
+    try:
+        mstore.pageview("fortune")
+    except Exception:
+        pass
+    return render_template("fortune.html", user=None)
 
-    document.getElementById('postNow').onclick = async () => {
-      await fetch('/api/post-now', {method:'POST'});
-      msgEl.textContent = 'Posting initiated.';
-      setTimeout(() => msgEl.textContent = '', 1500);
-    };
+@app.post("/fortune")
+def fortune_post():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+    except Exception:
+        payload = {}
+    name = (payload.get("name") or request.form.get("name") or "").strip()
+    birth = (payload.get("birth") or request.form.get("birth") or "").strip()  # YYYY-MM-DD
+    topic = (payload.get("topic") or request.form.get("topic") or "ภาพรวม").strip()
 
-    document.getElementById('addLine').onclick = async () => {
-      const line = document.getElementById('newLine').value.trim();
-      if (!line) return;
-      const r = await fetch('/api/tweets', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({line})});
-      const data = await r.json();
-      document.getElementById('newLine').value = '';
-      msgEl.textContent = 'Appended.';
-      setTimeout(() => msgEl.textContent = '', 1500);
-    };
+    import datetime, hashlib, random
+    today = datetime.date.today().isoformat()
+    seed_str = f"{name}|{birth}|{topic}|{today}"
+    seed = int(hashlib.sha256(seed_str.encode("utf-8")).hexdigest(), 16) % (10**8)
+    rnd = random.Random(seed)
 
-    async function loadConfig() {
-      const r = await fetch('/api/config');
-      const cfg = await r.json();
-      if (cfg.post_interval_seconds != null) postIntervalInput.value = cfg.post_interval_seconds;
-      if (cfg.collect_interval_minutes != null) collectIntervalInput.value = cfg.collect_interval_minutes;
-      if (Array.isArray(cfg.providers)) providersInput.value = cfg.providers.join(',');
-      if (cfg.sender_name) senderInput.value = cfg.sender_name;
-      if (cfg.tts_lang) ttsLangInput.value = cfg.tts_lang;
-      if (cfg.content_mode) contentModeSel.value = cfg.content_mode;
-      if (cfg.import_source_url) importUrlInput.value = cfg.import_source_url;
-      if (cfg.import_format) importFmtSel.value = cfg.import_format;
-      if (Array.isArray(cfg.hashtags_base)) hashtagsBaseInput.value = cfg.hashtags_base.join(',');
-      if (Array.isArray(cfg.openers)) openersInput.value = cfg.openers.join('\\n');
-      if (Array.isArray(cfg.core_love)) coreLoveInput.value = cfg.core_love.join('\\n');
-      if (Array.isArray(cfg.playful_addons)) playfulAddonsInput.value = cfg.playful_addons.join('\\n');
-      if (Array.isArray(cfg.light_spicy)) lightSpicyInput.value = cfg.light_spicy.join('\\n');
+    fortunes = {
+        "ภาพรวม": [
+            "วันนี้พลังงานดี มีโอกาสใหม่เข้ามา",
+            "ระวังความใจร้อนเล็กน้อย ตั้งสติแล้วไปต่อ",
+            "เหมาะกับการเริ่มต้นสิ่งใหม่ ๆ",
+            "มีเกณฑ์ได้รับข่าวดีจากคนไกล",
+            "พักใจสักนิด แล้วสิ่งดี ๆ จะตามมา",
+        ],
+        "การงาน": [
+            "งานคืบหน้าเร็ว ได้แรงสนับสนุนจากทีม",
+            "ระวังรายละเอียดสัญญา ทบทวนให้ครบถ้วน",
+            "เหมาะกับการวางแผนระยะยาว",
+            "มีโอกาสโชว์ผลงานและเป็นที่ยอมรับ",
+            "อย่ากลัวการเปลี่ยนแปลง มันพาคุณไปสู่โอกาส",
+        ],
+        "การเงิน": [
+            "รายรับ-รายจ่ายสมดุลขึ้นกว่าเดิม",
+            "ระวังการใช้จ่ายฟุ่มเฟือย คุมงบประมาณให้ดี",
+            "มีโชคเล็ก ๆ น้อย ๆ จากการเจรจา",
+            "เหมาะกับการลงทุนระยะยาวแบบปลอดภัย",
+            "ตรวจสอบบิล/สัญญา เพื่อเลี่ยงค่าใช้จ่ายแอบแฝง",
+        ],
+        "ความรัก": [
+            "คนโสดมีเกณฑ์พบคนที่ถูกใจ",
+            "คู่รักสื่อสารมากขึ้น เข้าใจกันดี",
+            "อย่าเก็บเรื่องเล็กเป็นเรื่องใหญ่ พูดคุยด้วยเหตุผล",
+            "มีโอกาสออกเดต/ทำกิจกรรมร่วมกัน",
+            "ความสัมพันธ์ก้าวหน้าอย่างเป็นธรรมชาติ",
+        ],
+        "สุขภาพ": [
+            "ร่างกายต้องการการพักผ่อนที่มีคุณภาพ",
+            "เหมาะกับการออกกำลังกายเบา ๆ และเข้ากลางแจ้ง",
+            "ดื่มน้ำมากขึ้น ระบบภายในจะดีขึ้น",
+            "ฟังสัญญาณร่างกาย อย่าฝืนจนเกินไป",
+            "เติมอาหารที่มีประโยชน์ ลดหวาน/เค็ม",
+        ],
+    }
+    chosen_list = fortunes.get(topic, fortunes["ภาพรวม"])
+    msg = rnd.choice(chosen_list)
+    lucky_color = rnd.choice(["น้ำเงิน","เขียว","ทอง","ขาว","ม่วง","ชมพู","ดำ","แดง"])
+    lucky_number = rnd.randint(1, 99)
+
+    result = {
+        "name": name or "คุณ",
+        "birth": birth,
+        "topic": topic,
+        "message": msg,
+        "lucky_color": lucky_color,
+        "lucky_number": lucky_number,
+        "date": today,
     }
 
-    async function loadMetrics() {
-      try {
-        const r = await fetch('/api/metrics');
-        const m = await r.json();
-        if (visitorsEl && m && typeof m.total_pageviews === 'number') {
-          visitorsEl.textContent = m.total_pageviews;
-        }
-      } catch (e) {}
-    }
+    try:
+        bus.publish({"type": "fortune", "ts": int(datetime.datetime.now().timestamp()), "name": name or "", "topic": topic, "message": msg})
+    except Exception:
+        pass
 
-    let count = 0;
-    function fmtTs(ts) {
-      const d = new Date(ts * 1000);
-      return d.toLocaleString();
-    }
+    return jsonify(result)
 
-    function addEvent(ev) {
-      count++;
-      countEl.textContent = count;
-      lastEl.textContent = fmtTs(ev.ts || (Date.now()/1000));
+@app.get("/healthz")
+def healthz():
+    return jsonify({"ok": True})
 
-      if (ev.type === 'post') {
-        if (ev.providers && Array.isArray(ev.providers)) {
-          providersEl.textContent = ev.providers.map(p => p.provider + ':' + p.status).join(', ');
-        }
-        const div = document.createElement('div');
-        div.className = 'e';
-        const hdr = document.createElement('div');
-        hdr.innerHTML = '<span class="badge">POST</span> <span class="time">' + fmtTs(ev.ts) + '</span>';
-        const body = document.createElement('div');
-        body.className = 'text';
-        body.textContent = ev.text || '';
-        const media = document.createElement('div');
-        media.className = 'media';
-        if (ev.media) {
-          if (ev.media.audio) media.innerHTML += '<a href="/media/' + ev.media.audio.replace(/^outputs\\//, '') + '" target="_blank">audio</a>';
-          if (ev.media.image) media.innerHTML += '<a href="/media/' + ev.media.image.replace(/^outputs\\//, '') + '" target="_blank">image</a>';
-          if (ev.media.video) media.innerHTML += '<a href="/media/' + ev.media.video.replace(/^outputs\\//, '') + '" target="_blank">video</a>';
-          latestMediaEl.innerHTML = media.innerHTML;
-        }
-        div.appendChild(hdr);
-        div.appendChild(body);
-        div.appendChild(media);
-        eventsEl.prepend(div);
-      } else if (ev.type === 'collect') {
-        const div = document.createElement('div');
-        div.className = 'e';
-        const hdr = document.createElement('div');
-        hdr.innerHTML = '<span class="badge">COLLECT</span> <span class="time">' + fmtTs(ev.ts) + '</span>';
-        const body = document.createElement('div');
-        body.className = 'text';
-        body.textContent = 'Metrics collected (' + (ev.organic_count || 0) + ' items; ads: ' + (ev.ads_status || '-') + ')';
-        div.appendChild(hdr);
-        div.appendChild(body);
-        eventsEl.prepend(div);
-      }
-    }
-
-    function connect() {
-      statusEl.textContent = 'Connecting...';
-      const es = new EventSource('/events');
-      es.onopen = () => { statusEl.textContent = 'Connected'; };
-      es.onerror = () => { statusEl.textContent = 'Reconnecting...'; };
-      es.onmessage = (e) => {
-        if (!e.data) return;
-        try {
-          const ev = JSON.parse(e.data);
-          if (ev.type === 'keepalive') return;
-          addEvent(ev);
-        } catch (err) {}
-      };
-    }
-
-    // Load initial recent events
-    fetch('/api/recent').then(r => r.json()).then(list => {
-      list.forEach(addEvent);
-      connect();
-      loadConfig();
-      loadMetrics();
-      setInterval(loadMetrics, 10000);
-    });
-  </script>
-</body>
-</html>
-"""
+def start_web():
+    app.run(host="0.0.0.0", port=WEB_PORT, debug=False, threaded=True)
 
 NODES_HTML = """
 <!DOCTYPE html>
