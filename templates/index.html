@@ -8,6 +8,7 @@
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin: 0; padding: 0; background: #111; color: #eee; }
     header { padding: 16px 24px; background: #181818; position: sticky; top: 0; border-bottom: 1px solid #2a2a2a; }
     h1 { margin: 0; font-size: 20px; }
+    .nav a { color: #85d0ff; text-decoration: none; margin-right: 12px; font-size: 14px; }
     .stats { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; font-size: 14px; color: #bbb; }
     .wrap { padding: 16px 24px; }
     .grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; }
@@ -34,6 +35,12 @@
 <body>
   <header>
     <h1>จัสมินชอบกินแซลมอน</h1>
+    <div class="nav">
+      <a href="/about">เกี่ยวกับ</a>
+      <a href="/gallery">แกลเลอรี</a>
+      <a href="/nodes">โหนด</a>
+      <a href="/status">สถานะ</a>
+    </div>
     <div class="stats">
       <div>Status: <span id="status">Connecting...</span></div>
       <div>Total events: <span id="count">0</span></div>
@@ -178,7 +185,7 @@
       if (Array.isArray(cfg.hashtags_base)) hashtagsBaseInput.value = cfg.hashtags_base.join(',');
       if (Array.isArray(cfg.openers)) openersInput.value = cfg.openers.join('\n');
       if (Array.isArray(cfg.core_love)) coreLoveInput.value = cfg.core_love.join('\n');
-      if (Array.isArray(cfg.playful_addons)) playfulAddonsInput.value = cfg.playful_addons.join('\n');
+      if (Array.isArray(cfg.playful_addons)) playfulAddonsInput.value = cfg.playfulAddons.join('\n');
       if (Array.isArray(cfg.light_spicy)) lightSpicyInput.value = cfg.light_spicy.join('\n');
     }
 

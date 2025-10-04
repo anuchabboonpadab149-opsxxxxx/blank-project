@@ -1,6 +1,9 @@
 import json
 import os
-from typing import Generator
+import time
+import threading
+import socket
+from typing import Generator, List, Dict
 
 from flask import Flask, Response, jsonify, render_template, render_template_string, send_from_directory, request
 
@@ -75,23 +78,6 @@ INDEX_HTML = """
           <option value="file">file</option>
           <option value="import">import</option>
         </select>
-        <label>Import source URL</label>
-        <input id="importUrl" type="text" placeholder="https://example.com/posts.txt" />
-        <label>Import format</label>
-        <select id="importFormat">
-          <option value="lines">lines</option>
-          <option value="json">json</option>
-        </select>
-        <label>Hashtags (comma-separated)</label>
-        <input id="hashtagsBase" type="text" placeholder="#จัสมิน,#ความรัก,..." />
-        <label>Openers (one per line)</label>
-        <textarea id="openers"></textarea>
-        <label>Core love lines (one per line)</label>
-        <textarea id="coreLove"></textarea>
-        <label>Playful addons (one per line)</label>
-        <textarea id="playfulAddons"></textarea>
-        <label>Light spicy (one per line)</label>
-        <textarea id="lightSpicy"></textarea>
         <div style="margin-top:6px;">
           <button class="btn" id="saveCfg">Save</button>
           <button class="btn alt" id="reloadSch">Reload schedule</button>
@@ -113,83 +99,6 @@ INDEX_HTML = """
     const lastEl = document.getElementById('last');
     const providersEl = document.getElementById('providers');
     const latestMediaEl = document.getElementById('latest-media');
-
-    const postIntervalInput = document.getElementById('postInterval');
-    const collectIntervalInput = document.getElementById('collectInterval');
-    const providersInput = document.getElementById('providersInput');
-    const senderInput = document.getElementById('senderName');
-    const ttsLangInput = document.getElementById('ttsLang');
-    const contentModeSel = document.getElementById('contentMode');
-    const hashtagsBaseInput = document.getElementById('hashtagsBase');
-    const openersInput = document.getElementById('openers');
-    const coreLoveInput = document.getElementById('coreLove');
-    const playfulAddonsInput = document.getElementById('playfulAddons');
-    const lightSpicyInput = document.getElementById('lightSpicy');
-    const importUrlInput = document.getElementById('importUrl');
-    const importFmtSel = document.getElementById('importFormat');
-    const msgEl = document.getElementById('msg');
-
-    document.getElementById('saveCfg').onclick = async () => {
-      const payload = {
-        post_interval_seconds: Number(postIntervalInput.value) || null,
-        collect_interval_minutes: Number(collectIntervalInput.value) || null,
-        providers: providersInput.value ? providersInput.value.split(',').map(x => x.trim()).filter(Boolean) : null,
-        sender_name: senderInput.value || null,
-        tts_lang: ttsLangInput.value || 'th',
-        content_mode: contentModeSel.value || null,
-        import_source_url: importUrlInput.value || null,
-        import_format: importFmtSel.value || 'lines',
-        hashtags_base: hashtagsBaseInput.value ? hashtagsBaseInput.value.split(',').map(x => x.trim()).filter(Boolean) : null,
-        openers: openersInput.value ? openersInput.value.split('\n').map(x => x.trim()).filter(Boolean) : null,
-        core_love: coreLoveInput.value ? coreLoveInput.value.split('\n').map(x => x.trim()).filter(Boolean) : null,
-        playful_addons: playfulAddonsInput.value ? playfulAddonsInput.value.split('\n').map(x => x.trim()).filter(Boolean) : null,
-        light_spicy: lightSpicyInput.value ? lightSpicyInput.value.split('\n').map(x => x.trim()).filter(Boolean) : null,
-      };
-      const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-      const data = await r.json();
-      msgEl.textContent = 'Saved.';
-      setTimeout(() => msgEl.textContent = '', 1500);
-    };
-
-    document.getElementById('reloadSch').onclick = async () => {
-      await fetch('/api/reload-schedule', {method:'POST'});
-      msgEl.textContent = 'Scheduler reloaded.';
-      setTimeout(() => msgEl.textContent = '', 1500);
-    };
-
-    document.getElementById('postNow').onclick = async () => {
-      await fetch('/api/post-now', {method:'POST'});
-      msgEl.textContent = 'Posting initiated.';
-      setTimeout(() => msgEl.textContent = '', 1500);
-    };
-
-    document.getElementById('addLine').onclick = async () => {
-      const line = document.getElementById('newLine').value.trim();
-      if (!line) return;
-      const r = await fetch('/api/tweets', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({line})});
-      const data = await r.json();
-      document.getElementById('newLine').value = '';
-      msgEl.textContent = 'Appended.';
-      setTimeout(() => msgEl.textContent = '', 1500);
-    };
-
-    async function loadConfig() {
-      const r = await fetch('/api/config');
-      const cfg = await r.json();
-      if (cfg.post_interval_seconds != null) postIntervalInput.value = cfg.post_interval_seconds;
-      if (cfg.collect_interval_minutes != null) collectIntervalInput.value = cfg.collect_interval_minutes;
-      if (Array.isArray(cfg.providers)) providersInput.value = cfg.providers.join(',');
-      if (cfg.sender_name) senderInput.value = cfg.sender_name;
-      if (cfg.tts_lang) ttsLangInput.value = cfg.tts_lang;
-      if (cfg.content_mode) contentModeSel.value = cfg.content_mode;
-      if (cfg.import_source_url) importUrlInput.value = cfg.import_source_url;
-      if (cfg.import_format) importFmtSel.value = cfg.import_format;
-      if (Array.isArray(cfg.hashtags_base)) hashtagsBaseInput.value = cfg.hashtags_base.join(',');
-      if (Array.isArray(cfg.openers)) openersInput.value = cfg.openers.join('\n');
-      if (Array.isArray(cfg.core_love)) coreLoveInput.value = cfg.core_love.join('\n');
-      if (Array.isArray(cfg.playful_addons)) playfulAddonsInput.value = cfg.playful_addons.join('\n');
-      if (Array.isArray(cfg.light_spicy)) lightSpicyInput.value = cfg.light_spicy.join('\n');
-    }
 
     let count = 0;
     function fmtTs(ts) {
@@ -258,7 +167,6 @@ INDEX_HTML = """
     fetch('/api/recent').then(r => r.json()).then(list => {
       list.forEach(addEvent);
       connect();
-      loadConfig();
     });
   </script>
 </body>
@@ -275,6 +183,70 @@ def index():
         return render_template("index.html")
     except Exception:
         return render_template_string(INDEX_HTML)
+
+
+@app.get("/about")
+def about():
+    return render_template("about.html")
+
+
+def _list_media(limit: int = 24) -> List[Dict]:
+    base = "outputs"
+    imgs_dir = os.path.join(base, "images")
+    vids_dir = os.path.join(base, "video")
+    items: List[Dict] = []
+    try:
+        for p in (os.listdir(imgs_dir) if os.path.exists(imgs_dir) else []):
+            full = os.path.join(imgs_dir, p)
+            if os.path.isfile(full):
+                items.append({"type": "image", "name": p, "path": f"images/{p}", "ts": os.path.getmtime(full)})
+    except Exception:
+        pass
+    try:
+        for p in (os.listdir(vids_dir) if os.path.exists(vids_dir) else []):
+            full = os.path.join(vids_dir, p)
+            if os.path.isfile(full):
+                items.append({"type": "video", "name": p, "path": f"video/{p}", "ts": os.path.getmtime(full)})
+    except Exception:
+        pass
+    items.sort(key=lambda x: x["ts"], reverse=True)
+    return items[:limit]
+
+
+@app.get("/gallery")
+def gallery():
+    media = _list_media(48)
+    return render_template("gallery.html", media=media)
+
+
+@app.get("/status")
+def status_page():
+    try:
+        import config_store
+        cfg = config_store.get_config()
+    except Exception:
+        cfg = {}
+    recent = bus.recent(20)
+    return render_template("status.html", cfg=cfg, recent=recent)
+
+
+@app.get("/nodes")
+def nodes_page():
+    try:
+        import node_registry as nr
+        nodes = nr.list_nodes()
+    except Exception:
+        nodes = []
+    return render_template("nodes.html", nodes=nodes)
+
+
+@app.get("/api/nodes")
+def api_nodes():
+    try:
+        import node_registry as nr
+        return jsonify(nr.list_nodes())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.get("/api/recent")
@@ -424,5 +396,29 @@ def api_tweets_append():
         return jsonify({"error": str(e)}), 500
 
 
+def _start_node_heartbeat():
+    try:
+        import node_registry as nr
+    except Exception:
+        return
+    node_id = nr.node_id_default()
+    try:
+        nr.register(node_id, role="web+worker", extra={"host": socket.gethostname()})
+    except Exception:
+        pass
+
+    def loop():
+        while True:
+            try:
+                nr.heartbeat(node_id)
+            except Exception:
+                pass
+            time.sleep(10)
+
+    t = threading.Thread(target=loop, name="node-heartbeat", daemon=True)
+    t.start()
+
+
 def start_web():
+    _start_node_heartbeat()
     app.run(host="0.0.0.0", port=WEB_PORT, debug=False, threaded=True)

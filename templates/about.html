@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>เกี่ยวกับระบบ — จัสมินชอบกินแซลมอน</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background:#111; color:#eee; }
+    a { color:#85d0ff; text-decoration:none; }
+    header { padding: 16px 24px; background:#181818; border-bottom:1px solid #2a2a2a; }
+    h1 { margin:0; font-size:20px; }
+    .wrap { padding: 16px 24px; line-height:1.7; }
+    .card { background:#181818; border:1px solid #2a2a2a; border-radius:10px; padding:12px; margin-bottom:16px; }
+    .small { color:#aaa; font-size:13px; }
+    ul { margin: 8px 0 8px 20px; }
+    code { background:#222; padding:2px 6px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>เกี่ยวกับระบบ — จัสมินชอบกินแซลมอน</h1>
+    <div class="small"><a href="/">กลับสู่แดชบอร์ด</a></div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>สรุประบบ</h2>
+      <p>นี่คือเครื่องสร้างคอนเทนต์อัตโนมัติ 24/7 ในธีม “จัสมินชอบกินแซลมอน” พร้อมสตรีมเหตุการณ์แบบเรียลไทม์ สร้างเสียง/รูป/วิดีโอ และกระจายไปยังแพลตฟอร์มโซเชียลที่ตั้งค่าไว้</p>
+      <ul>
+        <li>ทำงานอัตโนมัติทุกวินาที (ปรับได้) และเก็บสถิติทุกนาที</li>
+        <li>เนื้อหาเน้นซาชิมิ/โชยุ/วาซาบิ/โอมากาเสะ (ปรับคำได้ใน Settings)</li>
+        <li>พร้อมแดชบอร์ดแสดงผลสด, ลิงก์สื่อล่าสุด และ API ครบ</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>เริ่มต้นใช้งาน</h2>
+      <ol>
+        <li>ตั้งค่าไฟล์ <code>.env</code> ด้วยคีย์จริงของแพลตฟอร์มที่ต้องการ (Twitter/Facebook/LinkedIn/LINE/Telegram/Discord/Instagram/Reddit/Mastodon/Twitter Ads)</li>
+        <li>รันด้วย Docker: <code>docker compose up -d --build</code></li>
+        <li>เปิดหน้าแดชบอร์ด: <a href="/">/</a> และตรวจสุขภาพที่ <a href="/healthz">/healthz</a></li>
+      </ol>
+      <p class="small">หมายเหตุ: คีย์จริงควรจัดการผ่าน .env หรือระบบ Secret Manager ของโครงสร้างพื้นฐานเท่านั้น</p>
+    </div>
+
+    <div class="card">
+      <h2>API ที่มีให้</h2>
+      <ul>
+        <li><code>/events</code> — สตรีมเหตุการณ์ (SSE)</li>
+        <li><code>/api/latest</code>, <code>/api/feed</code>, <code>/api/recent</code></li>
+        <li><code>/api/config</code> (GET/POST), <code>/api/reload-schedule</code>, <code>/api/post-now</code></li>
+        <li><code>/api/nodes</code> (GET), <code>/api/nodes/register</code> (POST), <code>/api/nodes/heartbeat</code> (POST), <code>/api/nodes/summary</code> (GET)</li>
+        <li><code>/media/...</code> — ให้บริการไฟล์เสียง/รูป/วิดีโอ</li>
+        <li><code>/healthz</code> — สุขภาพระบบ</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>ความปลอดภัย</h2>
+      <ul>
+        <li>หลีกเลี่ยงการใส่คีย์ผ่าน UI ใช้ .env หรือ Secret Manager แทน</li>
+        <li>ระบบออกแบบให้ทนทานต่อการล้มเหลว: โพสต์ล้มเหลวก็ยังมีสื่อและเหตุการณ์อัปเดตทุกวินาที</li>
+        <li>ตั้งค่า <code>ADS_SIMULATION=false</code> เฉพาะเมื่อพร้อมยิงโฆษณาจริงและงบครบ</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
