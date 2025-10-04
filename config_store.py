@@ -35,6 +35,17 @@ _DEFAULTS: Dict[str, Any] = {
     "prompt_phone": "คุณคือหมอดูโทนี่ วิเคราะห์เบอร์โทรศัพท์ด้วยหลักตัวเลขและให้คำแนะนำ",
     "prompt_license": "คุณคือหมอดูโทนี่ วิเคราะห์เลขทะเบียนรถในมุมมงคลและวันดี",
     "prompt_name": "คุณคือหมอดูโทนี่ วิเคราะห์ชื่อ-นามสกุลให้คำแนะนำด้านภาพรวมชีวิต/งาน/ความรัก",
+
+    # Admin-configurable brand and shop
+    "brand_name": "อ.โทนี่สะท้อนกรรม",
+    "theme_primary": "#2a6bff",
+    "brand_logo_path": None,   # relative under outputs/branding or absolute URL if served locally
+    "payment_info": "โอนเข้าบัญชี/พร้อมเพย์: SCB 8162785073 ชื่อบัญชี พิรุฬห์วัฒน์ ชยมาฒย์",
+    "packages": [
+        {"id": "p100", "price": 100, "credits": 10},
+        {"id": "p300", "price": 300, "credits": 35},
+        {"id": "p500", "price": 500, "credits": 60},
+    ],
 }
 
 

@@ -205,6 +205,23 @@ DEFAULT_PACKAGES = [
 ]
 
 def list_packages() -> List[Dict[str, Any]]:
+    # allow override via runtime config
+    try:
+        import config_store
+        pkgs = config_store.get("packages")
+        if isinstance(pkgs, list) and pkgs:
+            # validate shape minimally
+            out = []
+            for p in pkgs:
+                pid = str(p.get("id", "")).strip() or None
+                price = int(p.get("price", 0))
+                credits = int(p.get("credits", 0))
+                if pid and price > 0 and credits > 0:
+                    out.append({"id": pid, "price": price, "credits": credits})
+            if out:
+                return out
+    except Exception:
+        pass
     return DEFAULT_PACKAGES
 
 def create_topup_request(user_id: str, package_id: str, amount: int, slip_path: Optional[str]) -> Dict[str, Any]:

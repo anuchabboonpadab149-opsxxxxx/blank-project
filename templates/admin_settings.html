@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>ตั้งค่าระบบ — อ.โทนี่สะท้อนกรรม</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif; margin:0; padding:0; background:#0f1115; color:#eaeaf1; }
+    a { color:#8ecbff; text-decoration:none; }
+    header { padding: 16px 24px; background:#151a24; border-bottom:1px solid #1f2430; display:flex; align-items:center; gap:16px;}
+    h1 { margin:0; font-size:20px; }
+    .wrap { padding: 16px 24px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    .panel { background:#151a24; border:1px solid #232a3a; border-radius:12px; padding:16px; }
+    label { display:block; font-size:12px; color:#9aa3b2; margin-top:8px; }
+    input[type="text"], input[type="color"] { width:100%; background:#11151f; border:1px solid #2b3348; color:#eaeaf1; border-radius:6px; padding:6px 8px; }
+    textarea { width:100%; background:#11151f; border:1px solid #2b3348; color:#eaeaf1; border-radius:6px; padding:6px 8px; min-height:80px;}
+    .btn { display:inline-block; background:#2a6bff; color:#fff; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; margin-top:10px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:8px 10px; border-bottom:1px solid #232a3a; font-size:13px; }
+    .small { color:#9aa3b2; font-size:12px; }
+    @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ตั้งค่าระบบ — อ.โทนี่สะท้อนกรรม</h1>
+    <a href="/">หน้าหลัก</a>
+    <a href="/admin">แอดมินคอนโซล</a>
+    <a href="/credentials">คีย์/LLM</a>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="panel">
+        <h3>แบรนด์</h3>
+        <label>Brand name</label>
+        <input id="brand_name" type="text" placeholder="อ.โทนี่สะท้อนกรรม" />
+        <label>Primary color</label>
+        <input id="theme_primary" type="color" value="#2a6bff" />
+        <label>อัปโหลดโลโก้ (1:1)</label>
+        <input id="logo_file" type="file" accept="image/*" />
+        <div class="small">โลโก้จะถูกเก็บใน outputs/branding/ และเข้าถึงผ่าน /media/branding/...</div>
+        <div id="logoMsg" class="small" style="margin-top:6px;"></div>
+        <button class="btn" id="uploadLogo">อัปโหลดโลโก้</button>
+      </div>
+      <div class="panel">
+        <h3>การชำระเงิน</h3>
+        <label>ข้อมูลชำระเงิน (แสดงในหน้า /tony)</label>
+        <textarea id="payment_info" placeholder="โอนเข้าบัญชี/พร้อมเพย์ ..."></textarea>
+        <button class="btn" id="saveBrand">บันทึกแบรนด์/การชำระเงิน</button>
+        <div id="brandMsg" class="small" style="margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <h3>แพ็กเกจเครดิต</h3>
+      <table id="tbl">
+        <thead><tr><th>id</th><th>price (฿)</th><th>credits</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button class="btn" id="addPkg">เพิ่มแพ็กเกจ</button>
+      <button class="btn" id="savePkgs">บันทึกแพ็กเกจ</button>
+      <div id="pkgMsg" class="small" style="margin-top:6px;"></div>
+    </div>
+  </div>
+
+  <script>
+    async function loadCfg() {
+      const r = await fetch('/api/config');
+      const cfg = await r.json();
+      document.getElementById('brand_name').value = cfg.brand_name || '';
+      document.getElementById('theme_primary').value = cfg.theme_primary || '#2a6bff';
+      document.getElementById('payment_info').value = cfg.payment_info || '';
+      renderPkgs(cfg.packages || []);
+    }
+
+    function renderPkgs(pkgs) {
+      const tb = document.querySelector('#tbl tbody');
+      tb.innerHTML = '';
+      pkgs.forEach((p, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td><input data-k="id" data-i="'+i+'" type="text" value="'+(p.id||'')+'"></td>'+
+                       '<td><input data-k="price" data-i="'+i+'" type="text" value="'+(p.price||0)+'"></td>'+
+                       '<td><input data-k="credits" data-i="'+i+'" type="text" value="'+(p.credits||0)+'"></td>'+
+                       '<td><button class="btn" data-del="'+i+'">ลบ</button></td>';
+        tb.appendChild(tr);
+      });
+      tb.querySelectorAll('button[data-del]').forEach(b => {
+        b.onclick = () => {
+          const i = Number(b.getAttribute('data-del'));
+          const rows = Array.from(document.querySelectorAll('#tbl tbody tr'));
+          rows[i].remove();
+        };
+      });
+    }
+
+    function collectPkgs() {
+      const rows = Array.from(document.querySelectorAll('#tbl tbody tr'));
+      const out = [];
+      rows.forEach(tr => {
+        const id = tr.querySelector('input[data-k="id"]').value.trim();
+        const price = Number(tr.querySelector('input[data-k="price"]').value || '0');
+        const credits = Number(tr.querySelector('input[data-k="credits"]').value || '0');
+        if (id && price > 0 && credits > 0) out.push({id, price, credits});
+      });
+      return out;
+    }
+
+    document.getElementById('addPkg').onclick = () => {
+      const tb = document.querySelector('#tbl tbody');
+      const i = tb.querySelectorAll('tr').length;
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td><input data-k="id" data-i="'+i+'" type="text" value=""></td>'+
+                     '<td><input data-k="price" data-i="'+i+'" type="text" value="0"></td>'+
+                     '<td><input data-k="credits" data-i="'+i+'" type="text" value="0"></td>'+
+                     '<td><button class="btn" data-del="'+i+'">ลบ</button></td>';
+      tb.appendChild(tr);
+      tr.querySelector('button[data-del]').onclick = () => tr.remove();
+    };
+
+    document.getElementById('savePkgs').onclick = async () => {
+      const pkgs = collectPkgs();
+      const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({packages: pkgs})});
+      const d = await r.json();
+      const m = document.getElementById('pkgMsg');
+      if (!d.error) m.textContent = 'บันทึกสำเร็จ'; else m.textContent = d.error;
+      setTimeout(()=> m.textContent = '', 2000);
+    };
+
+    document.getElementById('saveBrand').onclick = async () => {
+      const brand_name = document.getElementById('brand_name').value.trim();
+      const theme_primary = document.getElementById('theme_primary').value;
+      const payment_info = document.getElementById('payment_info').value;
+      const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({brand_name, theme_primary, payment_info})});
+      const d = await r.json();
+      const m = document.getElementById('brandMsg');
+      if (!d.error) m.textContent = 'บันทึกสำเร็จ'; else m.textContent = d.error;
+      setTimeout(()=> m.textContent = '', 2000);
+    };
+
+    document.getElementById('uploadLogo').onclick = async () => {
+      const f = document.getElementById('logo_file').files[0];
+      const m = document.getElementById('logoMsg');
+      if (!f) { m.textContent = 'กรุณาเลือกไฟล์'; return; }
+      const fd = new FormData();
+      fd.append('file', f);
+      const r = await fetch('/api/admin/upload-logo', {method:'POST', body: fd});
+      const d = await r.json();
+      if (!d.error) {
+        m.textContent = 'อัปโหลดสำเร็จ: ' + d.path;
+      } else {
+        m.textContent = d.error;
+      }
+      setTimeout(()=> m.textContent = '', 3000);
+    };
+
+    loadCfg();
+  </script>
+</body>
+</html>

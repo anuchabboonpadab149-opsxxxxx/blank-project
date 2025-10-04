@@ -159,9 +159,7 @@
 
         <hr style="border-color:#2a2a2a; margin:12px 0;">
         <div style="font-weight:600; margin-bottom:6px;">ข้อมูลชำระเงิน</div>
-        <div class="small">
-          โอนเข้าบัญชี/พร้อมเพย์: <b>SCB 8162785073</b> ชื่อบัญชี <b>พิรุฬห์วัฒน์ ชยมาฒย์</b>
-        </div>
+        <div id="payInfo" class="small"></div>
       </div>
     </div>
   </div>
@@ -331,9 +329,20 @@
       }).join('');
     }
 
+    async function loadBranding() {
+      try {
+        const r = await fetch('/api/config');
+        const cfg = await r.json();
+        // payment info
+        document.getElementById('payInfo').textContent = cfg.payment_info || '';
+        // packages section may already use config via API /packages
+      } catch (e) {}
+    }
+
     refreshUserBox();
     loadPackages();
     loadTopups();
+    loadBranding();
   </script>
 </body>
 </html>

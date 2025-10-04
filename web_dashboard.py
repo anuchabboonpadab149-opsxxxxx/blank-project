@@ -820,6 +820,32 @@ def admin_console():
         pass
     return render_template("admin_console.html")
 
+@app.get("/admin/settings")
+def admin_settings():
+    try:
+        mstore.pageview("admin_settings")
+    except Exception:
+        pass
+    return render_template("admin_settings.html")
+
+@app.post("/api/admin/upload-logo")
+def api_admin_upload_logo():
+    # Save uploaded logo under outputs/branding and set config.brand_logo_path
+    try:
+        file = request.files.get("file")
+        if not file:
+            return jsonify({"error": "file required"}), 400
+        os.makedirs(os.path.join("outputs", "branding"), exist_ok=True)
+        fname = f"logo_{int(time.time())}.png"
+        path = os.path.join("outputs", "branding", fname)
+        file.save(path)
+        # update config
+        import config_store
+        cfg = config_store.update_config({"brand_logo_path": path.replace("outputs/", "")})
+        return jsonify({"ok": True, "path": "/media/" + cfg.get("brand_logo_path", "")})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # --- Admin APIs (require ADMIN_SECRET in request) ---
 
 def _check_admin_secret(secret: str) -> bool:
