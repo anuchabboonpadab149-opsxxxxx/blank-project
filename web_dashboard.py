@@ -616,6 +616,13 @@ def api_credentials_post():
     try:
         payload = request.get_json(force=True, silent=True) or {}
         masked = credstore.update(payload)
+        # audit
+        try:
+            import audit_log
+            actor = (session.get("uid") and (ustore.get_user(session.get("uid")) or {}).get("username")) or "anonymous"
+            audit_log.record(actor=actor, action="credentials_update", target="credentials", meta={"keys": list(payload.keys())})
+        except Exception:
+            pass
         # Optionally publish event
         try:
             bus.publish({"type": "config", "action": "credentials_update", "keys": list(payload.keys())})
@@ -672,6 +679,13 @@ def api_set_config():
         patch = request.get_json(force=True, silent=True) or {}
         import config_store
         cfg = config_store.update_config(patch)
+        # audit
+        try:
+            import audit_log
+            actor = (session.get("uid") and (ustore.get_user(session.get("uid")) or {}).get("username")) or "anonymous"
+            audit_log.record(actor=actor, action="config_update", target="runtime_config", meta={"keys": list(patch.keys())})
+        except Exception:
+            pass
         # Optionally reschedule if intervals provided
         try:
             import scheduler_control
@@ -683,7 +697,8 @@ def api_set_config():
             pass
         return jsonify(cfg)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}),_code 5new0</0
+500
 
 
 @app.post("/api/reload-schedule")
@@ -850,18 +865,26 @@ def api_admin_upload_logo():
         # update config
         import config_store
         cfg = config_store.update_config({"brand_logo_path": path.replace("outputs/", "")})
+        # audit
+        try:
+            import audit_log
+            actor = (session.get("uid") and (ustore.get_user(session.get("uid")) or {}).get("username")) or "anonymous"
+            audit_log.record(actor=actor, action="upload_logo", target=cfg.get("brand_logo_path", ""), meta=None)
+        except Exception:
+            pass
         return jsonify({"ok": True, "path": "/media/" + cfg.get("brand_logo_path", "")})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}),_code 5new0</0
+
 
 # --- Admin APIs (require ADMIN_SECRET in request) ---
 
 def _check_admin_secret(secret: str) -> bool:
     return bool(secret) and secret == os.getenv("ADMIN_SECRET", "")
 
-@app.get("/api/tony/admin/users")
-def tony_admin_users():
-    ok, err = _ensure_tony_ready()
+def _is_admin_session() -> bool:
+    try:
+        uid = sessionk, err = _ensure_tony_ready()
     if not ok:
         return jsonify(err), 500
     secret = request.args.get("secret") or request.headers.get("X-Admin-Secret") or ""
@@ -894,9 +917,11 @@ def tony_admin_user_history():
     ok, err = _ensure_tony_ready()
     if not ok:
         return jsonify(err), 500
-    secret = request.args.get("secret") or request.headers.get("X-Admin-Secret") or ""
-    if not _check_admin_secret(secret):
+    if not _require_admin():
         return jsonify({"error": "forbidden"}), 403
+    user_id = request.args.get("user_id") or ""
+    if not user_id:
+       r": "forbidden"}), 403
     user_id = request.args.get("user_id") or ""
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
