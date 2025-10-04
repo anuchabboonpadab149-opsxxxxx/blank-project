@@ -3,6 +3,7 @@ import sys
 import argparse
 import logging
 import threading
+import time
 
 from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -12,6 +13,10 @@ import pytz
 
 from promote_ayutthaya import Config, post_one_from_file, collect_metrics, collect_ads_analytics
 from social_dispatcher import distribute_once
+
+import realtime_bus as bus
+import media_generator as media
+import metrics_store as mstore
 
 log = logging.getLogger("promote_cli")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -39,6 +44,16 @@ def _bool_env(name: str, default: bool = False) -> bool:
 
 def main():
     load_dotenv()
+    # Apply stored credentials (if credentials.json exists) to environment at startup
+    try:
+        import credentials_store as cstore
+        creds = cstore.get()
+        if isinstance(creds, dict) and creds:
+            for k, v in creds.items():
+                os.environ[str(k)] = str(v)
+            log.info("Applied credentials from credentials.json to environment.")
+    except Exception as e:
+        log.debug(f"No credentials store applied: {e}")
     args = parse_args()
 
     mode = args.mode or os.getenv("RUN_MODE", "once").strip()
