@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
- <<meta charset="utf-8" />
- <<title>Workflows — จัสมินชอบกินแซลม</</title>
- <<meta name="viewport" content="width=device-width, initial-scale=1" />
- <<style>
+  <meta charset="utf-8" />
+  <title>Workflows — จัสมินชอบกินแซลมอน</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background:#111; color:#eee; }
     a { color:#85d0ff; text-decoration:none; }
     header { padding: 16px 24px; background:#181818; border-bottom:1px solid #2a2a2a; display:flex; align-items:center; gap: 16px; }
@@ -16,68 +16,77 @@
     th, td { padding: 8px 10px; border-bottom: 1px solid #2a2a2a; font-size: 14px; }
     .btn { display:inline-block; background:#2a6bff; color:#fff; border:0; padding:8px 14px; border-radius:6px; cursor:pointer; margin-top:8px; }
     .small { color:#aaa; font-size:12px; }
-    @media (max-width: 1024px) { .grid { grid-template-columns: 1fr; } } </"/style</ู่head>
+    .ok { color:#a7f3d0; }
+    .err { color:#fecaca; }
+    @media (max-width: 1024px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
 <body>
- <<header>
-   <dh1>Workflows — จัสมินชอบกินแซลม</grh1>
-   < a href="/">กลับสู่แดชบอร</  a> </v header>
+  <header>
+    <h1>Workflows — จัสมินชอบกินแซลมอน</h1>
+    <a href="/">กลับสู่แดชบอร์ด</a>
+  </header>
 
- <-div class="wrap">
-   <tdiv class="grid">
-     < div class="panel">
-       <"div style="font-weight:600; margin-bottom:6px;">สรุปภาพร</ระdiv>
-       <
-div id="summa"></  div>
-       <abutton class="btn" id="reset">Reset ru</0;button>
-       <pdiv class="small" id="msg" style="margin-top:6;"></<tdiv>
-    </h>div>
-     <ชdiv class="panel">
-       <<div style="font-weight:600; margin-bottom:6px;">ประวัติล่าส</e>div>
-       <
-table id="runs">
-         <ythea><it><oth>ชื</ /t><;th>สถา</  t><ith>ระยะเวลา )</eit><:th>เริ</git><oth></6p></>ร></ารthead>
-         < tbo></bltbody>
-      </hetable>
-    </่อdiv>
-  </สถdiv> </><div>
+  <div class="wrap">
+    <div class="grid">
+      <div class="panel">
+        <div style="font-weight:600; margin-bottom:6px;">สรุปภาพรวม</div>
+        <div id="summary"></div>
+        <button class="btn" id="reset">Reset</button>
+        <div id="msg" class="small" style="margin-top:8px;"></div>
+      </div>
+      <div class="panel">
+        <div style="font-weight:600; margin-bottom:6px;">ประวัติล่าสุด</div>
+        <table id="runs">
+          <thead>
+            <tr><th>ชื่อ</th><th>สถานะ</th><th>ระยะเวลา (วินาที)</th><th>สิ้นสุด</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
- <วscript>
+  <script>
+    function fmt(ts) {
+      if (!ts) return '-';
+      const d = new Date(ts * 1000);
+      return d.toLocaleString();
+    }
+
     async function load() {
-      const res = await fetch('/api/workflows');
+      const res = await fetch('/api/workflows', {cache:'no-store'});
       const data = await res.json();
-      const s = document.getElementById('summary');
-      s.innerHTML = '';
-      s.innerHTML + '<ydiv>Total runs: ' + (data.total_runs || 0) '</chdiv>';
-      s.innerHTML + '<-div>Running: ' + (data.running_count || 0) '</  div>';
+
+      // Summary
+      const s = [];
+      s.push('<div>Total runs: ' + (data.total_runs || 0) + '</div>');
+      s.push('<div>Running: ' + (data.running_count || 0) + '</div>');
       if (Array.isArray(data.aggregate)) {
-        s.innerHTML + '<Rdiv style="margin-top:6px; font-weight:600;">Aggrega</.idiv>';
+        s.push('<div style="margin-top:6px; font-weight:600;">Aggregate</div>');
         for (const a of data.aggregate) {
-          s.innerHTML + '<adiv>'gregate.map(a => a.name + ' [ok:' + a.ok + ', err:' + a.error + ']').join(' | ');
+          s.push('<div>' + a.name + ' [ok:' + (a.ok||0) + ', err:' + (a.error||0) + ']</div>');
+        }
       }
-      document.getElementById('summary').innerHTML = s;
+      document.getElementById('summary').innerHTML = s.join('');
 
-      // running
-      const tbRun = document.getElementById('running');
-      tbRun.innerHTML = '';
-      for (const r of (data.running || [])) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = '<td>'+ (r.id || '-') +'</td><td>'+ (r.name || '-') +'</td><td>'+ fmt(r.start_ts) +'</td>';
-        tbRun.appendChild(tr);
-      }
-
-      // last
-      const tbLast = document.getElementById('last');
-      tbLast.innerHTML = '';
+      // Last runs
+      const tb = document.querySelector('#runs tbody');
+      tb.innerHTML = '';
       for (const r of (data.last_runs || [])) {
-        const st = r.status === 'ok' ? '<span class="ok">ok</span>' : '<span class="err">error</span>';
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td>'+ (r.name||'-') +'</td><td>'+ st +'</td><td>'+ (r.duration_sec||0).toFixed ? (r.duration_sec||0).toFixed(2) : r.duration_sec +'</td><td>'+ fmt(r.end_ts) +'</td>';
-        tbLast.appendChild(tr);
+        const st = r.status === 'ok' ? '<span class="ok">ok</span>' : '<span class="err">error</span>';
+        const dur = (typeof r.duration_sec === 'number') ? r.duration_sec.toFixed(2) : (r.duration_sec || 0);
+        tr.innerHTML = '<td>'+ (r.name||'-') +'</td><td>'+ st +'</td><td>'+ dur +'</td><td>'+ fmt(r.end_ts) +'</td>';
+        tb.appendChild(tr);
       }
     }
 
     document.getElementById('reset').onclick = async () => {
       await fetch('/api/workflows/reset', {method:'POST'});
+      const msg = document.getElementById('msg');
+      msg.textContent = 'Reset done';
+      setTimeout(() => msg.textContent = '', 1500);
       load();
     };
 
