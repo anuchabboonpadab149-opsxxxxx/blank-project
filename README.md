@@ -88,6 +88,61 @@ Tip: For real postings, put your keys in `.env` or add them at runtime via `/cre
 
 ---
 
+## Tony Fortune Platform (Premium Credits + LLM + Vision)
+
+Landing website and app:
+- Website (landing): `/tony-site`
+- App (fortune services): `/tony`
+- Admin approvals (top-up): `/tony/admin`
+
+User flow:
+1. Register/Login at `/tony`
+2. Top-up credits by uploading a slip (manual approval)
+3. Use any fortune service (1 credit per use)
+4. View your history
+
+Services:
+- Astrology (dob/tob + question)
+- Tools (tarot/dice/siamsee/pok)
+- Analysis (palm/face via image, dream via text)
+- Numbers (phone/license/name)
+
+Credits and top-up:
+- Manual approval with `ADMIN_SECRET` at `/tony/admin`
+- Default packages: 100฿→10, 300฿→35, 500฿→60 (configurable in `user_store.py`)
+
+LLM and Vision:
+- Supports OpenAI and Gemini for text and vision (image inline base64)
+- Prompt templates per science can be edited at `/credentials` (saved to runtime config)
+
+Required env:
+```
+# Sessions & Admin
+SECRET_KEY=change-me-tony-secret
+ADMIN_SECRET=your-strong-secret
+TONY_ADMINS=adminuser1,adminuser2
+
+# LLM provider selection and keys
+LLM_PROVIDER=openai            # or gemini
+OPENAI_API_KEY=...             # if using OpenAI
+OPENAI_MODEL=gpt-4o-mini       # default suggested
+GEMINI_API_KEY=...             # if using Gemini
+GEMINI_MODEL=gemini-1.5-flash  # default suggested
+```
+
+How to configure:
+1. Set `SECRET_KEY`, `ADMIN_SECRET` in `.env` (strong values)
+2. Open `/credentials` and set `LLM_PROVIDER` and API keys (OpenAI or Gemini)
+3. Optionally edit prompt templates per science in the same page
+4. Go to `/tony` to register/login and test services; use `/tony/admin` to approve top-ups
+
+Data files:
+- `outputs/tony_transactions.jsonl` — credit changes, top-up requests
+- `outputs/tony_history.jsonl` — user fortune history
+- `outputs/uploads` — uploaded images (palm/face), `outputs/topups` — slips
+
+---
+
 ## Credentials (Runtime)
 
 Open the credentials UI:
@@ -110,6 +165,7 @@ Allowed keys include:
 - Mastodon: `MASTODON_BASE_URL`, `MASTODON_ACCESS_TOKEN`
 - TikTok Ads (placeholder): `TIKTOK_APP_ID`, `TIKTOK_SECRET`, `TIKTOK_ADVERTISER_ID`
 - Twitter Ads: `ADS_ACCOUNT_ID`, `FUNDING_INSTRUMENT_ID`, `CAMPAIGN_ID`, `LINE_ITEM_ID`, `ADS_ENTITY_IDS`
+- LLM: `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`
 
 ---
 
@@ -135,18 +191,22 @@ make health HOST=192.168.10.121:8000
 
 Key modules:
 - `cli.py` — Orchestrates scheduler, starts web dashboard in background, handles "post" and "collect" jobs; emits SSE events.
-- `web_dashboard.py` — Flask app (SSE events, settings, credentials, nodes, workflows, metrics).
+- `web_dashboard.py` — Flask app (SSE events, settings, credentials, nodes, workflows, metrics, Tony platform & site).
 - `content_generator.py` — Persona-based content (auto-switch to Jasmine x Salmon based on SENDER_NAME or runtime config).
 - `media_generator.py` — gTTS audio, Pillow image (Thai fonts), moviepy video.
 - `social_dispatcher.py` — Dispatch to providers with Circuit Breaker wrapper and optional simulation.
 - `realtime_bus.py` — In-memory + JSONL events, SSE streaming.
-- `config_store.py` — JSON runtime config with concurrency control.
-- `scheduler_control.py` — Runtime scheduling control (reschedule, trigger).
+- `config_store.py` — JSON runtime config with concurrency control and prompt templates.
 - `credentials_store.py` — Securely stores credentials.json (masked GET, env injection on update).
+- `user_store.py` — Users, credits, top-up requests, and history for Tony platform.
+- `divination_engine.py` — Rule-based + LLM-backed divination and vision.
 - `promote_ayutthaya.py` — X/Twitter + Ads utilities (campaign/line-items/metrics).
 
 HTTP Endpoints:
 - `/` — dashboard
+- `/tony-site` — Tony official website (landing)
+- `/tony` — Tony app (fortune + credits)
+- `/tony/admin` — Admin approvals
 - `/events` — SSE
 - `/api/recent`, `/api/feed`, `/api/latest`
 - `/api/config` (GET/POST), `/api/reload-schedule`, `/api/post-now`
