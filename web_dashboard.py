@@ -562,11 +562,12 @@ def gallery_page():
         pass
     media = []
     base = "outputs"
-    try:
-        for root, dirs, files in os.walk(base):
-            for fname in files:
-                rel = os.path.relpath(os.path.join(root, fname), base)
-                lower = fname.lower()
+    # Prefer structured subdirs as documented: outputs/images, outputs/video, outputs/audio
+    dirs_to_scan = [
+        os.path.join(base, "images"),
+        os.path.join(base, "video"),
+    ]
+   
                 if lower.endswith((".jpg", ".jpeg", ".png", ".webp")):
                     media.append({"type": "image", "path": rel, "name": fname})
                 elif lower.endswith((".mp4", ".mov", ".mkv", ".webm")):
