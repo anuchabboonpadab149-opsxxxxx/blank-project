@@ -8,6 +8,7 @@ import realtime_bus as bus
 import node_registry as nreg
 import metrics_store as mstore
 import circuit_breaker as cbreak
+import credentials_store as credstore
 
 # Support PaaS environments (Heroku/Render/Railway) that pass PORT
 WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
@@ -51,6 +52,7 @@ INDEX_HTML = """
       <a href="/">Home</a>
       <a href="/about">About</a>
       <a href="/nodes">Nodes</a>
+      <a href="/credentials">Credentials</a>
     </nav>
   </header>
   <div class="wrap">
@@ -401,11 +403,21 @@ def about():
 
 @app.get("/nodes")
 def nodes_page():
+    return render_template_string(NODES_HTML)
+
+
+@app.get("/credentials")
+def credentials_page():
+    # Log pageview
     try:
-        mstore.pageview("nodes")
+        mstore.pageview("credentials")
     except Exception:
         pass
-    return render_template_string(NODES_HTML)
+    try:
+        return render_template("credentials.html")
+    except Exception:
+        # Minimal fallback if template missing
+        return "<html><body><h1>Credentials</h1><p>Use the API at /api/credentials to GET/POST values.</p></body></html>"
 
 
 @app.get("/api/recent")
@@ -528,6 +540,29 @@ def api_nodes_heartbeat():
 @app.get("/api/nodes/summary")
 def api_nodes_summary():
     return jsonify(nreg.summary())
+
+
+@app.get("/api/credentials")
+def api_credentials_get():
+    try:
+        return jsonify(credstore.get_masked())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/credentials")
+def api_credentials_post():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        masked = credstore.update(payload)
+        # Optionally publish event
+        try:
+            bus.publish({"type": "config", "action": "credentials_update", "keys": list(payload.keys())})
+        except Exception:
+            pass
+        return jsonify({"ok": True, "credentials": masked})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.get("/api/circuit")
