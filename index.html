@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>จัสมินชอบกินแซลมอน — Static Fallback</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin: 0; padding: 0; background: #111; color: #eee; }
+    header { padding: 16px 24px; background: #181818; position: sticky; top: 0; border-bottom: 1px solid #2a2a2a; }
+    h1 { margin: 0; font-size: 20px; }
+    .nav a { color: #85d0ff; text-decoration: none; margin-right: 12px; font-size: 14px; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; margin-left:10px; }
+    .demo { background:#3b2a00; color:#ffd580; }
+    .stats { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; font-size: 14px; color: #bbb; }
+    .wrap { padding: 16px 24px; }
+    .grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; }
+    .panel { background: #181818; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px; }
+    #events { max-height: calc(100vh - 260px); overflow: auto; }
+    .e { border-bottom: 1px dashed #2f2f2f; padding: 10px 4px; }
+    .e:last-child { border-bottom: 0; }
+    .time { color: #aaa; font-size: 12px; }
+    .text { font-size: 15px; margin: 6px 0; color: #f3f3f3; white-space: pre-wrap; }
+    .media a { color: #85d0ff; text-decoration: none; margin-right: 10px; }
+    label { display:block; font-size:12px; color:#bbb; margin-top:8px; }
+    input[type="text"], input[type="number"], select, textarea { width: 100%; background: #121212; border: 1px solid #2a2a2a; color: #eaeaea; border-radius: 6px; padding: 6px 8px; }
+    textarea { min-height: 60px; }
+    .btn { display: inline-block; background: #2a6bff; color: #fff; border: 0; padding: 6px 10px; border-radius: 6px; cursor: pointer; margin-top: 8px; margin-right: 6px; }
+    .btn.alt { background: #444; }
+    small { color:#888; }
+    @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } #events { max-height: none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>จัสมินชอบกินแซลมอน <span id="modeBadge" class="badge demo" title="Running without backend">DEMO MODE (static)</span></h1>
+    <div class="nav">
+      <a href="#" onclick="alert('Static demo: links are disabled');return false;">เกี่ยวกับ</a>
+      <a href="#" onclick="alert('Static demo: links are disabled');return false;">แกลเลอรี</a>
+      <a href="#" onclick="alert('Static demo: links are disabled');return false;">โหนด</a>
+      <a href="#" onclick="alert('Static demo: links are disabled');return false;">สถานะ</a>
+    </div>
+    <div class="stats">
+      <div>Status: <span id="status">Connecting...</span></div>
+      <div>Total events: <span id="count">0</span></div>
+      <div>Last update: <span id="last">-</span></div>
+      <div>Providers: <span id="providers"></span></div>
+      <div>Visitors: <span id="visitors">0</span></div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="panel" id="events"></div>
+      <div class="panel">
+        <div style="font-weight:600; margin-bottom:6px;">Latest Media</div>
+        <div id="latest-media"></div>
+        <hr style="border-color:#2a2a2a; margin:12px 0;">
+        <div style="font-weight:600; margin-bottom:6px;">Settings (Static demo only)</div>
+        <label>Post interval (seconds)</label>
+        <input id="postInterval" type="number" min="1" placeholder="1" value="1" />
+        <label>Sender name</label>
+        <input id="senderName" type="text" placeholder="จัสมิน" value="จัสมินชอบกินแซลมอน" />
+        <label>Hashtags (comma-separated)</label>
+        <input id="hashtagsBase" type="text" placeholder="#จัสมิน,#ความรัก,..." value="#จัสมินชอบกินแซลมอน,#ซาชิมิ,#วาซาบิ" />
+        <label>Openers (one per line)</label>
+        <textarea id="openers">คืนนี้โอมากาเสะไหมคะ 🍣
+ถ้าเธอคือวาซาบิ เราขอเป็นโชยุได้ไหม 😊
+แซลมอนคือรักแท้ของจัสมิน</textarea>
+        <label>Core love lines (one per line)</label>
+        <textarea id="coreLove">คิดถึงเธอพอๆ กับแซลมอนเลยนะ
+ถ้าใจเธอเป็นซาชิมิ เราขอชิมได้ไหม
+รักที่ละลายในปาก เหมือนปลาดิบดีๆ</textarea>
+        <label>Playful addons (one per line)</label>
+        <textarea id="playfulAddons">เพิ่มโชยุหน่อยมั้ยที่รัก
+วาซาบิขึ้นจมูกก็ยังยิ้มได้
+แจกหัวใจรูปปลาดิบ 💖🐟</textarea>
+        <label>Light spicy (one per line)</label>
+        <textarea id="lightSpicy">สับปลาด้วยรักเบาๆ
+เผ็ดวาซาบิแต่ไม่เท่าเธอหรอก
+โอมากาเสะคืนนี้เป็นของเรา</textarea>
+        <div style="margin-top:6px;">
+          <button class="btn" id="apply">Apply (demo)</button>
+          <button class="btn alt" id="postNow">Post now</button>
+        </div>
+        <small>หมายเหตุ: หน้านี้เป็นโหมดสแตติกเพื่อหลีกเลี่ยง 404 เมื่อไม่มีแบ็คเอนด์ หากเชื่อมกับบริการจริง หน้าแดชบอร์ดไดนามิกจะใช้งานอัตโนมัติ</small>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const eventsEl = document.getElementById('events');
+    const statusEl = document.getElementById('status');
+    const countEl = document.getElementById('count');
+    const lastEl = document.getElementById('last');
+    const providersEl = document.getElementById('providers');
+    const latestMediaEl = document.getElementById('latest-media');
+    const visitorsEl = document.getElementById('visitors');
+    const modeBadge = document.getElementById('modeBadge');
+
+    // Config (demo)
+    let cfg = {
+      post_interval_seconds: 1,
+      sender_name: 'จัสมินชอบกินแซลมอน',
+      hashtags_base: ['#จัสมินชอบกินแซลมอน','#ซาชิมิ','#วาซาบิ'],
+      openers: ['คืนนี้โอมากาเสะไหมคะ 🍣','ถ้าเธอคือวาซาบิ เราขอเป็นโชยุได้ไหม 😊','แซลมอนคือรักแท้ของจัสมิน'],
+      core_love: ['คิดถึงเธอพอๆ กับแซลมอนเลยนะ','ถ้าใจเธอเป็นซาชิมิ เราขอชิมได้ไหม','รักที่ละลายในปาก เหมือนปลาดิบดีๆ'],
+      playful_addons: ['เพิ่มโชยุหน่อยมั้ยที่รัก','วาซาบิขึ้นจมูกก็ยังยิ้มได้','แจกหัวใจรูปปลาดิบ 💖🐟'],
+      light_spicy: ['สับปลาด้วยรักเบาๆ','เผ็ดวาซาบิแต่ไม่เท่าเธอหรอก','โอมากาเสะคืนนี้เป็นของเรา'],
+    };
+
+    function fmtTs(ts) {
+      const d = new Date(ts * 1000);
+      return d.toLocaleString();
+    }
+
+    function pick(list) {
+      return list[Math.floor(Math.random() * list.length)];
+    }
+
+    function buildHashtags(list) {
+      return Array.from(new Set(list)).slice(0, 5).join(' ');
+    }
+
+    function generateCaption() {
+      const opener = pick(cfg.openers);
+      const core = pick(cfg.core_love);
+      const play = pick(cfg.playful_addons);
+      const spicy = Math.random() < 0.3 ? (' ' + pick(cfg.light_spicy)) : '';
+      const tags = buildHashtags(cfg.hashtags_base);
+      return `${opener}\n${core} ${play}${spicy}\n${tags}`;
+    }
+
+    function addEvent(ev) {
+      const div = document.createElement('div');
+      div.className = 'e';
+      const hdr = document.createElement('div');
+      hdr.innerHTML = '<span class="time">' + fmtTs(ev.ts) + '</span>';
+      const body = document.createElement('div');
+      body.className = 'text';
+      body.textContent = ev.text || '';
+      const media = document.createElement('div');
+      media.className = 'media';
+      div.appendChild(hdr);
+      div.appendChild(body);
+      div.appendChild(media);
+      eventsEl.prepend(div);
+      lastEl.textContent = fmtTs(ev.ts);
+      countEl.textContent = String(Number(countEl.textContent || '0') + 1);
+    }
+
+    // Try dynamic mode first
+    async function tryDynamic() {
+      try {
+        const r = await fetch('/healthz', {cache:'no-store'});
+        if (!r.ok) throw new Error('health not ok');
+        const r2 = await fetch('/api/recent', {cache:'no-store'});
+        if (!r2.ok) throw new Error('api recent not ok');
+        // Dynamic available
+        statusEl.textContent = 'Connected';
+        modeBadge.textContent = 'LIVE MODE';
+        modeBadge.className = 'badge';
+        // SSE
+        const es = new EventSource('/events');
+        es.onopen = () => { statusEl.textContent = 'Connected'; };
+        es.onerror = () => { statusEl.textContent = 'Reconnecting...'; };
+        es.onmessage = (e) => {
+          if (!e.data) return;
+          try {
+            const ev = JSON.parse(e.data);
+            if (ev.type === 'keepalive') return;
+            if (ev.route) {
+              // visit event
+              visitorsEl.textContent = String(Number(visitorsEl.textContent || '0') + 1);
+              return;
+            }
+            addEvent({ts: ev.ts || Date.now()/1000, text: ev.text || JSON.stringify(ev)});
+            if (ev.providers && Array.isArray(ev.providers)) {
+              providersEl.textContent = ev.providers.map(p => p.provider + ':' + p.status).join(', ');
+            }
+          } catch (_) {}
+        };
+        // Poll visitors
+        setInterval(async () => {
+          try {
+            const m = await (await fetch('/api/metrics', {cache:'no-store'})).json();
+            if (typeof m.total_pageviews === 'number') visitorsEl.textContent = m.total_pageviews;
+          } catch (_) {}
+        }, 10000);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Static demo generator
+    let demoTimer = null;
+    function startDemo() {
+      statusEl.textContent = 'Demo generating...';
+      function tick() {
+        addEvent({ts: Date.now()/1000, text: generateCaption()});
+      }
+      if (demoTimer) clearInterval(demoTimer);
+      demoTimer = setInterval(tick, Math.max(1, Number(document.getElementById('postInterval').value || '1')) * 1000);
+      tick();
+    }
+
+    // Controls
+    document.getElementById('apply').onclick = () => {
+      cfg.post_interval_seconds = Math.max(1, Number(document.getElementById('postInterval').value || '1'));
+      cfg.sender_name = document.getElementById('senderName').value || cfg.sender_name;
+      cfg.hashtags_base = (document.getElementById('hashtagsBase').value || '').split(',').map(x => x.trim()).filter(Boolean);
+      cfg.openers = (document.getElementById('openers').value || '').split('\n').map(x => x.trim()).filter(Boolean);
+      cfg.core_love = (document.getElementById('coreLove').value || '').split('\n').map(x => x.trim()).filter(Boolean);
+      cfg.playful_addons = (document.getElementById('playfulAddons').value || '').split('\n').map(x => x.trim()).filter(Boolean);
+      cfg.light_spicy = (document.getElementById('lightSpicy').value || '').split('\n').map(x => x.trim()).filter(Boolean);
+      if (demoTimer) {
+        clearInterval(demoTimer);
+        demoTimer = null;
+      }
+      startDemo();
+      alert('Applied (static demo).');
+    };
+
+    document.getElementById('postNow').onclick = () => {
+      addEvent({ts: Date.now()/1000, text: generateCaption()});
+    };
+
+    // Boot
+    (async () => {
+      const ok = await tryDynamic();
+      if (!ok) startDemo();
+    })();
+  </script>
+</body>
+</html>
