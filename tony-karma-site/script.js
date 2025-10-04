@@ -164,6 +164,15 @@ $('#clear-history')?.addEventListener('click', async () => {
 });
 renderHistory();
 
+/* Pricing - temporary upgrade for testing before Omise */
+window.upgradePlan = async function(plan_code) {
+  if (!state.user) { alert('กรุณาเข้าสู่ระบบก่อน'); return; }
+  try {
+    const headers = { 'Content-Type': 'application/json', ...(await authHeader()) };
+    const res = await fetch('/api/plan', { method: 'POST', headers, body: JSON.stringify({ plan_code }) });
+    if (!res.ok) throw new Error(await res.text());
+    alert('อัปเดตแพ็กเกจสำเร็จ: ' +();
+
 /* ASTROLOGY */
 const zodiac = (month, day) => {
   const z = [
@@ -298,7 +307,7 @@ $('#astro-form')?.addEventListener('submit', async (e) => {
 });
 
 /* TAROT with real images (Rider–Waite–Smith, public domain thumbnails via Wikimedia) */
-const TAROT = [
+const TAROT_MAJORS = [
   { id: 0,  key: 'Fool',            name: 'The Fool (การเริ่มต้น)', meaning: 'เริ่มต้นใหม่ เปิดใจ กล้าลอง สิ่งที่ไม่คุ้นเคยอาจนำโอกาส' },
   { id: 1,  key: 'Magician',        name: 'The Magician (นักมายากล)', meaning: 'ทรัพยากรพร้อม ใช้ทักษะและการสื่อสาร สร้างผลลัพธ์' },
   { id: 2,  key: 'High_Priestess',  name: 'The High Priestess (สตรีนักบวช)', meaning: 'ใช้สัญชาตญาณ ความลับ ความนิ่งช่วยให้เห็นคำตอบ' },
@@ -323,20 +332,63 @@ const TAROT = [
   { id: 21, key: 'World',           name: 'The World (โลก)', meaning: 'ครบถ้วน สมบูรณ์ วงจรเสร็จสิ้นพร้อมเริ่มใหม่' },
 ];
 
-function tarotImageUrl(id, key) {
+const SUITS = ['Wands','Cups','Swords','Pentacles'];
+const NUM_RANKS = ['01','02','03','04','05','06','07','08','09','10'];
+const FACE_RANKS = ['Page','Knight','Queen','King'];
+
+const TAROT_MINORS = [];
+SUITS.forEach(suit => {
+  NUM_RANKS.forEach(nn => {
+    const readable = nn.replace(/^0/, '') === '1' ? 'Ace' : String(parseInt(nn, 10));
+    TAROT_MINORS.push({
+      suit, rank: nn, name: `${suit} ${readable}`,
+      meaning: 'พลังงานของไพ่ชุดย่อย สะท้อนประเด็นชีวิตประจำวันในมิติต่างๆ'
+    });
+  });
+  FACE_RANKS.forEach(face => {
+    TAROT_MINORS.push({
+      suit, rank: face, name: `${suit} ${face}`,
+      meaning: 'บุคลิก/บทบาท/ระดับวุฒิภาวะในสถานการณ์'
+    });
+  });
+});
+
+const TAROT = TAROT_MAJORS;
+
+function tarotImageUrl(id, key, suit = null, rank = null) {
+  const mode = cfg().TAROT_IMAGE_MODE || 'rws-wikimedia';
+  if (mode === 'custom') {
+    const base = (cfg().CUSTOM_TAROT_BASE_URL || '').replace(/\/+$/, '');
+    if (suit && rank) {
+      // Minor
+      return `${base}/${suit}_${rank}.jpg`;
+    }
+    // Major
+    const pad = String(id).padStart(2, '0');
+    return `${base}/${pad}_${key}.jpg`;
+  }
+  // rws-wikimedia default
+  if (suit && rank) {
+    // Minor naming convention on Commons often SuitNN.jpg or SuitPage.jpg...
+    if (['Page','Knight','Queen','King'].includes(rank)) {
+      return `https://commons.wikimedia.org/wiki/Special:FilePath/${suit}${rank}.jpg?width=512`;
+    }
+    const nn = String(rank).padStart(2, '0');
+    return `https://commons.wikimedia.org/wiki/Special:FilePath/${suit}${nn}.jpg?width=512`;
+  }
   const pad = String(id).padStart(2, '0');
-  // Use Wikimedia Special:FilePath to avoid hash paths, request width=512
   return `https://commons.wikimedia.org/wiki/Special:FilePath/RWS_Tarot_${pad}_${key}.jpg?width=512`;
 }
 
 $('#draw-tarot')?.addEventListener('click', () => {
   const n = parseInt($('#tarot-count').value, 10);
+  const deck = [...TAROT_MAJORS, ...TAROT_MINORS];
   const rnd = seeded(String(Date.now()));
   const cards = [];
   for (let i = 0; i < n; i++) {
-    const idx = Math.floor(rnd()*TAROT.length);
+    const idx = Math.floor(rnd()*deck.length);
     const upright = rnd() > 0.5;
-    const data = TAROT[idx];
+    const data = deck[idx];
     cards.push({ ...data, upright });
   }
   const grid = $('#tarot-output');
@@ -344,7 +396,14 @@ $('#draw-tarot')?.addEventListener('click', () => {
   cards.forEach((c, i) => {
     const el = document.createElement('div');
     el.className = 'tarot-card';
-    const img = tarotImageUrl(c.id, c.key);
+    let img;
+    if (typeof c.id === 'number') {
+      // Major
+      img = tarotImageUrl(c.id, c.key);
+    } else {
+      // Minor
+      img = tarotImageUrl(null, null, c.suit, c.rank);
+    }
     el.innerHTML = `
       <img class="tarot-thumb" src="${img}" alt="${c.name}">
       <h4>${n === 3 ? ['อดีต','ปัจจุบัน','อนาคต'][i] + ' • ' : ''}${c.name} ${c.upright ? '(ไพ่ตั้ง)' : '(ไพ่กลับหัว)'}</h4>
