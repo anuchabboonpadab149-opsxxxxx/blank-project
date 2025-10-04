@@ -14,7 +14,7 @@ services:
       - POST_INTERVAL_SECONDS=${POST_INTERVAL_SECONDS:-1}
       - COLLECT_INTERVAL_MINUTES=${COLLECT_INTERVAL_MINUTES:-1}
       - GENERATE_CONTENT=${GENERATE_CONTENT:-true}
-      - SENDER_NAME=${SENDER_NAME:-Bee&Bell}
+      - SENDER_NAME=${SENDER_NAME:-จัสมินชอบกินแซลมอน}
       - ENABLE_ADS=${ENABLE_ADS:-true}
       - ADS_SIMULATION=${ADS_SIMULATION:-false}
       - PROVIDERS=${PROVIDERS:-twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok,mastodon}

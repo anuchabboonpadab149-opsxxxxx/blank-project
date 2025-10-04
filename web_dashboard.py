@@ -282,6 +282,25 @@ def api_recent():
     return jsonify(bus.recent(100))
 
 
+@app.get("/api/feed")
+def api_feed():
+    # Return last 200 events for compatibility
+    return jsonify(bus.recent(200))
+
+
+@app.get("/api/latest")
+def api_latest():
+    # Return the latest post event if available, else the latest event
+    events = bus.recent(50)
+    latest_post = None
+    latest_any = events[-1] if events else {}
+    for ev in reversed(events):
+        if ev.get("type") == "post":
+            latest_post = ev
+            break
+    return jsonify(latest_post or latest_any)
+
+
 @app.get("/healthz")
 def healthz():
     return jsonify({"ok": True})
