@@ -29,7 +29,7 @@ This script will:
 - POST /api/credentials to set LLM keys
 - Register + login a test user
 - Create a top-up request (no slip), approve it via ADMIN_SECRET
-- Call services: astrology, tools:tarot, analysis-upload (palm image), numbers:phone
+- Call services: astrology, tools:[tarot,dice,siamsee,pok], analysis-upload [palm,face], analysis dream, numbers:[phone,license,name]
 - Fetch history
 """
 
@@ -41,8 +41,9 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
-# a sample palm image (public domain/CC) — fallback to a small placeholder if download fails
-SAMPLE_IMAGE_URL = os.getenv("SAMPLE_IMAGE_URL", "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Palmistry_diagram.png/640px-Palmistry_diagram.png")
+# sample images (public domain/CC)
+PALM_IMAGE_URL = os.getenv("SAMPLE_IMAGE_URL", "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Palmistry_diagram.png/640px-Palmistry_diagram.png")
+FACE_IMAGE_URL = os.getenv("SAMPLE_FACE_URL", "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Face-smile.svg/512px-Face-smile.svg.png")
 
 def _get(path: str, **kw):
     return requests.get(BASE_URL + path, timeout=20, **kw)
@@ -115,18 +116,18 @@ def topup(sess: requests.Session, amount: int = 100):
         raise RuntimeError("Top-up approve failed: " + json.dumps(d2))
     print("[*] Top-up approved")
 
-def download_sample_image() -> str:
+def download_image(url: str, prefix: str) -> str:
     try:
-        print("[*] Downloading sample image ...")
-        r = requests.get(SAMPLE_IMAGE_URL, timeout=30)
+        print(f"[*] Downloading image: {url}")
+        r = requests.get(url, timeout=30)
         r.raise_for_status()
-        fd, path = tempfile.mkstemp(prefix="tony_palm_", suffix=".png")
+        fd, path = tempfile.mkstemp(prefix=prefix, suffix=".png")
         with os.fdopen(fd, "wb") as f:
             f.write(r.content)
-        print("[*] Saved sample image to", path)
+        print("[*] Saved image to", path)
         return path
     except Exception as e:
-        print("[!] Could not download sample image:", e)
+        print("[!] Could not download image:", e)
         return ""
 
 def call_services(sess: requests.Session):
@@ -138,16 +139,48 @@ def call_services(sess: requests.Session):
     r = sess.post(BASE_URL + "/api/tony/tools", json={"kind": "tarot", "cards": 3, "question": "ความรักครึ่งปีหลัง"}, timeout=30)
     print("    ->", r.status_code, r.text[:200])
 
+    print("[*] Calling tools: dice (3) ...")
+    r = sess.post(BASE_URL + "/api/tony/tools", json={"kind": "dice", "rolls": 3, "question": "ตัดสินใจลงทุนดีไหม"}, timeout=30)
+    print("    ->", r.status_code, r.text[:200])
+
+    print("[*] Calling tools: siamsee ...")
+    r = sess.post(BASE_URL + "/api/tony/tools", json={"kind": "siamsee"}, timeout=30)
+    print("    ->", r.status_code, r.text[:200])
+
+    print("[*] Calling tools: pok ...")
+    r = sess.post(BASE_URL + "/api/tony/tools", json={"kind": "pok", "cards": 3}, timeout=30)
+    print("    ->", r.status_code, r.text[:200])
+
     print("[*] Calling analysis-upload: palm ...")
-    img_path = download_sample_image()
+    palm_img = download_image(PALM_IMAGE_URL, "tony_palm_")
     files = {"kind": (None, "palm")}
-    if img_path and os.path.exists(img_path):
-        files["image"] = (os.path.basename(img_path), open(img_path, "rb"), "image/png")
+    if palm_img and os.path.exists(palm_img):
+        files["image"] = (os.path.basename(palm_img), open(palm_img, "rb"), "image/png")
     r = sess.post(BASE_URL + "/api/tony/analysis-upload", files=files, timeout=60)
+    print("    ->", r.status_code, r.text[:200])
+
+    print("[*] Calling analysis-upload: face ...")
+    face_img = download_image(FACE_IMAGE_URL, "tony_face_")
+    files = {"kind": (None, "face")}
+    if face_img and os.path.exists(face_img):
+        files["image"] = (os.path.basename(face_img), open(face_img, "rb"), "image/png")
+    r = sess.post(BASE_URL + "/api/tony/analysis-upload", files=files, timeout=60)
+    print("    ->", r.status_code, r.text[:200])
+
+    print("[*] Calling analysis: dream ...")
+    r = sess.post(BASE_URL + "/api/tony/analysis", json={"kind": "dream", "text": "เมื่อคืนฝันเห็นงูตัวใหญ่เข้าบ้าน"}, timeout=30)
     print("    ->", r.status_code, r.text[:200])
 
     print("[*] Calling numbers: phone ...")
     r = sess.post(BASE_URL + "/api/tony/numbers", json={"kind": "phone", "number": "0891234567"}, timeout=30)
+    print("    ->", r.status_code, r.text[:200])
+
+    print("[*] Calling numbers: license ...")
+    r = sess.post(BASE_URL + "/api/tony/numbers", json={"kind": "license", "text": "กข 1234"}, timeout=30)
+    print("    ->", r.status_code, r.text[:200])
+
+    print("[*] Calling numbers: name ...")
+    r = sess.post(BASE_URL + "/api/tony/numbers", json={"kind": "name", "name": "พิรุฬห์วัฒน์ ชยมาฒย์", "dob": "1990-02-05"}, timeout=30)
     print("    ->", r.status_code, r.text[:200])
 
 def fetch_history(sess: requests.Session):
