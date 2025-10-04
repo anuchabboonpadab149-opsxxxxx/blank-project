@@ -16,10 +16,13 @@ services:
       - GENERATE_CONTENT=${GENERATE_CONTENT:-true}
       - SENDER_NAME=${SENDER_NAME:-จัสมินชอบกินแซลมอน}
       - ENABLE_ADS=${ENABLE_ADS:-true}
-      - ADS_SIMULATION=${ADS_SIMULATION:-false}
+      - ADS_SIMULATION=${ADS_SIMULATION:-true}
       - PROVIDERS=${PROVIDERS:-twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,tiktok,mastodon}
       - WEB_DASHBOARD=${WEB_DASHBOARD:-true}
       - WEB_PORT=${WEB_PORT:-8000}
+      # Real API mode by default (no simulation)
+      - SIMULATE_ALL_PROVIDERS=${SIMULATE_ALL_PROVIDERS:-false}
+      - SIMULATE_ON_ERROR=${SIMULATE_ON_ERROR:-false}
     ports:
       - "8000:8000"
     volumes:

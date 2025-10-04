@@ -10,13 +10,12 @@
     header { padding: 16px 24px; background:#181818; border-bottom:1px solid #2a2a2a; display:flex; align-items:center; gap: 16px; }
     h1 { margin:0; font-size:20px; }
     .wrap { padding: 16px 24px; }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
     .panel { background:#181818; border:1px solid #2a2a2a; border-radius:10px; padding:12px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
     table { width:100%; border-collapse: collapse; }
     th, td { padding: 8px 10px; border-bottom: 1px solid #2a2a2a; font-size: 14px; }
+    .btn { display:inline-block; background:#2a6bff; color:#fff; border:0; padding:8px 14px; border-radius:6px; cursor:pointer; margin-top:8px; }
     .small { color:#aaa; font-size:12px; }
-    .ok { color:#a7f3d0; }
-    .err { color:#fecaca; }
     @media (max-width: 1024px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -25,71 +24,58 @@
     <h1>Workflows — จัสมินชอบกินแซลมอน</h1>
     <a href="/">กลับสู่แดชบอร์ด</a>
   </header>
+
   <div class="wrap">
     <div class="grid">
       <div class="panel">
-        <div style="font-weight:600; margin-bottom:6px;">สรุป</div>
-        <div id="summary" class="small">Loading...</div>
-        <button id="reset">รีเซ็ตประวัติ</button>
+        <div style="font-weight:600; margin-bottom:6px;">สรุปภาพรวม</div>
+        <div id="summary"></div>
+        <button class="btn" id="reset">Reset runs</button>
+        <div class="small" id="msg" style="margin-top:6px;"></div>
       </div>
       <div class="panel">
-        <div style="font-weight:600; margin-bottom:6px;">กำลังทำงานอยู่</div>
-        <table>
-          <thead><tr><th>id</th><th>ชื่อ</th><th>เริ่ม</th></tr></thead>
-          <tbody id="running"></tbody>
-        </table>
-      </div>
-      <div class="panel" style="grid-column: 1 / -1;">
-        <div style="font-weight:600; margin-bottom:6px;">รายการล่าสุด</div>
-        <table>
-          <thead><tr><th>ชื่อ</th><th>สถานะ</th><th>ระยะเวลา (s)</th><th>สิ้นสุด</th></tr></thead>
-          <tbody id="last"></tbody>
+        <div style="font-weight:600; margin-bottom:6px;">ประวัติล่าสุด</div>
+        <table id="runs">
+          <thead><tr><th>ชื่อ</th><th>สถานะ</th><th>ระยะเวลา (s)</th><th>เริ่ม</th><th>จบ</th></tr></thead>
+          <tbody></tbody>
         </table>
       </div>
     </div>
   </div>
+
   <script>
-    function fmt(ts) { return new Date((ts||0) * 1000).toLocaleString(); }
-
     async function load() {
-      const r = await fetch('/api/workflows', {cache:'no-store'});
-      const data = await r.json();
-
-      // summary
-      let s = 'Total runs: ' + (data.total_runs || 0) + ', Running: ' + (data.running_count || 0);
+      const res = await fetch('/api/workflows');
+      const data = await res.json();
+      const s = document.getElementById('summary');
+      s.innerHTML = '';
+      s.innerHTML += '<div>Total runs: ' + (data.total_runs || 0) + '</div>';
+      s.innerHTML += '<div>Running: ' + (data.running_count || 0) + '</div>';
       if (Array.isArray(data.aggregate)) {
-        s += '<br>Per workflow: ';
-        s += data.aggregate.map(a => a.name + ' [ok:' + a.ok + ', err:' + a.error + ']').join(' | ');
+        s.innerHTML += '<div style="margin-top:6px; font-weight:600;">Aggregate</div>';
+        for (const a of data.aggregate) {
+          s.innerHTML += '<div>' + (a.name || '-') + ': ok=' + (a.ok||0) + ', error=' + (a.error||0) + ', last=' + (a.last_duration_sec||'-') + 's</div>';
+        }
       }
-      document.getElementById('summary').innerHTML = s;
-
-      // running
-      const tbRun = document.getElementById('running');
-      tbRun.innerHTML = '';
-      for (const r of (data.running || [])) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = '<td>'+ (r.id || '-') +'</td><td>'+ (r.name || '-') +'</td><td>'+ fmt(r.start_ts) +'</td>';
-        tbRun.appendChild(tr);
-      }
-
-      // last
-      const tbLast = document.getElementById('last');
-      tbLast.innerHTML = '';
+      const tb = document.querySelector('#runs tbody');
+      tb.innerHTML = '';
       for (const r of (data.last_runs || [])) {
-        const st = r.status === 'ok' ? '<span class="ok">ok</span>' : '<span class="err">error</span>';
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td>'+ (r.name||'-') +'</td><td>'+ st +'</td><td>'+ (r.duration_sec||0).toFixed ? (r.duration_sec||0).toFixed(2) : r.duration_sec +'</td><td>'+ fmt(r.end_ts) +'</td>';
-        tbLast.appendChild(tr);
+        const start = r.start_ts ? new Date(r.start_ts*1000).toLocaleString() : '-';
+        const end = r.end_ts ? new Date(r.end_ts*1000).toLocaleString() : '-';
+        tr.innerHTML = '<td>'+ (r.name||'-') +'</td><td>'+ (r.status||'-') +'</td><td>'+ (r.duration_sec||'-') +'</td><td>'+ start +'</td><td>'+ end +'</td>';
+        tb.appendChild(tr);
       }
     }
-
     document.getElementById('reset').onclick = async () => {
-      await fetch('/api/workflows/reset', {method:'POST'});
+      const r = await fetch('/api/workflows/reset', {method:'POST'});
+      const j = await r.json();
+      document.getElementById('msg').textContent = j.ok ? 'Reset done' : ('Error: ' + (j.error||'unknown'));
       load();
+      setTimeout(() => document.getElementById('msg').textContent = '', 1500);
     };
-
-    setInterval(load, 5000);
     load();
+    setInterval(load, 5000);
   </script>
 </body>
 </html>
