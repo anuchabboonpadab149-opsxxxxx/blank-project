@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from typing import Generator
 
 from flask import Flask, Response, jsonify, render_template, render_template_string, send_from_directory, request
@@ -756,5 +757,71 @@ def api_tweets_append():
         return jsonify({"error": str(e)}), 500
 
 
-def start_web():
-    app.run(host="0.0.0.0", port=WEB_PORT, debug=False, threaded=True)
+# ===== Credits APIs =====
+@app.get("/api/credits")
+def api_get_credits():
+    try:
+        user = request.args.get("user", default="guest")
+    except Exception:
+        user = "guest"
+    try:
+        import credits_store as cstore
+        return jsonify({"user": user, "credits": cstore.get(user)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/credits/use")
+def api_use_credit():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        user = str(payload.get("user", "guest")).strip() or "guest"
+    except Exception:
+        user = "guest"
+    try:
+        import credits_store as cstore
+        left = cstore.use(user)
+        if left is None:
+            return jsonify({"ok": False, "error": "insufficient_credits"}), 400
+        return jsonify({"ok": True, "credits_left": left})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/credits/add")
+def api_add_credit():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        user = str(payload.get("user", "guest")).strip() or "guest"
+        delta = int(payload.get("delta", 0))
+    except Exception:
+        user = "guest"
+        delta = 0
+    try:
+        import credits_store as cstore
+        newv = cstore.add(user, delta)
+        return jsonify({"ok": True, "credits": newv})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===== Payment notify (mock webhook) =====
+@app.post("/api/payment/notify")
+def api_payment_notify():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        user = str(payload.get("user", "guest")).strip() or "guest"
+        amount = float(payload.get("amount", 0))
+        # simple mapping: 100 THB -> 5 credits
+        credits = 0
+        if amount >= 100:
+            credits = 5
+        elif amount >= 50:
+            credits = 2
+        import credits_store as cstore
+        newv = cstore.add(user, credits)
+        try:
+            bus.publish({"type": "payment", "user": user, "amount": amount, "credits_added": credits, "ts": time.time()})
+        except Exception:
+            pass
+        return jsonify({"ue)

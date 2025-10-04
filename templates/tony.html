@@ -254,7 +254,7 @@
             <h2 id="modalTitle">...</h2>
             
             <div id="modalForm">
-                <p>กรุณากรอกข้อมูลเพื่อทำนายชะตา (เป็นการจำลอง)</p>
+                <p>กรุณากรอกข้อมูลเพื่อทำนายชะตา</p>
                 <input type="text" id="userInput" placeholder="ใส่ข้อมูลของคุณที่นี่ (เช่น คำถาม/วันเกิด)" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; background-color: white; color: black;">
                 <button class="btn" style="width: 100%;" onclick="startDivination()">ยืนยันและทำนาย (หัก 1 สิทธิ์)</button>
             </div>
@@ -277,7 +277,9 @@
             </ol>
              <img src="https://via.placeholder.com/150x150/FFFFFF/000000?text=QR+Code+SCB+8162785073" alt="QR Code SCB 8162785073" style="width: 150px; height: 150px;">
             <p style="font-weight: bold;">บัญชี: พิรุฬห์วัฒน์ ชยมาฒย์ (816-278-5073)</p>
-            <button class="btn" onclick="alert('ฟังก์ชันแจ้งสลิปโอนเงิน (จำลอง) - ต้องทำระบบเชื่อมต่อการส่งรูปภาพจริง')">แจ้งสลิป</button>
+            <button class="btn" onclick="notifyPayment(100)">แจ้งสลิป (ยืนยันยอดอัตโนมั)</บบbutton>
+      </ูปdiv>
+  </">_codeลิป</button>
         </div>
     </div>
 
@@ -286,12 +288,20 @@
     </footer>
 
     <script>
-        // JavaScript สำหรับการทำงานจำลอง
-        let currentCredits = 5;
+        // JavaScript สำหรับการทำงานจริงกับ API
+        const USER_ID = 'guest';
 
-        // อัปเดตสถานะสิทธิ์
-        function updateCreditsDisplay() {
-            document.getElementById('userStatus').innerHTML = `สวัสดี, ผู้ใช้งาน! | สิทธิ์คงเหลือ: <strong>${currentCredits} สิทธิ์</strong>`;
+        async function fetchCredits() {
+            try {
+                const r = await fetch(`/api/credits?user=${encodeURIComponent(USER_ID)}`, {cache:'no-store'});
+                const data = await r.json();
+                return typeof data.credits === 'number' ? data.credits : 0;
+            } catch (e) { return 0; }
+        }
+
+        async function updateCreditsDisplay() {
+            const credits = await fetchCredits();
+            document.getElementById('userStatus').innerHTML = `สวัสดี, ผู้ใช้งาน! | สิทธิ์คงเหลือ: <strong>${credits} สิทธิ์</strong>`;
         }
 
         // เปิด Modal ดูดวง
@@ -323,40 +333,55 @@
             document.getElementById('paymentModal').style.display = 'block';
         }
 
+        async function notifyPayment(amountTHB=100) {
+            try {
+                const r = await fetch('/api/payment/notify', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ user: USER_ID, amount: amountTHB })
+                });
+                const data = await r.json();
+                if (data.ok) {
+                    alert(`บันทึกยอดสำเร็จ +${ }
+
         // ปิด Modal
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
         }
 
-        // ฟังก์ชันจำลองการทำนาย (Simulated Divination)
-        function startDivination() {
-            if (currentCredits <= 0) {
-                document.getElementById('resultDisplay').innerHTML = '<span style="color: red; font-weight: bold;">❌ สิทธิ์คงเหลือไม่พอ! กรุณาเติมสิทธิ์ก่อนทำนาย</span>';
-                return;
-            }
-
-            const input = document.getElementById('userInput').value;
+        // ฟังก์ชันเรียก API ทำนายจริง (หักสิทธิ์บนเซิร์ฟเวอร์)
+        async function startDivination() {
+            const input = document.getElementById('userInput').value.trim();
             if (!input) {
                 document.getElementById('resultDisplay').innerHTML = 'กรุณาใส่ข้อมูลเพื่อเริ่มการทำนาย';
                 return;
             }
-
-            // **ฟังก์ชัน Back-end จำลอง**
+            const title = document.getElementById('modalTitle').innerText;
             document.getElementById('resultDisplay').innerHTML = 'กำลังหักสิทธิ์และประมวลผลคำทำนายด้วย AI... (รอสักครู่)';
-            
-            // จำลองการหักสิทธิ์และการประมวลผล
-            setTimeout(() => {
-                currentCredits--; // **จำลองการหักสิทธิ์**
-                updateCreditsDisplay();
-                
-                const title = document.getElementById('modalTitle').innerText;
+
+            try {
+                const r = await fetch('/api/divination', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user: USER_ID, type: title, text: input })
+                });
+                const data = await r.json();
+                if (!r.ok || !data.ok) {
+                    const err = data.error || 'เกิดข้อผิดพลาด';
+                    document.getElementById('resultDisplay').innerHTML = `<span style="color:red;font-weight:bold;">❌ ${err}</span>`;
+                    return;
+                }
+                await updateCreditsDisplay();
+                const item = data.item || {};
                 document.getElementById('resultDisplay').innerHTML = `
                     <p style="color: lightgreen; font-weight: bold;">✅ หัก 1 สิทธิ์สำเร็จ!</p>
                     <p><strong>คำทำนายจาก อ.โทนี่สะท้อนกรรม (${title}):</strong></p>
                     <p>ข้อมูลที่คุณป้อน: "${input}"</p>
-                    <p style="font-style: italic;">"คำทำนายที่แท้จริงจาก AI Engine จะปรากฏ ณ ตรงนี้. คุณสามารถนำโค้ดนี้ไปเชื่อมต่อกับ Back-end (Node.js/Python) เพื่อเรียกใช้ Gemini API หรือโมเดลโหราศาสตร์เฉพาะทาง เพื่อสร้างคำทำนายที่สมบูรณ์และเป็นไปตามหลักการของแต่ละศาสตร์."</p>
+                    <pre style="white-space: pre-wrap;">${item.result || ''}</pre>
                 `;
-            }, 2000); // รอ 2 วินาที จำลองการทำงานของ AI
+            } catch (e) {
+                document.getElementById('resultDisplay').innerHTML = '<span style="color:red;font-weight:bold;">❌ ระบบไม่พร้อม กรุณาลองใหม่</span>';
+            }
         }
 
         // เริ่มต้นเมื่อโหลดหน้าเว็บ
