@@ -335,8 +335,7 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
         tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
 
     promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
-    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": t_codeexnewt</}
-</}
+    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": text}
 
 
 def collect_metrics(cfg: Config, max_items: int = 50) -> Dict[str, Any]:

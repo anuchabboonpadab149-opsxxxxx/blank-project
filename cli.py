@@ -6,6 +6,7 @@ import threading
 
 from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 import pytz
@@ -37,6 +38,7 @@ def main():
     mode = args.mode or os.getenv("RUN_MODE", "once").strip()
     tz = args.tz or os.getenv("TIMEZONE", "Asia/Bangkok")
     distribute_all = os.getenv("DISTRIBUTE_ALL", "true").lower() in {"1", "true", "yes"}
+    web_enabled = os.getenv("WEB_DASHBOARD", "true").lower() in {"1", "true", "yes"}
 
     # Posting trigger env
     post_cron = (args.post_cron or os.getenv("POST_CRON", "")).strip()
@@ -49,21 +51,49 @@ def main():
     collect_interval_min = args.collect_interval_min if args.collect_interval_min is not None else (int(collect_interval_min_env) if collect_interval_min_env.isdigit() else None)
 
     if mode == "once":
-        if distribute_all:
-            res = distribute_once()
-            log.info(f"Distributed to providers: {res}")
-        else:
-            cfg = Config()
-            res = post_one_from_file(cfg)
-            log.info(f"Posted and promoted on Twitter: {res}")
+        # One-shot post + metrics + media + event
+        text_for_event = None
+        post_result = None
+        try:
+            if distribute_all:
+                post_result = distribute_once()
+                text_for_event = post_result.get("text")
+                log.info(f"Distributed to providers: {post_result}")
+            else:
+                cfg = Config()
+                post_result = post_one_from_file(cfg)
+                text_for_event = post_result.get("text")
+                log.info(f"Posted and promoted on Twitter: {post_result}")
+        except Exception as e:
+            log.error(f"Post once failed: {e}", exc_info=True)
+        # Media + event publish
+        try:
+            from content_generator import generate_caption
+            from media_generator import generate_all
+            import realtime_bus as bus
+            if not text_for_event:
+                cfg2 = Config()
+                text_for_event = generate_caption(sender_name=cfg2.SENDER_NAME)
+            media = generate_all(text_for_event)
+            bus.publish({"type": "post", "text": text_for_event, "providers": (post_result or {}).get("providers"), "twitter_detail": (post_result or {}).get("twitter_detail"), "media": media})
+        except Exception as e:
+            log.error(f"Media generation/event publish failed: {e}", exc_info=True)
+
         cfg = Config()
         met = collect_metrics(cfg)
         log.info(f"Collected organic metrics: {met}")
         ads = collect_ads_analytics(cfg)
         log.info(f"Collected ads analytics: {ads}")
+        try:
+            import realtime_bus as bus
+            bus.publish({"type": "collect", "organic_count": met.get("count", 0), "ads_status": ads.get("status", str(ads))})
+        except Exception:
+            pass
         return
 
-    scheduler = BlockingScheduler(timezone=pytz.timezone(tz))
+    # Scheduler selection
+    SchedulerCls = BackgroundScheduler if web_enabled else BlockingScheduler
+    scheduler = SchedulerCls(timezone=pytz.timezone(tz))
 
     post_lock = threading.Lock()
     collect_lock = threading.Lock()
@@ -73,13 +103,44 @@ def main():
             log.info("Post job already running; skipping.")
             return
         try:
+            text_for_event = None
+            result = None
             if distribute_all:
-                res = distribute_once()
-                log.info(f"Post job distributed: {res}")
+                try:
+                    result = distribute_once()
+                    text_for_event = (result or {}).get("text")
+                    log.info(f"Post job distributed: {result}")
+                except Exception as e:
+                    log.error(f"Post job distribute failed: {e}", exc_info=True)
             else:
-                cfg = Config()
-                res = post_one_from_file(cfg)
-                log.info(f"Post job (Twitter only) result: {res}")
+                try:
+                    cfg_local = Config()
+                    result = post_one_from_file(cfg_local)
+                    text_for_event = (result or {}).get("text")
+                    log.info(f"Post job (Twitter only) result: {result}")
+                except Exception as e:
+                    log.error(f"Post job (Twitter) failed: {e}", exc_info=True)
+
+            # Fallback text generation if posting failed or returned no text
+            if not text_for_event:
+                try:
+                    from content_generator import generate_caption
+                    cfg_local2 = Config()
+                    text_for_event = generate_caption(sender_name=cfg_local2.SENDER_NAME)
+                except Exception as e:
+                    log.error(f"Fallback content generation failed: {e}", exc_info=True)
+                    text_for_event = ""
+
+            # Generate media and publish event
+            try:
+                from media_generator import generate_all
+                import realtime_bus as bus
+                cfg_local3 = Config()
+                media = generate_all(text_for_event, sender=cfg_local3.SENDER_NAME)
+                bus.publish({"type": "post", "text": text_for_event, "providers": (result or {}).get("providers"), "twitter_detail": (result or {}).get("twitter_detail"), "media": media})
+            except Exception as e:
+                log.error(f"Media generation or event publish failed: {e}", exc_info=True)
+
         except Exception as e:
             log.error(f"Post job failed: {e}", exc_info=True)
         finally:
@@ -90,11 +151,16 @@ def main():
             log.info("Collect job already running; skipping.")
             return
         try:
-            cfg = Config()
-            met = collect_metrics(cfg)
+            cfg_local = Config()
+            met = collect_metrics(cfg_local)
             log.info(f"Collect organic metrics result: {met}")
-            ads = collect_ads_analytics(cfg)
+            ads = collect_ads_analytics(cfg_local)
             log.info(f"Collect ads analytics result: {ads}")
+            try:
+                import realtime_bus as bus
+                bus.publish({"type": "collect", "organic_count": met.get("count", 0), "ads_status": ads.get("status", str(ads))})
+            except Exception:
+                pass
         except Exception as e:
             log.error(f"Collect job failed: {e}", exc_info=True)
         finally:
@@ -153,11 +219,22 @@ def main():
         scheduler.add_job(collect_job, IntervalTrigger(minutes=1, timezone=tzinfo),
                           id="collect_default", replace_existing=True, max_instances=1, coalesce=True)
 
-    log.info("Scheduler started; press Ctrl+C to stop.")
-    try:
+    if web_enabled:
+        log.info("Starting BackgroundScheduler + web dashboard")
         scheduler.start()
-    except (KeyboardInterrupt, SystemExit):
-        log.info("Scheduler stopped.")
+        try:
+            from web_dashboard import start_web
+            start_web()  # blocks
+        except (KeyboardInterrupt, SystemExit):
+            log.info("Web server stopped.")
+        finally:
+            scheduler.shutdown(wait=False)
+    else:
+        log.info("Scheduler started; press Ctrl+C to stop.")
+        try:
+            scheduler.start()
+        except (KeyboardInterrupt, SystemExit):
+            log.info("Scheduler stopped.")
 
 
 if __name__ == "__main__":

@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install system dependencies (if any needed)
+# Install system dependencies (ffmpeg for video, fonts for Thai text rendering)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates tzdata && \
+    ca-certificates tzdata ffmpeg fonts-dejavu-core fonts-thai-tlwg && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy project files
@@ -21,6 +21,10 @@ COPY . /app
 ENV RUN_MODE=daemon
 ENV INTERVAL_SECONDS=1800
 ENV TIMEZONE=Asia/Bangkok
+ENV WEB_DASHBOARD=true
+ENV WEB_PORT=8000
+
+EXPOSE 8000
 
 # Use entrypoint script to load env if mounted
 ENTRYPOINT ["/bin/sh", "-c", "chmod +x /app/run.sh && /app/run.sh"]
