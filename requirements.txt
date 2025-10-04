@@ -14,3 +14,6 @@ Pillow==10.4.0
 moviepy==1.0.3
 imageio-ffmpeg==0.4.9
 SQLAlchemy==2.0.34
+alembic==1.13.2
+opencv-python-headless==4.10.0.84
+mediapipe==0.10.14

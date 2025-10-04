@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>รายงาน/สถิติ — อ.โทนี่สะท้อนกรรม</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif; margin:0; padding:0; background:#0f1115; color:#eaeaf1; }
+    a { color:#8ecbff; text-decoration:none; }
+    header { padding: 16px 24px; background:#151a24; border-bottom:1px solid #1f2430; display:flex; align-items:center; gap:16px; }
+    .wrap { padding: 16px 24px; }
+    .panel { background:#151a24; border:1px solid #232a3a; border-radius:12px; padding:16px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    .muted { color:#9aa3b2; }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="font-weight:600;">รายงาน/สถิติ</div>
+    <a href="/admin">แอดมินคอนโซล</a>
+    <a href="/portal">ศูนย์รวม</a>
+  </header>
+  <div class="wrap">
+    <div class="grid">
+      <div class="panel">
+        <div style="font-weight:600;">ภาพรวม</div>
+        <div id="overview" class="muted"></div>
+      </div>
+      <div class="panel">
+        <div style="font-weight:600;">การใช้งานตามบริการ</div>
+        <div id="usage" class="muted"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    async function load() {
+      const r = await fetch('/api/admin/reports');
+      const d = await r.json();
+      if (d.error) { alert(d.error); return; }
+      document.getElementById('overview').innerHTML = `
+        ผู้ใช้ทั้งหมด: <b>${d.users_count||0}</b><br>
+        เติมสิทธิ์ค้างอนุมัติ: <b>${(d.topup||{}).pending||0}</b><br>
+        เติมสิทธิ์อนุมัติแล้ว: <b>${(d.topup||{}).approved||0}</b>
+      `;
+      const u = d.usage || {};
+      const lines = Object.keys(u).sort().map(k => `- ${k}: ${u[k]} ครั้ง`).join('<br>');
+      document.getElementById('usage').innerHTML = lines || 'ยังไม่มีข้อมูล';
+    }
+    load();
+  </script>
+</body>
+</html>

@@ -25,6 +25,30 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     role: Mapped[str] = mapped_column(String(32), default="member")  # member|admin
 
+class Role(Base):
+    __tablename__ = "roles"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    desc: Mapped[Optional[str]] = mapped_column(String(255), default=None)
+
+class Permission(Base):
+    __tablename__ = "permissions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    desc: Mapped[Optional[str]] = mapped_column(String(255), default=None)
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    role_id: Mapped[int] = mapped_column(Integer, index=True)
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    role_id: Mapped[int] = mapped_column(Integer, index=True)
+    perm_id: Mapped[int] = mapped_column(Integer, index=True)
+
 class Topup(Base):
     __tablename__ = "topups"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

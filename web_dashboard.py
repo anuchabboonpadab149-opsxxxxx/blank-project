@@ -697,8 +697,7 @@ def api_set_config():
             pass
         return jsonify(cfg)
     except Exception as e:
-        return jsonify({"error": str(e)}),_code 5new0</0
-500
+        return jsonify({"error": str(e)}), 500
 
 
 @app.post("/api/reload-schedule")
@@ -851,6 +850,22 @@ def admin_settings():
         pass
     return render_template("admin_settings.html")
 
+@app.get("/admin/roles")
+def admin_roles_page():
+    try:
+        mstore.pageview("admin_roles")
+    except Exception:
+        pass
+    return render_template("admin_roles.html")
+
+@app.get("/admin/reports")
+def admin_reports_page():
+    try:
+        mstore.pageview("admin_reports")
+    except Exception:
+        pass
+    return render_template("admin_reports.html")
+
 @app.post("/api/admin/upload-logo")
 def api_admin_upload_logo():
     # Save uploaded logo under outputs/branding and set config.brand_logo_path
@@ -874,81 +889,120 @@ def api_admin_upload_logo():
             pass
         return jsonify({"ok": True, "path": "/media/" + cfg.get("brand_logo_path", "")})
     except Exception as e:
-        return jsonify({"error": str(e)}),_code 5new0</0
+        return jsonify({"error": str(e)}), 500
 
-
-# --- Admin APIs (require ADMIN_SECRET in request) ---
-
-def _check_admin_secret(secret: str) -> bool:
-    return bool(secret) and secret == os.getenv("ADMIN_SECRET", "")
-
-def _is_admin_session() -> bool:
-    try:
-        uid = sessionk, err = _ensure_tony_ready()
-    if not ok:
-        return jsonify(err), 500
-    secret = request.args.get("secret") or request.headers.get("X-Admin-Secret") or ""
-    if not _check_admin_secret(secret):
-        return jsonify({"error": "forbidden"}), 403
-    users = ustore.list_users()
-    # strip sensitive fields
-    for u in users:
-        u.pop("pw_hash", None)
-        u.pop("salt", None)
-    return jsonify({"items": users})
-
-@app.get("/api/tony/admin/topups")
-def tony_admin_topups_all():
-    ok, err = _ensure_tony_ready()
-    if not ok:
-        return jsonify(err), 500
-    secret = request.args.get("secret") or request.headers.get("X-Admin-Secret") or ""
-    if not _check_admin_secret(secret):
-        return jsonify({"error": "forbidden"}), 403
-    status = request.args.get("status") or None
-    items = ustore.list_topups(status=status)
-    users = {u.get("id"): u.get("username") for u in (ustore.list_users() if ustore else [])}
-    for it in items:
-        it["username"] = users.get(it.get("user_id"))
-    return jsonify({"items": items})
-
-@app.get("/api/tony/admin/user-history")
-def tony_admin_user_history():
-    ok, err = _ensure_tony_ready()
-    if not ok:
-        return jsonify(err), 500
+# --- RBAC APIs (roles/permissions) ---
+@app.get("/api/admin/roles")
+def api_admin_roles_list():
     if not _require_admin():
         return jsonify({"error": "forbidden"}), 403
-    user_id = request.args.get("user_id") or ""
-    if not user_id:
-       r": "forbidden"}), 403
-    user_id = request.args.get("user_id") or ""
-    if not user_id:
-        return jsonify({"error": "user_id required"}), 400
-    items = ustore.list_history(user_id=user_id, limit=200)
-    return jsonify({"items": items})
+    try:
+        import db as _db
+        if not _db.DB_URL:
+            return jsonify({"error": "db_required"}), 400
+        with _db.get_session() as s:
+            roles = s.query(_db.Role).all()
+            perms = s.query(_db.Permission).all()
+        return jsonify({"roles": [{"id": r.id, "name": r.name, "desc": r.desc} for r in roles],
+                        "perms": [{"id": p.id, "code": p.code, "desc": p.desc} for p in perms]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-@app.get("/api/tony/session")
-def tony_session():
-    ok, err = _ensure_tony_ready()
-    if not ok:
-        return jsonify(err), 500
-    u = _current_user()
-    return jsonify({"user": u})
-
-@app.post("/api/tony/register")
-def tony_register():
-    ok, err = _ensure_tony_ready()
-    if not ok:
-        return jsonify(err), 500
+@app.post("/api/admin/roles")
+def api_admin_roles_create():
+    if not _require_admin():
+        return jsonify({"error": "forbidden"}), 403
     try:
         payload = request.get_json(force=True, silent=True) or {}
-        username = str(payload.get("username", "")).strip()
-        password = str(payload.get("password", "")).strip()
-        u = ustore.register(username, password)
-        return jsonify({"ok": True, "user": u})
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
+        name = (payload.get("name") or "").strip()
+        desc = (payload.get("desc") or "").strip() or None
+        if not name:
+            return jsonify({"error": "name required"}), 400
+        import db as _db
+        with _db.get_session() as s:
+            r = _db.Role(name=name, desc=desc)
+            s.add(r); s.commit()
+            rid = r.id
+        return jsonify({"ok": True, "id": rid})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.post("/api/admin/perms")
+def api_admin_perms_create():
+    if not _require_admin():
+        return jsonify({"error": "forbidden"}), 403
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        code = (payload.get("code") or "").strip()
+        desc = (payload.get("desc") or "").strip() or None
+        if not code:
+            return jsonify({"error": "code required"}), 400
+        import db as _db
+        with _db.get_session() as s:
+            p = _db.Permission(code=code, desc=desc)
+            s.add(p); s.commit()
+            pid = p.id
+        return jsonify({"ok": True, "id": pid})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.post("/api/admin/role-assign-perm")
+def api_admin_role_assign_perm():
+    if not _require_admin():
+        return jsonify({"error": "forbidden"}), 403
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        role_id = int(payload.get("role_id"))
+        perm_id = int(payload.get("perm_id"))
+        import db as _db
+        with _db.get_session() as s:
+            rp = _db.RolePermission(role_id=role_id, perm_id=perm_id)
+            s.add(rp); s.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.post("/api/admin/user-assign-role")
+def api_admin_user_assign_role():
+    if not _require_admin():
+        return jsonify({"error": "forbidden"}), 403
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        username = (payload.get("username") or "").strip()
+        role_id = int(payload.get("role_id"))
+        if not username:
+            return jsonify({"error": "username required"}), 400
+        import db as _db
+        with _db.get_session() as s:
+            u = s.query(_db.User).filter(_db.User.username.ilike(username)).one_or_none()
+            if not u:
+                return jsonify({"error": "user_not_found"}), 404
+            ur = _db.UserRole(user_id=u.id, role_id=role_id)
+            s.add(ur); s.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- Reports API ---
+@app.get("/api/admin/reports")
+def api_admin_reports():
+    if not _require_admin():
+        return jsonify({"error": "forbidden"}), 403
+    try:
+        import db as _db
+        with _db.get_session() as s:
+            users_count = s.query(_db.User).count()
+            topup_pending = s.query(_db.Topup).filter(_db.Topup.status == "pending").count()
+            topup_approved = s.query(_db.Topup).filter(_db.Topup.status == "approved").count()
+            # usage by service
+            from sqlalchemy import func
+            usage = s.query(_db.History.service, func.count(_db.History.id)).group_by(_db.History.service).all()
+            usage_map = {k: v for k, v in usage}
+        return jsonify({
+            "users_count": users_count,
+            "topup": {"pending": topup_pending, "approved": topup_approved},
+            "usage": usage_map
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1150,14 +1204,40 @@ def tony_analysis_upload():
         saved = None
         if img:
             saved = _save_upload(img, "uploads")
+        # Optional vision pre-processing (OpenCV) to enhance image before LLM
+        processed_path = None
+        try:
+            if saved:
+                import cv2  # type: ignore
+                import numpy as np  # moviepy already pulls numpy
+                raw = os.path.join(saved)
+                im = cv2.imread(raw)
+                if im is not None:
+                    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+                    # CLAHE for contrast enhancement
+                    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                    enh = clahe.apply(gray)
+                    # For face: try simple denoise; for palm: edge emphasis
+                    if kind == "palm":
+                        enh = cv2.bilateralFilter(enh, 9, 75, 75)
+                        enh = cv2.Canny(enh, 50, 150)
+                    else:
+                        enh = cv2.bilateralFilter(enh, 9, 75, 75)
+                    out_name = os.path.splitext(os.path.basename(saved))[0] + "_proc.png"
+                    out_dir = os.path.join("outputs", "uploads")
+                    processed_path = os.path.join(out_dir, out_name)
+                    cv2.imwrite(processed_path, enh)
+        except Exception:
+            processed_path = None
+
         okd, _ = _deduct_or_402(u["id"], "analysis")
         if not okd:
             return jsonify({"error": "insufficient_credits"}), 402
-        payload = {"kind": kind, "image_path": saved}
+        payload = {"kind": kind, "image_path": processed_path or saved}
         result = deng.engine_dispatch("analysis", payload)
         res_with_path = dict(result)
         if saved:
-            res_with_path["image_path"] = saved.replace("outputs/", "")
+            res_with_path["image_path"] = (processed_path or saved).replace("outputs/", "")
         ustore.record_history(u["id"], "analysis", payload, res_with_path)
         try:
             bus.publish({"type": "tony", "service": "analysis", "kind": kind, "user": u.get("username"), "ts": time.time()})

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>RBAC — จัดการบทบาทและสิทธิ์</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif; margin:0; padding:0; background:#0f1115; color:#eaeaf1; }
+    a { color:#8ecbff; text-decoration:none; }
+    header { padding: 16px 24px; background:#151a24; border-bottom:1px solid #1f2430; display:flex; align-items:center; gap:16px; }
+    .wrap { padding: 16px 24px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    .panel { background:#151a24; border:1px solid #232a3a; border-radius:12px; padding:16px; }
+    label { display:block; font-size:12px; color:#9aa3b2; margin-top:8px; }
+    input { width:100%; background:#11151f; border:1px solid #2b3348; color:#eaeaf1; border-radius:6px; padding:6px 8px; }
+    .btn { display:inline-block; background:#2a6bff; color:#fff; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; margin-top:8px; }
+    .small { color:#9aa3b2; font-size:12px; }
+    ul { margin:0; padding-left:18px; }
+    li { margin:6px 0; }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="font-weight:600;">RBAC — จัดการบทบาทและสิทธิ์</div>
+    <a href="/admin">แอดมินคอนโซล</a>
+    <a href="/portal">ศูนย์รวม</a>
+  </header>
+  <div class="wrap">
+    <div class="grid">
+      <div class="panel">
+        <div style="font-weight:600;">บทบาท (Roles)</div>
+        <div class="small" id="roles"></div>
+        <label>ชื่อบทบาท</label><input id="role_name" placeholder="manager">
+        <label>คำอธิบาย</label><input id="role_desc" placeholder="ผู้จัดการระบบ">
+        <button class="btn" id="addRole">เพิ่มบทบาท</button>
+      </div>
+      <div class="panel">
+        <div style="font-weight:600;">สิทธิ์ (Permissions)</div>
+        <div class="small" id="perms"></div>
+        <label>โค้ดสิทธิ์</label><input id="perm_code" placeholder="view_reports">
+        <label>คำอธิบาย</label><input id="perm_desc" placeholder="ดูรายงาน">
+        <button class="btn" id="addPerm">เพิ่มสิทธิ์</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <div style="font-weight:600;">จับคู่ บทบาท ↔ สิทธิ์</div>
+      <label>Role ID</label><input id="rid" placeholder="ตัวเลข id">
+      <label>Perm ID</label><input id="pid" placeholder="ตัวเลข id">
+      <button class="btn" id="assignPerm">มอบสิทธิ์ให้บทบาท</button>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <div style="font-weight:600;">จับคู่ ผู้ใช้ ↔ บทบาท</div>
+      <label>username</label><input id="uname" placeholder="user1">
+      <label>Role ID</label><input id="rid2" placeholder="ตัวเลข id">
+      <button class="btn" id="assignRole">มอบบทบาทให้ผู้ใช้</button>
+    </div>
+  </div>
+
+  <script>
+    async function load() {
+      const r = await fetch('/api/admin/roles');
+      const d = await r.json();
+      if (d.error) { alert(d.error); return; }
+      document.getElementById('roles').innerHTML = (d.roles||[]).map(r => `- [${r.id}] ${r.name} — ${r.desc||''}`).join('<br>') || 'ยังไม่มีบทบาท';
+      document.getElementById('perms').innerHTML = (d.perms||[]).map(p => `- [${p.id}] ${p.code} — ${p.desc||''}`).join('<br>') || 'ยังไม่มีสิทธิ์';
+    }
+    document.getElementById('addRole').onclick = async () => {
+      const name=document.getElementById('role_name').value.trim();
+      const desc=document.getElementById('role_desc').value.trim();
+      const r=await fetch('/api/admin/roles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,desc})});
+      const d=await r.json(); if (d.ok) load(); else alert(d.error||'error');
+    };
+    document.getElementById('addPerm').onclick = async () => {
+      const code=document.getElementById('perm_code').value.trim();
+      const desc=document.getElementById('perm_desc').value.trim();
+      const r=await fetch('/api/admin/perms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,desc})});
+      const d=await r.json(); if (d.ok) load(); else alert(d.error||'error');
+    };
+    document.getElementById('assignPerm').onclick = async () => {
+      const role_id=Number(document.getElementById('rid').value||'0');
+      const perm_id=Number(document.getElementById('pid').value||'0');
+      const r=await fetch('/api/admin/role-assign-perm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role_id,perm_id})});
+      const d=await r.json(); if (d.ok) alert('สำเร็จ'); else alert(d.error||'error');
+    };
+    document.getElementById('assignRole').onclick = async () => {
+      const username=document.getElementById('uname').value.trim();
+      const role_id=Number(document.getElementById('rid2').value||'0');
+      const r=await fetch('/api/admin/user-assign-role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,role_id})});
+      const d=await r.json(); if (d.ok) alert('สำเร็จ'); else alert(d.error||'error');
+    };
+    load();
+  </script>
+</body>
+</html>
