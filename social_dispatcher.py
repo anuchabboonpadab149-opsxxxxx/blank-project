@@ -28,13 +28,9 @@ def _bool_env(name: str, default: bool = False) -> bool:
     return str(v).strip().lower() in {"1", "true", "yes", "on"}
 
 
-# Autonomous defaults:
-# - Always keep posting without manual steps.
-# - If credentials are missing => auto-simulate.
-# - If provider errors (rate limit/network) => simulate on error by default.
+# Defaults: real API mode (no simulation) unless explicitly enabled
 SIMULATE_ALL_PROVIDERS = _bool_env("SIMULATE_ALL_PROVIDERS", False)
-SIMULATE_ON_ERROR = _bool_env("SIMULATE_ON_ERROR", True)
-AUTO_SIMULATE_IF_MISSING = _bool_env("AUTO_SIMULATE_IF_MISSING", True)
+SIMULATE_ON_ERROR = _bool_env("SIMULATE_ON_ERROR", False)
 
 
 def _provider_names() -> List[str]:
@@ -45,8 +41,38 @@ def _provider_names() -> List[str]:
             return [str(x).strip().lower() for x in names_cfg if str(x).strip()]
     except Exception:
         pass
-    names_env = os.getenv("PROVIDERS", "twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,mastodon,tiktok")
+    names_env = os.getenv("PROVIDERS", "twitter")
     return [n.strip().lower() for n in names_env.split(",") if n.strip()]
+
+
+def _has_credentials(name: str) -> bool:
+    """
+    Minimal credential presence check per provider.
+    Used to auto-enable simulation when nothing is configured.
+    """
+    env = lambda k: (os.getenv(k) or "").strip()
+    name = (name or "").lower()
+    if name == "twitter":
+        return all(env(k) for k in ["TW_CONSUMER_KEY", "TW_CONSUMER_SECRET", "TW_ACCESS_TOKEN", "TW_ACCESS_TOKEN_SECRET"])
+    if name == "facebook":
+        return all(env(k) for k in ["FB_PAGE_ID", "FB_ACCESS_TOKEN"])
+    if name == "linkedin":
+        return all(env(k) for k in ["LI_ACCESS_TOKEN", "LI_ORG_URN"])
+    if name == "line":
+        return bool(env("LINE_CHANNEL_ACCESS_TOKEN"))
+    if name == "telegram":
+        return all(env(k) for k in ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"])
+    if name == "discord":
+        return bool(env("DISCORD_WEBHOOK_URL"))
+    if name == "instagram":
+        return all(env(k) for k in ["IG_USER_ID", "FB_ACCESS_TOKEN", "IG_IMAGE_URL"])
+    if name == "reddit":
+        return all(env(k) for k in ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_USERNAME", "REDDIT_PASSWORD", "REDDIT_SUBREDDIT"])
+    if name == "mastodon":
+        return all(env(k) for k in ["MASTODON_BASE_URL", "MASTODON_ACCESS_TOKEN"])
+    if name == "tiktok":
+        return all(env(k) for k in ["TIKTOK_APP_ID", "TIKTOK_SECRET", "TIKTOK_ADVERTISER_ID"])
+    return False
 
 
 def _build_providers(cfg: Config) -> List:
@@ -96,7 +122,7 @@ def _simulate_post(provider_name: str, text: str) -> Dict[str, Any]:
 
 def _maybe_simulate(ret: Dict[str, Any], provider: str, text: str) -> Dict[str, Any]:
     status = (ret or {}).get("status")
-    if status == "skipped" and (SIMULATE_ALL_PROVIDERS or AUTO_SIMULATE_IF_MISSING):
+    if status == "skipped" and SIMULATE_ALL_PROVIDERS:
         return _simulate_post(provider, text)
     if status == "error" and SIMULATE_ON_ERROR:
         return _simulate_post(provider, text)
@@ -140,11 +166,20 @@ def _post_with_cb(p, text: str) -> Dict[str, Any]:
 def distribute_once() -> Dict[str, Any]:
     """
     Pull next text (tweets.txt/import/generator) and distribute to providers.
-    Tries real APIs where credentials exist; otherwise auto-simulates so the
-    system never blocks and always exports events/media every second.
+    Real API mode by default; simulation can be enabled by env flags.
     """
     cfg = Config()
     providers = _build_providers(cfg)
+
+    # Auto-enable simulation if no provider has credentials configured
+    try:
+        names = _provider_names()
+        if names and not any(_has_credentials(n) for n in names):
+            global SIMULATE_ALL_PROVIDERS
+            SIMULATE_ALL_PROVIDERS = True
+            log.info("No provider credentials detected; enabling SIMULATE_ALL_PROVIDERS=True automatically.")
+    except Exception:
+        pass
 
     statuses: List[Dict[str, Any]] = []
     text: Optional[str] = None
@@ -161,6 +196,31 @@ def distribute_once() -> Dict[str, Any]:
             statuses.append(_simulate_post("twitter", text))
         twitter_detail = {"provider": "twitter", "status": "ok", "detail": {"simulated": True}}
         return {"text": text, "providers": statuses, "twitter_detail": twitter_detail}
+
+    # Real mode: post on Twitter with CB
+    def _tw_call():
+        return post_one_auto(cfg)
+
+    tw_result = call_with_circuit("twitter", _tw_call)
+
+    if isinstance(tw_result, dict) and "provider" in tw_result and "status" in tw_result:
+        twitter_detail = _maybe_simulate(tw_result, "twitter", tw_result.get("text") or "")
+        text = twitter_detail.get("text")
+        statuses.append(twitter_detail)
+    else:
+        twitter_detail = tw_result if isinstance(tw_result, dict) else {}
+        text = (twitter_detail or {}).get("text")
+        statuses.append({"provider": "twitter", "status": "ok", "detail": {"tweet_id": twitter_detail.get("tweet_id")}})
+
+    if not text:
+        text = _generate_text()
+
+    for p in providers:
+        if getattr(p, "name", "") == "twitter":
+            continue
+        statuses.append(_post_with_cb(p, text))
+
+    return {"text": text, "providers": statuses, "twitter_detail": twitter_detail}
 
     # Real mode attempt: post on Twitter with CB (if credentials missing, will error -> simulate on error)
     def _tw_call():
