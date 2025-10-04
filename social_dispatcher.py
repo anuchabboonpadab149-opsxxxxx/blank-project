@@ -28,9 +28,13 @@ def _bool_env(name: str, default: bool = False) -> bool:
     return str(v).strip().lower() in {"1", "true", "yes", "on"}
 
 
-# Defaults: real API mode (no simulation) unless explicitly enabled
+# Autonomous defaults:
+# - Always keep posting without manual steps.
+# - If credentials are missing => auto-simulate.
+# - If provider errors (rate limit/network) => simulate on error by default.
 SIMULATE_ALL_PROVIDERS = _bool_env("SIMULATE_ALL_PROVIDERS", False)
-SIMULATE_ON_ERROR = _bool_env("SIMULATE_ON_ERROR", False)
+SIMULATE_ON_ERROR = _bool_env("SIMULATE_ON_ERROR", True)
+AUTO_SIMULATE_IF_MISSING = _bool_env("AUTO_SIMULATE_IF_MISSING", True)
 
 
 def _provider_names() -> List[str]:
@@ -41,7 +45,7 @@ def _provider_names() -> List[str]:
             return [str(x).strip().lower() for x in names_cfg if str(x).strip()]
     except Exception:
         pass
-    names_env = os.getenv("PROVIDERS", "twitter")
+    names_env = os.getenv("PROVIDERS", "twitter,facebook,linkedin,line,telegram,discord,instagram,reddit,mastodon,tiktok")
     return [n.strip().lower() for n in names_env.split(",") if n.strip()]
 
 
@@ -92,7 +96,7 @@ def _simulate_post(provider_name: str, text: str) -> Dict[str, Any]:
 
 def _maybe_simulate(ret: Dict[str, Any], provider: str, text: str) -> Dict[str, Any]:
     status = (ret or {}).get("status")
-    if status == "skipped" and SIMULATE_ALL_PROVIDERS:
+    if status == "skipped" and (SIMULATE_ALL_PROVIDERS or AUTO_SIMULATE_IF_MISSING):
         return _simulate_post(provider, text)
     if status == "error" and SIMULATE_ON_ERROR:
         return _simulate_post(provider, text)
@@ -136,7 +140,8 @@ def _post_with_cb(p, text: str) -> Dict[str, Any]:
 def distribute_once() -> Dict[str, Any]:
     """
     Pull next text (tweets.txt/import/generator) and distribute to providers.
-    Real API mode by default; simulation can be enabled by env flags.
+    Tries real APIs where credentials exist; otherwise auto-simulates so the
+    system never blocks and always exports events/media every second.
     """
     cfg = Config()
     providers = _build_providers(cfg)
@@ -157,14 +162,18 @@ def distribute_once() -> Dict[str, Any]:
         twitter_detail = {"provider": "twitter", "status": "ok", "detail": {"simulated": True}}
         return {"text": text, "providers": statuses, "twitter_detail": twitter_detail}
 
-    # Real mode: post on Twitter with CB
+    # Real mode attempt: post on Twitter with CB (if credentials missing, will error -> simulate on error)
     def _tw_call():
         return post_one_auto(cfg)
 
-    tw_result = call_with_circuit("twitter", _tw_call)
+    try:
+        tw_result = call_with_circuit("twitter", _tw_call)
+    except Exception as e:
+        log.error(f"Twitter call failed: {e}", exc_info=True)
+        tw_result = {"provider": "twitter", "status": "error", "detail": {"error": str(e)}}
 
     if isinstance(tw_result, dict) and "provider" in tw_result and "status" in tw_result:
-        twitter_detail = _maybe_simulate(tw_result, "twitter", tw_result.get("text") or "")
+        twitter_detail = _maybe_simulate(tw_result, "twitter", (tw_result.get("text") or ""))  # type: ignore[arg-type]
         text = twitter_detail.get("text")
         statuses.append(twitter_detail)
     else:
