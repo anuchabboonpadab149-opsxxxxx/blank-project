@@ -567,17 +567,119 @@ def gallery_page():
         os.path.join(base, "images"),
         os.path.join(base, "video"),
     ]
-   
+    try:
+        for d in dirs_to_scan:
+            if not os.path.isdir(d):
+                continue
+            for fname in os.listdir(d):
+                full = os.path.join(d, fname)
+                if not os.path.isfile(full):
+                    continue
+                lower = fname.lower()
+                mtype = None
                 if lower.endswith((".jpg", ".jpeg", ".png", ".webp")):
-                    media.append({"type": "image", "path": rel, "name": fname})
+                    mtype = "image"
                 elif lower.endswith((".mp4", ".mov", ".mkv", ".webm")):
-                    media.append({"type": "video", "path": rel, "name": fname})
-        # show newest first by filename (optional better: by mtime)
-        media.sort(key=lambda m: m.get("name") or "", reverse=True)
+                    mtype = "video"
+                if not mtype:
+                    continue
+                try:
+                    mtime = os.path.getmtime(full)
+                except Exception:
+                    mtime = 0
+                rel = os.path.relpath(full, base)
+                media.append({"type": mtype, "path": rel, "name": fname, "mtime": mtime})
+        # newest first by mtime
+        media.sort(key=lambda m: m.get("mtime", 0), reverse=True)
         media = media[:60]
     except Exception:
         media = []
     return render_template("gallery.html", media=media, user=current_user())
+
+# Fortune (ดูดวง) page
+@app.get("/fortune")
+def fortune_page():
+    try:
+        mstore.pageview("fortune")
+    except Exception:
+        pass
+    return render_template("fortune.html", user=current_user())
+
+@app.post("/fortune")
+def fortune_post():
+    # Accept JSON or form; generate deterministic fortune for today
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+    except Exception:
+        payload = {}
+    name = (payload.get("name") or request.form.get("name") or "").strip()
+    birth = (payload.get("birth") or request.form.get("birth") or "").strip()  # YYYY-MM-DD
+    topic = (payload.get("topic") or request.form.get("topic") or "ภาพรวม").strip()
+
+    import datetime, hashlib, random
+    today = datetime.date.today().isoformat()
+    seed_str = f"{name}|{birth}|{topic}|{today}"
+    seed = int(hashlib.sha256(seed_str.encode("utf-8")).hexdigest(), 16) % (10**8)
+    rnd = random.Random(seed)
+
+    fortunes = {
+        "ภาพรวม": [
+            "วันนี้พลังงานดี มีโอกาสใหม่เข้ามา",
+            "ระวังความใจร้อนเล็กน้อย ตั้งสติแล้วไปต่อ",
+            "เหมาะกับการเริ่มต้นสิ่งใหม่ ๆ",
+            "มีเกณฑ์ได้รับข่าวดีจากคนไกล",
+            "พักใจสักนิด แล้วสิ่งดี ๆ จะตามมา",
+        ],
+        "การงาน": [
+            "งานคืบหน้าเร็ว ได้แรงสนับสนุนจากทีม",
+            "ระวังรายละเอียดสัญญา ทบทวนให้ครบถ้วน",
+            "เหมาะกับการวางแผนระยะยาว",
+            "มีโอกาสโชว์ผลงานและเป็นที่ยอมรับ",
+            "อย่ากลัวการเปลี่ยนแปลง มันพาคุณไปสู่โอกาส",
+        ],
+        "การเงิน": [
+            "รายรับ-รายจ่ายสมดุลขึ้นกว่าเดิม",
+            "ระวังการใช้จ่ายฟุ่มเฟือย คุมงบประมาณให้ดี",
+            "มีโชคเล็ก ๆ น้อย ๆ จากการเจรจา",
+            "เหมาะกับการลงทุนระยะยาวแบบปลอดภัย",
+            "ตรวจสอบบิล/สัญญา เพื่อเลี่ยงค่าใช้จ่ายแอบแฝง",
+        ],
+        "ความรัก": [
+            "คนโสดมีเกณฑ์พบคนที่ถูกใจ",
+            "คู่รักสื่อสารมากขึ้น เข้าใจกันดี",
+            "อย่าเก็บเรื่องเล็กเป็นเรื่องใหญ่ พูดคุยด้วยเหตุผล",
+            "มีโอกาสออกเดต/ทำกิจกรรมร่วมกัน",
+            "ความสัมพันธ์ก้าวหน้าอย่างเป็นธรรมชาติ",
+        ],
+            "สุขภาพ": [
+            "ร่างกายต้องการการพักผ่อนที่มีคุณภาพ",
+            "เหมาะกับการออกกำลังกายเบา ๆ และเข้ากลางแจ้ง",
+            "ดื่มน้ำมากขึ้น ระบบภายในจะดีขึ้น",
+            "ฟังสัญญาณร่างกาย อย่าฝืนจนเกินไป",
+            "เติมอาหารที่มีประโยชน์ ลดหวาน/เค็ม",
+        ],
+    }
+    chosen_list = fortunes.get(topic, fortunes["ภาพรวม"])
+    msg = rnd.choice(chosen_list)
+    lucky_color = rnd.choice(["น้ำเงิน","เขียว","ทอง","ขาว","ม่วง","ชมพู","ดำ","แดง"])
+    lucky_number = rnd.randint(1, 99)
+
+    result = {
+        "name": name or "คุณ",
+        "birth": birth,
+        "topic": topic,
+        "message": msg,
+        "lucky_color": lucky_color,
+        "lucky_number": lucky_number,
+        "date": today,
+    }
+
+    try:
+        bus.publish({"type": "fortune", "ts": int(datetime.datetime.now().timestamp()), "name": name or "", "topic": topic, "message": msg})
+    except Exception:
+        pass
+
+    return jsonify(result)
 
 
 @app.get("/events")
