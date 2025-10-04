@@ -420,6 +420,18 @@ def about():
     return render_template("about.html")
 
 
+@app.get("/tony")
+def tony_page():
+    try:
+        mstore.pageview("tony")
+    except Exception:
+        pass
+    try:
+        return render_template("tony.html")
+    except Exception:
+        return "<html><body><h1>อ.โทนี่สะท้อนกรรม</h1><p>Template missing.</p></body></html>"
+
+
 @app.get("/nodes")
 def nodes_page():
     return render_template_string(NODES_HTML)
