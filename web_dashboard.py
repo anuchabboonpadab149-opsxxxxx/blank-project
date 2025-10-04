@@ -6,7 +6,8 @@ from flask import Flask, Response, jsonify, render_template, render_template_str
 
 import realtime_bus as bus
 
-WEB_PORT = int(os.getenv("WEB_PORT", "8000"))
+# Support PaaS environments (Heroku/Render/Railway) that pass PORT
+WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
 
 # Minimal inline template to avoid external files
 INDEX_HTML = """
@@ -279,6 +280,11 @@ def index():
 @app.get("/api/recent")
 def api_recent():
     return jsonify(bus.recent(100))
+
+
+@app.get("/healthz")
+def healthz():
+    return jsonify({"ok": True})
 
 
 @app.get("/events")
