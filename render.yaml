@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: jasmine-salmon
+    env: docker
+    region: singapore
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /healthz
+    envVars:
+      - key: RUN_MODE
+        value: daemon
+      - key: WEB_DASHBOARD
+        value: "true"
+      - key: TIMEZONE
+        value: Asia/Bangkok

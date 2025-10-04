@@ -1,0 +1,13 @@
+{
+    email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+    encode gzip
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET,POST,OPTIONS"
+        Access-Control-Allow-Headers "*"
+    }
+    reverse_proxy promote-ayutthaya:8000
+}
