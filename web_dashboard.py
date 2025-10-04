@@ -2,7 +2,7 @@ import json
 import os
 from typing import Generator
 
-from flask import Flask, Response, jsonify, render_template_string, send_from_directory, request
+from flask import Flask, Response, jsonify, render_template, render_template_string, send_from_directory, request
 
 import realtime_bus as bus
 
@@ -269,7 +269,11 @@ app = Flask(__name__)
 
 @app.get("/")
 def index():
-    return render_template_string(INDEX_HTML)
+    # Prefer template file if available; fallback to inline HTML.
+    try:
+        return render_template("index.html")
+    except Exception:
+        return render_template_string(INDEX_HTML)
 
 
 @app.get("/api/recent")
