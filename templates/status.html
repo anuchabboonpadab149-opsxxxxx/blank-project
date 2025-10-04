@@ -26,6 +26,9 @@
         <a href="/about">เกี่ยวกับ</a>
         <a href="/gallery">แกลเลอรี</a>
         <a href="/nodes">โหนด</a>
+        <a href="/qr">QR</a>
+        <span style="margin-left:8px;color:#888;">{{ 'เข้าสู่ระบบแล้ว: ' + (user or '') if user else '' }}</span>
+        {% if user %}<a href="/logout" style="margin-left:12px;">Logout</a>{% else %}<a href="/login" style="margin-left:12px;">Login</a>{% endif %}
       </nav>
     </div>
   </header>

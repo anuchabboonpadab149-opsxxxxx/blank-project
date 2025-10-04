@@ -20,7 +20,16 @@
 <body>
   <header>
     <h1>เกี่ยวกับระบบ — จัสมินชอบกินแซลมอน</h1>
-    <div class="small"><a href="/">กลับสู่แดชบอร์ด</a> · <a href="/static/docs/SSH_BACKEND_GUIDE.md" target="_blank">SSH/Backend Guide</a> · <a href="/static/docs/ARCHITECTURE.md" target="_blank">Architecture</a> · <a href="/static/docs/OPERATIONS.md" target="_blank">Operations</a> · <a href="/README.md" target="_blank">README</a></div>
+    <div class="small">
+      <a href="/">กลับสู่แดชบอร์ด</a> ·
+      <a href="/qr">QR</a> ·
+      <span>{{ 'เข้าสู่ระบบแล้ว: ' + (user or '') if user else '' }}</span>
+      {% if user %}<a href="/logout" style="margin-left:12px;">Logout</a>{% else %}<a href="/login" style="margin-left:12px;">Login</a>{% endif %} ·
+      <a href="/static/docs/SSH_BACKEND_GUIDE.md" target="_blank">SSH/Backend Guide</a> ·
+      <a href="/static/docs/ARCHITECTURE.md" target="_blank">Architecture</a> ·
+      <a href="/static/docs/OPERATIONS.md" target="_blank">Operations</a> ·
+      <a href="/README.md" target="_blank">README</a>
+    </div>
   </header>
 
   <div class="wrap">

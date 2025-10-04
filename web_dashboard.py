@@ -327,6 +327,9 @@ NODES_HTML = """
     <h1>Nodes — จัสมินชอบกินแซลมอน</h1>
     <a href="/">กลับสู่แดชบอร์ด</a>
     <a href="/about">About</a>
+    <a href="/qr">QR</a>
+    <span style="margin-left:8px;color:#888;">{{ 'เข้าสู่ระบบแล้ว: ' + (user or '') if user else '' }}</span>
+    {% if user %}<a href="/logout" style="margin-left:12px;">Logout</a>{% else %}<a href="/login" style="margin-left:12px;">Login</a>{% endif %}
   </header>
   <div class="wrap">
     <div class="grid">
@@ -475,12 +478,12 @@ def about():
         mstore.pageview("about")
     except Exception:
         pass
-    return render_template("about.html")
+    return render_template("about.html", user=current_user())
 
 
 @app.get("/nodes")
 def nodes_page():
-    return render_template_string(NODES_HTML)
+    return render_template_string(NODES_HTML, user=current_user())
 
 
 @app.get("/credentials")
