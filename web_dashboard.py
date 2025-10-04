@@ -804,6 +804,14 @@ def tony_site():
         pass
     return render_template("tony_site.html")
 
+@app.get("/portal")
+def site_portal():
+    try:
+        mstore.pageview("site_portal")
+    except Exception:
+        pass
+    return render_template("portal.html")
+
 @app.get("/admin")
 def admin_console():
     try:
