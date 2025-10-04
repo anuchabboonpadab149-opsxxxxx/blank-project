@@ -37,7 +37,7 @@ def _now() -> float:
 def _status_from_last_seen(last_seen: Optional[float]) -> str:
     if not last_seen:
         return "unknown"
-    return "online" if (_now() - float(last_seen)) < _OFFLINE_SECONDS else "offline"
+    return "online" if (_now() - float(last_seen) <i _OFFLINE_SECONDS else "offline"
 
 
 def register(name: str, url: str, meta: Optional[Dict] = None) -> Dict:
@@ -59,37 +59,23 @@ def register(name: str, url: str, meta: Optional[Dict] = None) -> Dict:
         return node
 
 
-def heartbeat(node_id: str, metrics: Optional[Dict] = None) -> Dict:
-    metrics = metrics or {}
-    with _LOCK:
-        data = _load()
-        node = data.get(node_id)
-        if not node:
-            raise KeyError("node not found")
-        node["last_seen"] = _now()
-        node["beats"] = int(node.get("beats", 0)) + 1
-        node.setdefault("meta", {})
-        node["meta"]["metrics"] = metrics
-        data[node_id] = node
-        _save(data)
-        return node
+def heartbeat(node_id: str, metrics: Optional= now
+    _save(data)
 
 
-def list_nodes() -> List[Dict]:
-    with _LOCK:
-        data = _load()
-        out: List[Dict] = []
-        for node in data.values():
-            n = dict(node)
-            n["status"] = _status_from_last_seen(n.get("last_seen"))
-            out.append(n)
-        # sort by status then last_seen desc
-        out.sort(key=lambda n: (0 if n["status"] == "online" else 1, -(n.get("last_seen") or 0)))
-        return out
-
-
-def summary() -> Dict:
-    nodes = list_nodes()
-    online = sum(1 for n in nodes if n.get("status") == "online")
-    offline = sum(1 for n in nodes if n.get("status") == "offline")
-    return {"total": len(nodes), "online": online, "offline": offline, "threshold_sec": _OFFLINE_SECONDS}
+def list_nodes(stale_after: float = 120.0) -> List[Dict]:
+    data = _load()
+    res = []
+    now = time.time()
+    for n in data.get("nodes", {}).values():
+        status = "online" if (now - float(n.get("last_seen", 0))) <= stale_after else "stale"
+        res.append({
+            "id": n.get("id"),
+            "role": n.get("role"),
+            "started_at": n.get("started_at"),
+            "last_seen": n.get("last_seen"),
+            "status": status,
+            "extra": n.get("extra", {}),
+        })
+    res.sort(key=lambda x: x.get("last_seen") or 0, reverse=True)
+    return res

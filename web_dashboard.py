@@ -6,6 +6,8 @@ from flask import Flask, Response, jsonify, render_template, render_template_str
 
 import realtime_bus as bus
 import node_registry as nreg
+import metrics_store as mstore
+import circuit_breaker as cbreak
 
 # Support PaaS environments (Heroku/Render/Railway) that pass PORT
 WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
@@ -57,6 +59,7 @@ INDEX_HTML = """
       <div>Total events: <span id="count">0</span></div>
       <div>Last update: <span id="last">-</span></div>
       <div>Providers: <span id="providers"></span></div>
+      <div>Visitors: <span id="visitors">0</span></div>
     </div>
     <div class="grid" style="margin-top:12px;">
       <div class="panel" id="events"></div>
@@ -120,6 +123,7 @@ INDEX_HTML = """
     const lastEl = document.getElementById('last');
     const providersEl = document.getElementById('providers');
     const latestMediaEl = document.getElementById('latest-media');
+    const visitorsEl = document.getElementById('visitors');
 
     const postIntervalInput = document.getElementById('postInterval');
     const collectIntervalInput = document.getElementById('collectInterval');
@@ -198,6 +202,16 @@ INDEX_HTML = """
       if (Array.isArray(cfg.light_spicy)) lightSpicyInput.value = cfg.light_spicy.join('\\n');
     }
 
+    async function loadMetrics() {
+      try {
+        const r = await fetch('/api/metrics');
+        const m = await r.json();
+        if (visitorsEl && m && typeof m.total_pageviews === 'number') {
+          visitorsEl.textContent = m.total_pageviews;
+        }
+      } catch (e) {}
+    }
+
     let count = 0;
     function fmtTs(ts) {
       const d = new Date(ts * 1000);
@@ -266,6 +280,8 @@ INDEX_HTML = """
       list.forEach(addEvent);
       connect();
       loadConfig();
+      loadMetrics();
+      setInterval(loadMetrics, 10000);
     });
   </script>
 </body>
@@ -362,6 +378,11 @@ app = Flask(__name__)
 
 @app.get("/")
 def index():
+    # Log pageview
+    try:
+        mstore.pageview("index")
+    except Exception:
+        pass
     # Prefer template file if available; fallback to inline HTML.
     try:
         return render_template("index.html")
@@ -371,11 +392,19 @@ def index():
 
 @app.get("/about")
 def about():
+    try:
+        mstore.pageview("about")
+    except Exception:
+        pass
     return render_template("about.html")
 
 
 @app.get("/nodes")
 def nodes_page():
+    try:
+        mstore.pageview("nodes")
+    except Exception:
+        pass
     return render_template_string(NODES_HTML)
 
 
@@ -401,6 +430,56 @@ def api_latest():
             latest_post = ev
             break
     return jsonify(latest_post or latest_any)
+
+
+@app.get("/events")
+def events() -> Response:
+    # Count SSE subscribers as visits too
+    try:
+        mstore.pageview("events")
+    except Exception:
+        pass
+
+    def gen() -> Generator[str, None, None]:
+        for ev in bus.stream(keepalive_sec=1.0):
+            try:
+                yield "data: " + json.dumps(ev, ensure_ascii=False) + "\n\n"
+            except Exception:
+                # continue even if a single event cannot be serialized
+                continue
+
+    headers = {"Cache-Control": "no-cache"}
+    return Response(gen(), mimetype="text/event-stream", headers=headers)
+
+
+@app.get("/api/metrics")
+def api_metrics():
+    try:
+        return jsonify(mstore.get_metrics())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/circuit-states")
+def api_circuit_states():
+    try:
+        return jsonify(cbreak.states())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/events")
+def events_stream():
+    try:
+        last_id = request.args.get("last_id", default=None, type=int)
+    except Exception:
+        last_id = None
+
+    def _gen():
+        for ev in bus.stream(last_id=last_id, keepalive_sec=1.0):
+            yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+
+    return Response(_gen(), mimetype="text/event-stream")
 
 
 @app.get("/api/nodes")
@@ -449,6 +528,22 @@ def api_nodes_heartbeat():
 @app.get("/api/nodes/summary")
 def api_nodes_summary():
     return jsonify(nreg.summary())
+
+
+@app.get("/api/circuit")
+def api_circuit_states():
+    try:
+        return jsonify(cbreak.states())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/metrics")
+def api_metrics():
+    try:
+        return jsonify(mstore.get_metrics())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.get("/healthz")
