@@ -13,13 +13,14 @@
     .card { background:#181818; border:1px solid #2a2a2a; border-radius:10px; padding:12px; margin-bottom:16px; }
     .small { color:#aaa; font-size:13px; }
     ul { margin: 8px 0 8px 20px; }
-    code { background:#222; padding:2px 6px; border-radius:6px; }
+    code, pre.code { background:#222; padding:2px 6px; border-radius:6px; }
+    pre.code { white-space:pre-wrap; }
   </style>
 </head>
 <body>
   <header>
     <h1>เกี่ยวกับระบบ — จัสมินชอบกินแซลมอน</h1>
-    <div class="small"><a href="/">กลับสู่แดชบอร์ด</a></div>
+    <div class="small"><a href="/">กลับสู่แดชบอร์ด</a> · <a href="/static/docs/SSH_BACKEND_GUIDE.md" target="_blank">ดาวน์โหลดคู่มือ (Markdown)</a></div>
   </header>
 
   <div class="wrap">
@@ -34,13 +35,49 @@
     </div>
 
     <div class="card">
-      <h2>เริ่มต้นใช้งาน</h2>
+      <h2>SSH คืออะไร (สรุปใช้งาน)</h2>
+      <p>SSH (Secure Shell) คือโปรโตคอลสำหรับเชื่อมต่อเครื่อง/เซิร์ฟเวอร์จากระยะไกลผ่านช่องทางที่เข้ารหัส ปลอดภัยกว่าการใช้ Telnet/FTP</p>
+      <ul>
+        <li><b>IP/Hostname</b>: ที่อยู่ปลายทางที่ต้องการเชื่อมต่อ</li>
+        <li><b>Port</b>: พอร์ตของ SSH (ดีฟอลต์ 22) ถ้าไม่ใช่ 22 ให้ระบุด้วย <code>-p</code></li>
+      </ul>
+      <p><b>คำสั่งพื้นฐาน</b></p>
+      <pre class="code">ssh username@host_or_ip
+ssh username@host_or_ip -p 2222
+ssh -i ~/.ssh/id_ed25519 username@host_or_ip -p 2222</pre>
+      <p><b>ตัวอย่าง</b></p>
+      <pre class="code">ssh admin@192.168.1.100
+ssh ubuntu@example.com -p 2222</pre>
+    </div>
+
+    <div class="card">
+      <h2>แก้สิทธิ์ (Permissions) ที่ถูกต้อง</h2>
+      <p>กรณีขึ้นข้อความ <code>Permission denied (publickey)</code> ให้ตรวจสิทธิ์ไฟล์กุญแจ:</p>
+      <pre class="code">chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys</pre>
+    </div>
+
+    <div class="card">
+      <h2>ตั้งค่าแบ็กเอนด์แบบครบวงจร (End-to-End Backend)</h2>
       <ol>
-        <li>ตั้งค่าไฟล์ <code>.env</code> ด้วยคีย์จริงของแพลตฟอร์มที่ต้องการ (Twitter/Facebook/LinkedIn/LINE/Telegram/Discord/Instagram/Reddit/Mastodon/Twitter Ads)</li>
-        <li>รันด้วย Docker: <code>docker compose up -d --build</code></li>
-        <li>เปิดหน้าแดชบอร์ด: <a href="/">/</a> และตรวจสุขภาพที่ <a href="/healthz">/healthz</a></li>
+        <li><b>ติดตั้ง Docker + Compose</b> บนเซิร์ฟเวอร์ (Ubuntu/Debian แนะนำ)</li>
+        <li><b>ตั้งค่า .env</b> (คีย์จริงของแพลตฟอร์มต่างๆ และพอร์ต/โหมดโพสต์)</li>
+        <li><b>เปิดพอร์ตไฟร์วอลล์</b> อย่างน้อย 8000/TCP (และ 22/TCP สำหรับ SSH)</li>
+        <li><b>รัน</b> ด้วย <code>docker compose up -d --build</code></li>
+        <li><b>ตรวจสุขภาพ</b> ที่ <code>/healthz</code>, สตรีมสดที่ <code>/events</code></li>
+        <li><b>ใส่คีย์จริง</b> ที่หน้า <code>/credentials</code> (ระบบจะยิง API จริงโดยอัตโนมัติเมื่อคีย์ครบ)</li>
       </ol>
-      <p class="small">หมายเหตุ: คีย์จริงควรจัดการผ่าน .env หรือระบบ Secret Manager ของโครงสร้างพื้นฐานเท่านั้น</p>
+      <p class="small">หมายเหตุ: ถ้าเปิดหน้าเว็บสาธารณะผ่าน HTTPS แล้วเรียกแบ็กเอนด์ผ่าน HTTP ภายใน LAN เบราว์เซอร์บางตัวจะบล็อก (Mixed Content) — ให้เปิดหน้าแดชบอร์ดจาก LAN ตรงๆ (เช่น <code>http://192.168.10.121:8000</code>) หรือวาง Reverse Proxy/HTTPS ภายใน</p>
+    </div>
+
+    <div class="card">
+      <h2>Troubleshooting</h2>
+      <ul>
+        <li><b>Connection refused</b>: บริการ <code>sshd</code> หรือแบ็กเอนด์อาจยังไม่รัน / พอร์ต/ไฟร์วอลล์ไม่เปิด</li>
+        <li><b>Permission denied (publickey)</b>: คีย์ไม่ตรงหรือสิทธิ์ไฟล์ผิด — ดูหัวข้อ “แก้สิทธิ์” ด้านบน</li>
+        <li><b>Timeout</b>: เส้นทางเครือข่าย/ไฟร์วอลล์/พอร์ตไม่เปิด หรือ NAT/Port Forwarding ไม่ตั้ง</li>
+        <li><b>Mixed Content</b>: หน้า HTTPS เรียก HTTP ภายใน — ให้เปิดผ่าน LAN ตรงๆ หรือทำ HTTPS ให้แบ็กเอนด์</li>
+      </ul>
     </div>
 
     <div class="card">
@@ -58,10 +95,12 @@
     <div class="card">
       <h2>ความปลอดภัย</h2>
       <ul>
+        <li>ปิด <code>root</code> login และใช้ key-based authentication</li>
         <li>หลีกเลี่ยงการใส่คีย์ผ่าน UI ใช้ .env หรือ Secret Manager แทน</li>
-        <li>ระบบออกแบบให้ทนทานต่อการล้มเหลว: โพสต์ล้มเหลวก็ยังมีสื่อและเหตุการณ์อัปเดตทุกวินาที</li>
+        <li>ระบบทนทานต่อการล้มเหลว: โพสต์ล้มเหลวก็ยังมีสื่อและเหตุการณ์อัปเดตทุกวินาที</li>
         <li>ตั้งค่า <code>ADS_SIMULATION=false</code> เฉพาะเมื่อพร้อมยิงโฆษณาจริงและงบครบ</li>
       </ul>
+      <p class="small">มีคู่มือฉบับเต็มในรูปแบบ Markdown: <a href="/static/docs/SSH_BACKEND_GUIDE.md" target="_blank">/static/docs/SSH_BACKEND_GUIDE.md</a></p>
     </div>
   </div>
 </body>
