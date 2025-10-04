@@ -71,6 +71,18 @@ chmod 600 ~/.ssh/authorized_keys</pre>
     </div>
 
     <div class="card">
+      <h2>ลิงก์ระบบ (ต้องมีแบ็กเอนด์)</h2>
+      <p>
+        <a href="/healthz" target="_blank">/healthz</a> ·
+        <a href="/events" target="_blank">/events</a> ·
+        <a href="/api/recent" target="_blank">/api/recent</a> ·
+        <a href="/api/feed" target="_blank">/api/feed</a> ·
+        <a href="/credentials" target="_blank">/credentials</a>
+      </p>
+      <p class="small">ลิงก์ด้านบนจะทำงานเมื่อบริการแบ็กเอนด์ Flask ของระบบกำลังทำงานอยู่บนเครื่อง/โดเมนนี้</p>
+    </div>
+
+    <div class="card">
       <h2>Troubleshooting</h2>
       <ul>
         <li><b>Connection refused</b>: บริการ <code>sshd</code> หรือแบ็กเอนด์อาจยังไม่รัน / พอร์ต/ไฟร์วอลล์ไม่เปิด</li>
@@ -90,17 +102,6 @@ chmod 600 ~/.ssh/authorized_keys</pre>
         <li><code>/media/...</code> — ให้บริการไฟล์เสียง/รูป/วิดีโอ</li>
         <li><code>/healthz</code> — สุขภาพระบบ</li>
       </ul>
-    </div>
-
-    <div class="card">
-      <h2>ความปลอดภัย</h2>
-      <ul>
-        <li>ปิด <code>root</code> login และใช้ key-based authentication</li>
-        <li>หลีกเลี่ยงการใส่คีย์ผ่าน UI ใช้ .env หรือ Secret Manager แทน</li>
-        <li>ระบบทนทานต่อการล้มเหลว: โพสต์ล้มเหลวก็ยังมีสื่อและเหตุการณ์อัปเดตทุกวินาที</li>
-        <li>ตั้งค่า <code>ADS_SIMULATION=false</code> เฉพาะเมื่อพร้อมยิงโฆษณาจริงและงบครบ</li>
-      </ul>
-      <p class="small">มีคู่มือฉบับเต็มในรูปแบบ Markdown: <a href="/static/docs/SSH_BACKEND_GUIDE.md" target="_blank">/static/docs/SSH_BACKEND_GUIDE.md</a></p>
     </div>
   </div>
 </body>
