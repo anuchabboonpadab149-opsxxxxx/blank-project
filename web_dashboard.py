@@ -465,11 +465,8 @@ def index():
         mstore.pageview("index")
     except Exception:
         pass
-    # Prefer template file if available; fallback to inline HTML.
-    try:
-        return render_template("index.html", user=current_user())
-    except Exception:
-        return render_template_string(INDEX_HTML, user=current_user())
+    # Redirect homepage to fortune page (ธีมเหลือแค่ดูดวง)
+    return redirect(url_for("fortune_page"))
 
 
 @app.get("/about")
