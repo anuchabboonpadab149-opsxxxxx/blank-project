@@ -2,8 +2,16 @@ import random
 import datetime
 from typing import Dict, Any, List, Tuple
 
-# Lightweight rule/template-based divination engine.
-# This is a placeholder designed to be replaced with a true LLM integration later.
+# Lightweight rule/template-based divination engine with optional LLM integration.
+# If LLM keys are configured, the engine will call OpenAI/Gemini with prompt templates from config_store.
+try:
+    import config_store
+except Exception:
+    config_store = None
+try:
+    import llm_client
+except Exception:
+    llm_client = None
 
 MAJOR_ARCANA = [
     "The Fool", "The Magician", "The High Priestess", "The Empress", "The Emperor",
@@ -62,8 +70,36 @@ def _fortune_level(seed: int) -> str:
         return "ปานกลาง"
     return "ควรระวัง"
 
+def _cfg_get(key: str, default: str = "") -> str:
+    try:
+        if config_store:
+            v = config_store.get(key)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+    except Exception:
+        pass
+    return default
+
+def _try_llm(system: str, prompt: str, vision_path: str = "") -> str:
+    if not llm_client:
+        raise RuntimeError("llm_client_unavailable")
+    # raises if not configured; the caller should handle and fallback
+    if vision_path:
+        return llm_client.call_llm_vision(prompt=prompt, image_path=vision_path, system=system)
+    return llm_client.call_llm_text(prompt=prompt, system=system)
+
 def analyze_astrology(dob: str, tob: str = "", question: str = "") -> Dict[str, Any]:
-    # dob: YYYY-MM-DD, tob: HH:MM
+    # If LLM configured, use LLM with template
+    sys = _cfg_get("prompt_astrology", "คุณคือหมอดูโทนี่ วิเคราะห์ดวงแบบโครงสร้าง ขั้นตอน กระชับ")
+    user_prompt = f"ข้อมูลวันเกิด: {dob or '-'} เวลาเกิด: {tob or '-'}\\nคำถาม: {question or '-'}\\nโปรดสรุป: โฟกัสหลัก / ระดับดวง / คำแนะนำปฏิบัติ"
+    try:
+        text = _try_llm(sys, user_prompt)
+        if text:
+            return {"llm": True, "result": text}
+    except Exception:
+        pass
+
+    # fallback rule-based
     try:
         dt = datetime.datetime.strptime(dob, "%Y-%m-%d")
     except Exception:
@@ -117,6 +153,16 @@ def draw_tarot(n: int = 3) -> List[Tuple[str, str]]:
 
 def analyze_tarot(n: int, question: str = "") -> Dict[str, Any]:
     cards = draw_tarot(n)
+    sys = _cfg_get("prompt_tarot", "คุณคือหมอดูโทนี่ ตีความไพ่ยิปซีแบบโครงสร้าง")
+    try:
+        prompt = f"คำถาม: {question or '-'}\\nผลการสุ่มไพ่: " + \\
+                 ", ".join([c for c, _ in cards]) + "\\nโปรดสรุปแนวโน้มและคำแนะนำ"
+        text = _try_llm(sys, prompt)
+        if text:
+            return {"llm": True, "cards": cards, "result": text}
+    except Exception:
+        pass
+    # fallback
     summary = "คำถาม: " + (question or "-") + " | สาระ: "
     if any("Sun" in c[0] or "Star" in c[0] or "Wheel" in c[0] for c in cards):
         trend = "แนวโน้มบวก เปิดทางก้าวหน้า"
@@ -129,6 +175,15 @@ def analyze_tarot(n: int, question: str = "") -> Dict[str, Any]:
 def analyze_dice(rolls: int = 3) -> Dict[str, Any]:
     rolls = max(1, min(6, rolls))
     nums = [random.randint(1, 6) for _ in range(rolls)]
+    try:
+        sys = _cfg_get("prompt_dice", "")
+        if sys and llm_client:
+            prompt = f"ผลทอยลูกเต๋า: {nums} โปรดสรุปแนวโน้มและคำแนะนำ"
+            txt = _try_llm(sys, prompt)
+            if txt:
+                return {"llm": True, "dice": nums, "result": txt}
+    except Exception:
+        pass
     s = sum(nums)
     if s <= 7:
         meaning = "คำตอบเอนเอียงไปทาง 'ชะลอ/ทบทวน' ก่อน"
@@ -140,6 +195,15 @@ def analyze_dice(rolls: int = 3) -> Dict[str, Any]:
 
 def analyze_siamsee() -> Dict[str, Any]:
     num = random.randint(1, 100)
+    try:
+        sys = _cfg_get("prompt_siamsee", "")
+        if sys and llm_client:
+            prompt = f"เลขเซียมซี: {num} โปรดตีความระดับดวงและข้อควรทำ"
+            txt = _try_llm(sys, prompt)
+            if txt:
+                return {"llm": True, "stick": num, "result": txt}
+    except Exception:
+        pass
     level = _fortune_level(num)
     brief = {
         "ดีมาก": "ดวงขึ้น งาน/รัก/เงินเดินหน้า",
@@ -154,10 +218,27 @@ def analyze_pok(n: int = 3) -> Dict[str, Any]:
     ranks = ["ดอกจิก", "โพธิ์แดง", "ข้าวหลามตัด", "โพธิ์ดำ"]
     values = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"]
     cards = [random.choice(values) + " " + random.choice(ranks) for _ in range(max(1, min(5, n)))]
+    try:
+        sys = _cfg_get("prompt_pok", "")
+        if sys and llm_client:
+            prompt = f"ชุดไพ่ป๊อก: {cards} โปรดสรุปแนวโน้มและคำแนะนำ"
+            txt = _try_llm(sys, prompt)
+            if txt:
+                return {"llm": True, "cards": cards, "result": txt}
+    except Exception:
+        pass
     total_hint = "แต้มรวมอยู่ในเกณฑ์ " + random.choice(["ดี", "พอใช้", "ควรระวัง"])
     return {"cards": cards, "summary": total_hint}
 
 def analyze_palm_face(kind: str) -> Dict[str, Any]:
+    sys = _cfg_get("prompt_palm" if kind == "palm" else "prompt_face", "")
+    try:
+        if sys and llm_client:
+            # vision path should be provided by caller via payload["image_path"] if needed, but engine_dispatch wraps it.
+            # here we just return a marker for vision to handle in engine_dispatch
+            pass
+    except Exception:
+        pass
     if kind == "palm":
         traits = [
             "เส้นวาสนาชัด มีโอกาสเติบโตในงาน",
@@ -173,6 +254,15 @@ def analyze_palm_face(kind: str) -> Dict[str, Any]:
     return {"traits": traits, "advice": "การอ่านจากภาพเป็นเพียงแนวโน้ม ต้องดูองค์รวมและสภาพแวดล้อม"}
 
 def analyze_dream(text: str) -> Dict[str, Any]:
+    sys = _cfg_get("prompt_dream", "")
+    if sys and llm_client:
+        try:
+            prompt = f"ความฝัน: {text}"
+            txt = _try_llm(sys, prompt)
+            if txt:
+                return {"llm": True, "result": txt}
+        except Exception:
+            pass
     text_l = (text or "").lower()
     if any(k in text_l for k in ["งู", "snake"]):
         meaning = "งูมักสื่อถึงการเปลี่ยนแปลง/คู่ครอง/ปมในใจ"
@@ -185,6 +275,15 @@ def analyze_dream(text: str) -> Dict[str, Any]:
     return {"meaning": meaning, "note": "บันทึกความฝันต่อเนื่องจะช่วยให้ตีความแม่นยำขึ้น"}
 
 def analyze_phone(number: str) -> Dict[str, Any]:
+    sys = _cfg_get("prompt_phone", "")
+    if sys and llm_client:
+        try:
+            prompt = f"เบอร์โทรศัพท์: {number} โปรดวิเคราะห์ในเชิงตัวเลขพร้อมคำแนะนำ"
+            txt = _try_llm(sys, prompt)
+            if txt:
+                return {"llm": True, "result": txt}
+        except Exception:
+            pass
     digits = [int(ch) for ch in number if ch.isdigit()]
     total = sum(digits)
     root = _reduce_to_single_digit(total)
@@ -207,6 +306,15 @@ def analyze_phone(number: str) -> Dict[str, Any]:
     }
 
 def analyze_license(text: str) -> Dict[str, Any]:
+    sys = _cfg_get("prompt_license", "")
+    if sys and llm_client:
+        try:
+            prompt = f"เลขทะเบียนรถ: {text} โปรดแปลความหมาย, วันมงคล และข้อควรระวัง"
+            txt = _try_llm(sys, prompt)
+            if txt:
+                return {"llm": True, "result": txt}
+        except Exception:
+            pass
     digits = [int(ch) for ch in text if ch.isdigit()]
     total = sum(digits)
     root = _reduce_to_single_digit(total)
@@ -219,6 +327,15 @@ def analyze_license(text: str) -> Dict[str, Any]:
     }
 
 def analyze_name(name: str, dob: str = "") -> Dict[str, Any]:
+    sys = _cfg_get("prompt_name", "")
+    if sys and llm_client:
+        try:
+            prompt = f"ชื่อ-นามสกุล: {name} วันเกิด: {dob or '-'} โปรดวิเคราะห์ภาพรวมชีวิต/งาน/ความรัก และคำแนะนำ"
+            txt = _try_llm(sys, prompt)
+            if txt:
+                return {"llm": True, "result": txt}
+        except Exception:
+            pass
     if not name:
         return {"score": 0, "meaning": "กรุณาระบุชื่อ"}
     # Simple latin-thai mapping by codepoints
@@ -258,6 +375,19 @@ def engine_dispatch(service: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     if service == "analysis":
         kind = (payload.get("kind") or "palm").lower()
         if kind in ("palm", "face"):
+            # If LLM + vision available, use it
+            sys = _cfg_get("prompt_palm" if kind == "palm" else "prompt_face", "")
+            image_path = payload.get("image_path") or ""
+            if sys and llm_client and image_path:
+                try:
+                    txt = _try_llm(sys, f"วิเคราะห์{('ลายมือ' if kind=='palm' else 'โหงวเฮ้ง')}จากภาพ พร้อมคำแนะนำ", vision_path=image_path)
+                    if txt:
+                        out = {"llm": True, "result": txt}
+                        if image_path:
+                            out["image_path"] = image_path
+                        return out
+                except Exception:
+                    pass
             return analyze_palm_face(kind)
         if kind == "dream":
             return analyze_dream(payload.get("text", ""))

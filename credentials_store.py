@@ -30,6 +30,10 @@ ALLOWED_KEYS = [
     "ADS_ACCOUNT_ID", "FUNDING_INSTRUMENT_ID", "CAMPAIGN_ID", "LINE_ITEM_ID",
     # Optional Ads analytics
     "ADS_ENTITY_IDS",
+    # LLM providers
+    "LLM_PROVIDER",           # openai|gemini
+    "OPENAI_API_KEY", "OPENAI_MODEL",
+    "GEMINI_API_KEY", "GEMINI_MODEL",
 ]
 
 
