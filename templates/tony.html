@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>อ.โทนี่สะท้อนกรรม — ศูนย์บริการดูดวง + ระบบสิทธิ์</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background:#111; color:#eee; }
+    a { color:#85d0ff; text-decoration:none; }
+    header { padding: 16px 24px; background:#181818; border-bottom:1px solid #2a2a2a; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    h1 { margin:0; font-size:20px; }
+    .wrap { padding: 16px 24px; }
+    .row { display:grid; grid-template-columns: 1fr 360px; gap:16px; }
+    .panel { background:#181818; border:1px solid #2a2a2a; border-radius:10px; padding:12px; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#262626; color:#ddd; font-size:12px; margin-right:6px; }
+    .btn { display:inline-block; background:#2a6bff; color:#fff; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; margin-top:8px; margin-right:6px; }
+    .btn.alt { background:#444; }
+    label { display:block; font-size:12px; color:#bbb; margin-top:8px; }
+    input[type="text"], input[type="password"], input[type="date"], input[type="time"], input[type="number"], textarea, select {
+      width:100%; background:#121212; border:1px solid #2a2a2a; color:#eaeaea; border-radius:6px; padding:6px 8px;
+    }
+    textarea { min-height:70px; }
+    .tabs { display:flex; gap:10px; margin-bottom:10px; flex-wrap: wrap; }
+    .tab { padding:6px 10px; border-radius:999px; border:1px solid #2a2a2a; cursor:pointer; font-size:13px; }
+    .tab.active { background:#2a6bff; border-color:#2a6bff; }
+    .section { display:none; }
+    .section.active { display:block; }
+    ul.inline { padding-left:18px; }
+    .small { color:#aaa; font-size:12px; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    @media (max-width: 980px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>อ.โทนี่สะท้อนกรรม</h1>
+      <div class="small">แพลตฟอร์มดูดวงพรีเมียม — ใช้สิทธิ์ครั้งละ 1 เครดิต</div>
+    </div>
+    <div id="userBox" class="small"></div>
+  </header>
+
+  <div class="wrap">
+    <div class="row">
+      <div class="panel">
+        <div class="tabs">
+          <div class="tab active" data-sec="home">หน้าแรก</div>
+          <div class="tab" data-sec="astrology">โหราศาสตร์</div>
+          <div class="tab" data-sec="tools">เครื่องมือทำนาย</div>
+          <div class="tab" data-sec="analysis">วิเคราะห์ลักษณะ</div>
+          <div class="tab" data-sec="numbers">ตัวเลขและชื่อ</div>
+          <div class="tab" data-sec="history">ประวัติ</div>
+        </div>
+
+        <div id="home" class="section active">
+          <p>ยินดีต้อนรับสู่ระบบดูดวงของ <b>อ.โทนี่สะท้อนกรรม</b>. บริการทุกศาสตร์จะหัก <b>1 เครดิต</b> ต่อครั้ง.</p>
+          <ul class="inline">
+            <li>โหราศาสตร์: ผูกดวง, ดวงจร, ฤกษ์ยาม</li>
+            <li>เครื่องมือทำนาย: ไพ่ยิปซี / ลูกเต๋า / เซียมซี / ไพ่ป๊อก</li>
+            <li>วิเคราะห์ลักษณะ: ลายมือ / โหงวเฮ้ง / ทำนายฝัน</li>
+            <li>ตัวเลขและชื่อ: เบอร์โทร / ทะเบียนรถ / ชื่อ-นามสกุล</li>
+          </ul>
+          <div class="small">หมายเหตุ: ต้องเข้าสู่ระบบก่อนใช้งานพรีเมียม</div>
+        </div>
+
+        <div id="astrology" class="section">
+          <h3>โหราศาสตร์ (1 เครดิต)</h3>
+          <label>วันเกิด</label>
+          <input id="dob" type="date" />
+          <label>เวลาเกิด (ถ้ามี)</label>
+          <input id="tob" type="time" />
+          <label>คำถาม/ประเด็น</label>
+          <input id="ast_q" type="text" placeholder="เช่น งาน/ความรัก/เงิน" />
+          <button class="btn" id="btnAst">ดูดวง</button>
+          <div id="astOut" class="small" style="margin-top:10px;"></div>
+        </div>
+
+        <div id="tools" class="section">
+          <h3>เครื่องมือทำนาย (1 เครดิต)</h3>
+          <label>เลือกประเภท</label>
+          <select id="toolKind">
+            <option value="tarot">ไพ่ยิปซี (3/5/10 ใบ)</option>
+            <option value="dice">ลูกเต๋า (3 ลูก)</option>
+            <option value="siamsee">เซียมซี</option>
+            <option value="pok">ไพ่ป๊อก</option>
+          </select>
+          <div class="grid2">
+            <div>
+              <label>จำนวนไพ่/ลูกเต๋า</label>
+              <input id="toolCount" type="number" min="1" max="10" value="3" />
+            </div>
+            <div>
+              <label>คำถาม (ถ้ามี)</label>
+              <input id="toolQ" type="text" placeholder="ใส่คำถามเพื่อความแม่นยำ" />
+            </div>
+          </div>
+          <button class="btn" id="btnTool">ทำนาย</button>
+          <div id="toolOut" class="small" style="margin-top:10px;"></div>
+        </div>
+
+        <div id="analysis" class="section">
+          <h3>วิเคราะห์ลักษณะ (1 เครดิต)</h3>
+          <label>เลือก</label>
+          <select id="anaKind">
+            <option value="palm">ลายมือ (อัปโหลดภาพ)</option>
+            <option value="face">โหงวเฮ้ง (อัปโหลดภาพ)</option>
+            <option value="dream">ทำนายฝัน (พิมพ์ข้อความ)</option>
+          </select>
+          <div id="anaImgBox">
+            <label>ไฟล์ภาพ</label>
+            <input id="anaFile" type="file" accept="image/*" />
+          </div>
+          <div id="anaTextBox" style="display:none;">
+            <label>พิมพ์ความฝันโดยละเอียด</label>
+            <textarea id="dreamText"></textarea>
+          </div>
+          <button class="btn" id="btnAna">วิเคราะห์</button>
+          <div id="anaOut" class="small" style="margin-top:10px;"></div>
+        </div>
+
+        <div id="numbers" class="section">
+          <h3>ตัวเลขและชื่อ (1 เครดิต)</h3>
+          <label>เลือก</label>
+          <select id="numKind">
+            <option value="phone">เบอร์โทรศัพท์</option>
+            <option value="license">เลขทะเบียนรถ</option>
+            <option value="name">ชื่อ-นามสกุล</option>
+          </select>
+          <div id="numInputs">
+            <label id="lblNum">ใส่ข้อมูล</label>
+            <input id="numText" type="text" placeholder="ตัวอย่าง: 0891234567" />
+          </div>
+          <button class="btn" id="btnNum">ทำนาย</button>
+          <div id="numOut" class="small" style="margin-top:10px;"></div>
+        </div>
+
+        <div id="history" class="section">
+          <h3>ประวัติการดูดวงของฉัน</h3>
+          <div id="hist"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="font-weight:600; margin-bottom:6px;">บัญชีและสิทธิ์</div>
+        <div id="acct"></div>
+        <hr style="border-color:#2a2a2a; margin:12px 0;">
+        <div style="font-weight:600; margin-bottom:6px;">เติมสิทธิ์ (Top-up)</div>
+        <div class="small">ชำระผ่านโอนเงิน/QR แล้วอัปสลิป ระบบจะตรวจและเพิ่มสิทธิ์</div>
+        <div id="packages"></div>
+        <label>แพ็กเกจ</label>
+        <select id="pkgSel"></select>
+        <label>จำนวนเงิน (บาท)</label>
+        <input id="amount" type="number" min="10" step="10" placeholder="เช่น 100" />
+        <label>แนบสลิป</label>
+        <input id="slip" type="file" accept="image/*" />
+        <button class="btn" id="btnTopup">ส่งคำขอเติมสิทธิ์</button>
+        <div id="topupMsg" class="small" style="margin-top:8px;"></div>
+        <div id="topupList" class="small" style="margin-top:12px;"></div>
+
+        <hr style="border-color:#2a2a2a; margin:12px 0;">
+        <div style="font-weight:600; margin-bottom:6px;">ข้อมูลชำระเงิน</div>
+        <div class="small">
+          โอนเข้าบัญชี/พร้อมเพย์: <b>SCB 8162785073</b> ชื่อบัญชี <b>พิรุฬห์วัฒน์ ชยมาฒย์</b>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tabs
+    for (const t of document.querySelectorAll('.tab')) {
+      t.onclick = () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        document.getElementById(t.dataset.sec).classList.add('active');
+        if (t.dataset.sec === 'history') loadHistory();
+      };
+    }
+
+    // Login/register/logout box
+    async function refreshUserBox() {
+      const r = await fetch('/api/tony/session');
+      const data = await r.json();
+      const box = document.getElementById('userBox');
+      const acct = document.getElementById('acct');
+      if (data.user) {
+        box.innerHTML = 'ผู้ใช้: <b>' + data.user.username + '</b> | เครดิตคงเหลือ: <b>' + data.user.credits + '</b> | <a href="#" id="logout">ออกจากระบบ</a>';
+        acct.innerHTML = 'เข้าสู่ระบบแล้ว — เครดิตคงเหลือ: <b>' + data.user.credits + '</b>';
+        document.getElementById('logout').onclick = async () => {
+          await fetch('/api/tony/logout', {method:'POST'});
+          refreshUserBox(); loadTopups(); loadPackages();
+        };
+      } else {
+        box.innerHTML = '<input id="u" type="text" placeholder="username" style="width:140px;"> ' +
+                        '<input id="p" type="password" placeholder="password" style="width:140px;"> ' +
+                        '<button class="btn" id="loginBtn">เข้าสู่ระบบ</button> ' +
+                        '<button class="btn alt" id="regBtn">สมัคร</button>';
+        acct.innerHTML = 'ยังไม่เข้าสู่ระบบ';
+        document.getElementById('loginBtn').onclick = async () => {
+          const u = document.getElementById('u').value.trim();
+          const p = document.getElementById('p').value.trim();
+          const rr = await fetch('/api/tony/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
+          const d = await rr.json();
+          if (d.ok) { refreshUserBox(); loadTopups(); loadPackages(); } else { alert(d.error || 'login failed'); }
+        };
+        document.getElementById('regBtn').onclick = async () => {
+          const u = document.getElementById('u').value.trim();
+          const p = document.getElementById('p').value.trim();
+          const rr = await fetch('/api/tony/register', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
+          const d = await rr.json();
+          if (d.ok) { alert('สมัครสำเร็จ กรุณาเข้าสู่ระบบ'); } else { alert(d.error || 'register failed'); }
+        };
+      }
+    }
+
+    async function loadPackages() {
+      const r = await fetch('/api/tony/packages');
+      const data = await r.json();
+      const pkgSel = document.getElementById('pkgSel');
+      pkgSel.innerHTML = '';
+      for (const p of data.packages || []) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.id + ' — ' + p.price + ' บาท / ' + p.credits + ' สิทธิ์';
+        pkgSel.appendChild(opt);
+      }
+      document.getElementById('packages').innerHTML = (data.packages || []).map(p => 
+        '<div class="small"><span class="badge">แพ็ก</span> ' + p.id + ': ' + p.price + '฿ → ' + p.credits + ' สิทธิ์</div>'
+      ).join('');
+    }
+
+    async function loadTopups() {
+      const r = await fetch('/api/tony/topups');
+      const data = await r.json();
+      const list = data.items || [];
+      const box = document.getElementById('topupList');
+      if (!list.length) { box.textContent = 'ยังไม่มีคำขอเติมสิทธิ์'; return; }
+      box.innerHTML = list.map(t => {
+        const ts = new Date((t.created_ts||0)*1000).toLocaleString();
+        const st = t.status;
+        return '- ' + ts + ' | ' + t.package_id + ' | ' + t.price + '฿ | ' + st;
+      }).join('<br>');
+    }
+
+    document.getElementById('btnTopup').onclick = async () => {
+      const pkg = document.getElementById('pkgSel').value;
+      const amt = Number(document.getElementById('amount').value || '0');
+      const file = document.getElementById('slip').files[0];
+      const fd = new FormData();
+      fd.append('package_id', pkg);
+      fd.append('amount', String(amt));
+      if (file) fd.append('slip', file);
+      const r = await fetch('/api/tony/topup-request', {method:'POST', body: fd});
+      const d = await r.json();
+      const msg = document.getElementById('topupMsg');
+      if (d.ok) { msg.textContent = 'ส่งคำขอแล้ว — รอการยืนยัน'; loadTopups(); }
+      else { msg.textContent = d.error || 'ส่งคำขอล้มเหลว'; }
+      setTimeout(() => msg.textContent = '', 3000);
+    };
+
+    // Handlers for services
+    document.getElementById('btnAst').onclick = async () => {
+      const dob = document.getElementById('dob').value;
+      const tob = document.getElementById('tob').value;
+      const q = document.getElementById('ast_q').value;
+      const r = await fetch('/api/tony/astrology', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({dob, tob, question:q})});
+      const d = await r.json();
+      if (!r.ok) { document.getElementById('astOut').textContent = d.error || 'เกิดข้อผิดพลาด'; return; }
+      document.getElementById('astOut').textContent = JSON.stringify(d.result, null, 2);
+      refreshUserBox();
+    };
+
+    document.getElementById('btnTool').onclick = async () => {
+      const kind = document.getElementById('toolKind').value;
+      const count = Number(document.getElementById('toolCount').value || '3');
+      const q = document.getElementById('toolQ').value;
+      const r = await fetch('/api/tony/tools', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kind, cards:count, rolls:count, question:q})});
+      const d = await r.json();
+      if (!r.ok) { document.getElementById('toolOut').textContent = d.error || 'เกิดข้อผิดพลาด'; return; }
+      document.getElementById('toolOut').textContent = JSON.stringify(d.result, null, 2);
+      refreshUserBox();
+    };
+
+    const anaKind = document.getElementById('anaKind');
+    anaKind.onchange = () => {
+      const k = anaKind.value;
+      document.getElementById('anaImgBox').style.display = (k==='palm'||k==='face') ? 'block' : 'none';
+      document.getElementById('anaTextBox').style.display = (k==='dream') ? 'block' : 'none';
+    };
+    document.getElementById('btnAna').onclick = async () => {
+      const kind = document.getElementById('anaKind').value;
+      if (kind === 'dream') {
+        const text = document.getElementById('dreamText').value;
+        const r = await fetch('/api/tony/analysis', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kind, text})});
+        const d = await r.json();
+        if (!r.ok) { document.getElementById('anaOut').textContent = d.error || 'เกิดข้อผิดพลาด'; return; }
+        document.getElementById('anaOut').textContent = JSON.stringify(d.result, null, 2);
+      } else {
+        const file = document.getElementById('anaFile').files[0];
+        const fd = new FormData();
+        fd.append('kind', kind);
+        if (file) fd.append('image', file);
+        const r = await fetch('/api/tony/analysis-upload', {method:'POST', body: fd});
+        const d = await r.json();
+        if (!r.ok) { document.getElementById('anaOut').textContent = d.error || 'เกิดข้อผิดพลาด'; return; }
+        document.getElementById('anaOut').textContent = JSON.stringify(d.result, null, 2);
+      }
+      refreshUserBox();
+    };
+
+    document.getElementById('btnNum').onclick = async () => {
+      const kind = document.getElementById('numKind').value;
+      const text = document.getElementById('numText').value;
+      const r = await fetch('/api/tony/numbers', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kind, number:text, text, name:text})});
+      const d = await r.json();
+      if (!r.ok) { document.getElementById('numOut').textContent = d.error || 'เกิดข้อผิดพลาด'; return; }
+      document.getElementById('numOut').textContent = JSON.stringify(d.result, null, 2);
+      refreshUserBox();
+    };
+
+    async function loadHistory() {
+      const r = await fetch('/api/tony/history');
+      const d = await r.json();
+      const box = document.getElementById('hist');
+      if (!d.items || !d.items.length) { box.textContent = 'ยังไม่มีประวัติ'; return; }
+      box.innerHTML = d.items.map(x => {
+        const ts = new Date((x.ts||0)*1000).toLocaleString();
+        const sum = JSON.stringify(x.result);
+        return '<div class="small"><span class="badge">['+x.service+']</span> ' + ts + '<br>' + sum + '</div>';
+      }).join('');
+    }
+
+    refreshUserBox();
+    loadPackages();
+    loadTopups();
+  </script>
+</body>
+</html>

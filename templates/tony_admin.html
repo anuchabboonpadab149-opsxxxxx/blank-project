@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>Tony Admin — อนุมัติการเติมสิทธิ์</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background:#111; color:#eee; }
+    a { color:#85d0ff; text-decoration:none; }
+    header { padding: 16px 24px; background:#181818; border-bottom:1px solid #2a2a2a; }
+    h1 { margin:0; font-size:20px; }
+    .wrap { padding: 16px 24px; }
+    .panel { background:#181818; border:1px solid #2a2a2a; border-radius:10px; padding:12px; }
+    label { display:block; font-size:12px; color:#bbb; margin-top:8px; }
+    input[type="text"], input[type="password"] { width:100%; background:#121212; border:1px solid #2a2a2a; color:#eaeaea; border-radius:6px; padding:6px 8px; }
+    .btn { display:inline-block; background:#2a6bff; color:#fff; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; margin-top:8px; margin-right:6px; }
+    .small { color:#aaa; font-size:12px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:8px 10px; border-bottom:1px solid #2a2a2a; font-size:14px; }
+    img { max-width: 160px; height: auto; border-radius: 6px; border:1px solid #2a2a2a; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tony Admin — อนุมัติการเติมสิทธิ์</h1>
+    <div class="small"><a href="/tony">กลับหน้า Tony</a></div>
+  </header>
+  <div class="wrap">
+    <div class="panel">
+      <label>Admin Secret</label>
+      <input id="sec" type="password" placeholder="กรอกรหัสแอดมิน (ADMIN_SECRET)" />
+      <button class="btn" id="btnLoad">โหลดคำขอค้างอยู่</button>
+      <div id="msg" class="small" style="margin-top:8px;"></div>
+      <div id="list" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <script>
+    async function fetchPending() {
+      const r = await fetch('/api/tony/admin/pending?secret=' + encodeURIComponent(document.getElementById('sec').value.trim()));
+      const d = await r.json();
+      const box = document.getElementById('list');
+      if (!d.items || !d.items.length) { box.textContent = 'ไม่มีคำขอคงค้าง'; return; }
+      box.innerHTML = '<table><thead><tr><th>เวลา</th><th>ผู้ใช้</th><th>แพ็กเกจ</th><th>ยอด</th><th>สลิป</th><th>อนุมัติ</th></tr></thead><tbody>' +
+        d.items.map(x => {
+          const ts = new Date((x.created_ts||0)*1000).toLocaleString();
+          const slip = x.slip_path ? ('<a href="/media/' + x.slip_path.replace(/^outputs\\//,'') + '" target="_blank"><img src="/media/' + x.slip_path.replace(/^outputs\\//,'') + '"></a>') : '-';
+          return '<tr>' +
+            '<td>'+ts+'</td>' +
+            '<td>'+ (x.username || x.user_id) +'</td>' +
+            '<td>'+ x.package_id +'</td>' +
+            '<td>'+ x.price +'฿ ('+ x.credits_on_approve +' สิทธิ์)</td>' +
+            '<td>'+ slip +'</td>' +
+            '<td><button class="btn" onclick="approve(\\''+x.id+'\\')">อนุมัติ</button></td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>';
+    }
+    async function approve(id) {
+      const sec = document.getElementById('sec').value.trim();
+      if (!sec) { alert('กรอกรหัสแอดมินก่อน'); return; }
+      const r = await fetch('/api/tony/topup-approve', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({topup_id: id, admin_secret: sec})});
+      const d = await r.json();
+      if (d.ok) { alert('อนุมัติสำเร็จ'); fetchPending(); } else { alert(d.error || 'ไม่สำเร็จ'); }
+    }
+    document.getElementById('btnLoad').onclick = fetchPending;
+  </script>
+</body>
+</html>

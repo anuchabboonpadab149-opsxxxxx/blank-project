@@ -1,8 +1,9 @@
 import json
 import os
+import time
 from typing import Generator
 
-from flask import Flask, Response, jsonify, render_template, render_template_string, send_from_directory, request
+from flask import Flask, Response, jsonify, render_template, render_template_string, send_from_directory, request, session
 
 import realtime_bus as bus
 import node_registry as nreg
@@ -10,6 +11,14 @@ import metrics_store as mstore
 import circuit_breaker as cbreak
 import credentials_store as credstore
 import workflow_store as wstore
+
+# Optional: user and divination modules
+try:
+    import user_store as ustore
+    import divination_engine as deng
+except Exception:
+    ustore = None
+    deng = None
 
 # Support PaaS environments (Heroku/Render/Railway) that pass PORT
 WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
@@ -378,6 +387,8 @@ NODES_HTML = """
 """
 
 app = Flask(__name__)
+# Sessions for login/credits (Tony platform)
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "change-me-tony-secret")
 
 # CORS: allow cross-origin calls from static dashboards (e.g., cosine.page)
 @app.after_request
@@ -743,6 +754,315 @@ def api_tweets_append():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ---------- Tony Platform (Login + Credits + Divination) ----------
+def _ensure_tony_ready():
+    if not ustore or not deng:
+        return False, {"error": "tony_modules_missing"}
+    return True, None
+
+def _sanitize_filename(name: str) -> str:
+    base = "".join(ch for ch in (name or "") if ch.isalnum() or ch in (".", "-", "_"))
+    return base or "file"
+
+def _save_upload(file, subdir: str) -> str:
+    os.makedirs(os.path.join("outputs", subdir), exist_ok=True)
+    fname = f"{int(time.time())}_{_sanitize_filename(getattr(file, 'filename', '') or 'upload')}"
+    path = os.path.join("outputs", subdir, fname)
+    file.save(path)
+    return path
+
+def _current_user():
+    try:
+        uid = session.get("uid")
+        if not uid or not ustore:
+            return None
+        u = ustore.get_user(uid)
+        if not u:
+            return None
+        # strip secrets if any
+        u = {k: v for k, v in u.items() if k not in ("pw_hash", "salt")}
+        return u
+    except Exception:
+        return None
+
+@app.get("/tony")
+def tony_home():
+    try:
+        mstore.pageview("tony")
+    except Exception:
+        pass
+    return render_template("tony.html")
+
+@app.get("/api/tony/session")
+def tony_session():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    u = _current_user()
+    return jsonify({"user": u})
+
+@app.post("/api/tony/register")
+def tony_register():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        username = str(payload.get("username", "")).strip()
+        password = str(payload.get("password", "")).strip()
+        u = ustore.register(username, password)
+        return jsonify({"ok": True, "user": u})
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.post("/api/tony/login")
+def tony_login():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        username = str(payload.get("username", "")).strip()
+        password = str(payload.get("password", "")).strip()
+        u = ustore.authenticate(username, password)
+        if not u:
+            return jsonify({"error": "invalid_credentials"}), 401
+        session["uid"] = u["id"]
+        # Optionally set admin via env list
+        admins = [x.strip().lower() for x in (os.getenv("TONY_ADMINS", "") or "").split(",") if x.strip()]
+        if u.get("username", "").lower() in admins:
+            try:
+                ustore.set_admin(u.get("username", ""), True)
+            except Exception:
+                pass
+        return jsonify({"ok": True, "user": u})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.post("/api/tony/logout")
+def tony_logout():
+    session.pop("uid", None)
+    return jsonify({"ok": True})
+
+@app.get("/api/tony/packages")
+def tony_packages():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    return jsonify({"packages": ustore.list_packages()})
+
+@app.get("/tony/admin")
+def tony_admin_page():
+    return render_template("tony_admin.html")
+
+@app.get("/api/tony/admin/pending")
+def tony_admin_pending():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    secret = request.args.get("secret") or request.headers.get("X-Admin-Secret") or ""
+    if not secret or secret != os.getenv("ADMIN_SECRET", ""):
+        return jsonify({"error": "forbidden"}), 403
+    items = ustore.list_topups(status="pending")
+    # attach usernames
+    users = {u.get("id"): u.get("username") for u in (ustore.list_users() if ustore else [])}
+    for it in items:
+        it["username"] = users.get(it.get("user_id"))
+    return jsonify({"items": items})
+
+@app.get("/api/tony/topups")
+def tony_topups():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    u = _current_user()
+    if not u:
+        return jsonify({"error": "not_logged_in"}), 401
+    items = ustore.list_topups(user_id=u["id"])
+    return jsonify({"items": items})
+
+@app.post("/api/tony/topup-request")
+def tony_topup_request():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    u = _current_user()
+    if not u:
+        return jsonify({"error": "not_logged_in"}), 401
+    try:
+        package_id = request.form.get("package_id", "").strip()
+        amount = int(request.form.get("amount", "0") or "0")
+        slip = request.files.get("slip")
+        slip_path = None
+        if slip:
+            slip_path = _save_upload(slip, "topups")
+        req = ustore.create_topup_request(u["id"], package_id, amount, slip_path)
+        try:
+            bus.publish({"type": "topup", "action": "request", "user": u.get("username"), "amount": amount, "id": req.get("id")})
+        except Exception:
+            pass
+        return jsonify({"ok": True, "request": req})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.post("/api/tony/topup-approve")
+def tony_topup_approve():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    # simple admin secret-based approval
+    payload = request.get_json(force=True, silent=True) or {}
+    secret = str(payload.get("admin_secret", "")).strip()
+    if not secret or secret != os.getenv("ADMIN_SECRET", ""):
+        return jsonify({"error": "forbidden"}), 403
+    tid = str(payload.get("topup_id", "")).strip()
+    if not tid:
+        return jsonify({"error": "topup_id required"}), 400
+    try:
+        res = ustore.approve_topup(tid, admin_name="admin")
+        try:
+            bus.publish({"type": "topup", "action": "approve", "id": tid, "user_id": res.get("user_id"), "credits": res.get("credits_on_approve")})
+        except Exception:
+            pass
+        return jsonify({"ok": True, "topup": res})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def _deduct_or_402(user_id: str, reason: str):
+    try:
+        bal = ustore.deduct_credit(user_id, reason)
+        return True, bal
+    except RuntimeError as re:
+        if "insufficient_credits" in str(re):
+            return False, None
+        raise
+    except Exception as e:
+        raise
+
+@app.post("/api/tony/astrology")
+def tony_astrology():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    u = _current_user()
+    if not u:
+        return jsonify({"error": "not_logged_in"}), 401
+    payload = request.get_json(force=True, silent=True) or {}
+    okd, _ = _deduct_or_402(u["id"], "astrology")
+    if not okd:
+        return jsonify({"error": "insufficient_credits"}), 402
+    result = deng.engine_dispatch("astrology", payload)
+    ustore.record_history(u["id"], "astrology", payload, result)
+    try:
+        bus.publish({"type": "tony", "service": "astrology", "user": u.get("username"), "ts": time.time()})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "result": result})
+
+@app.post("/api/tony/tools")
+def tony_tools():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    u = _current_user()
+    if not u:
+        return jsonify({"error": "not_logged_in"}), 401
+    payload = request.get_json(force=True, silent=True) or {}
+    okd, _ = _deduct_or_402(u["id"], "tools")
+    if not okd:
+        return jsonify({"error": "insufficient_credits"}), 402
+    result = deng.engine_dispatch("tools", payload)
+    ustore.record_history(u["id"], "tools", payload, result)
+    try:
+        bus.publish({"type": "tony", "service": "tools", "user": u.get("username"), "ts": time.time()})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "result": result})
+
+@app.post("/api/tony/analysis")
+def tony_analysis():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    u = _current_user()
+    if not u:
+        return jsonify({"error": "not_logged_in"}), 401
+    payload = request.get_json(force=True, silent=True) or {}
+    okd, _ = _deduct_or_402(u["id"], "analysis")
+    if not okd:
+        return jsonify({"error": "insufficient_credits"}), 402
+    result = deng.engine_dispatch("analysis", payload)
+    ustore.record_history(u["id"], "analysis", payload, result)
+    try:
+        bus.publish({"type": "tony", "service": "analysis", "user": u.get("username"), "ts": time.time()})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "result": result})
+
+@app.post("/api/tony/analysis-upload")
+def tony_analysis_upload():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    u = _current_user()
+    if not u:
+        return jsonify({"error": "not_logged_in"}), 401
+    try:
+        kind = (request.form.get("kind") or "palm").strip().lower()
+        img = request.files.get("image")
+        saved = None
+        if img:
+            saved = _save_upload(img, "uploads")
+        okd, _ = _deduct_or_402(u["id"], "analysis")
+        if not okd:
+            return jsonify({"error": "insufficient_credits"}), 402
+        payload = {"kind": kind, "image_path": saved}
+        result = deng.engine_dispatch("analysis", payload)
+        res_with_path = dict(result)
+        if saved:
+            res_with_path["image_path"] = saved.replace("outputs/", "")
+        ustore.record_history(u["id"], "analysis", payload, res_with_path)
+        try:
+            bus.publish({"type": "tony", "service": "analysis", "kind": kind, "user": u.get("username"), "ts": time.time()})
+        except Exception:
+            pass
+        return jsonify({"ok": True, "result": res_with_path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.post("/api/tony/numbers")
+def tony_numbers():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    u = _current_user()
+    if not u:
+        return jsonify({"error": "not_logged_in"}), 401
+    payload = request.get_json(force=True, silent=True) or {}
+    okd, _ = _deduct_or_402(u["id"], "numbers")
+    if not okd:
+        return jsonify({"error": "insufficient_credits"}), 402
+    result = deng.engine_dispatch("numbers", payload)
+    ustore.record_history(u["id"], "numbers", payload, result)
+    try:
+        bus.publish({"type": "tony", "service": "numbers", "user": u.get("username"), "ts": time.time()})
+    except Exception:
+        pass
+    return jsonify({"ok": True, "result": result})
+
+@app.get("/api/tony/history")
+def tony_history():
+    ok, err = _ensure_tony_ready()
+    if not ok:
+        return jsonify(err), 500
+    u = _current_user()
+    if not u:
+        return jsonify({"error": "not_logged_in"}), 401
+    items = ustore.list_history(u["id"], limit=50)
+    return jsonify({"items": items})
 
 def start_web():
     app.run(host="0.0.0.0", port=WEB_PORT, debug=False, threaded=True)
