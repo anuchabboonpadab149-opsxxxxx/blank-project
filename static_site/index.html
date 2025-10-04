@@ -5,30 +5,57 @@
   <title>อ.โทนี่สะท้อนกรรม — เว็บไซต์ทางการ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background:#0f1115; color:#eaeaf1; }
-    a { color:#8ecbff; text-decoration:none; }
-    header { padding: 24px; position: sticky; top:0; background: rgba(16,18,24,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid #1f2430; display:flex; align-items:center; justify-content:space-between; }
-    .brand { font-weight:700; letter-spacing:0.2px; }
+    :root {
+      --primary: #2a6bff;
+      --primary-weak: #2a3344;
+      --accent: #8ecbff;
+      --bg: #0f1115;
+      --panel: #151a24;
+      --border: #232a3a;
+      --border-soft: #1f2430;
+      --text: #eaeaf1;
+      --muted: #9aa3b2;
+    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background:var(--bg); color:var(--text); }
+    a { color:var(--accent); text-decoration:none; }
+    header { padding: 24px; position: sticky; top:0; background: rgba(16,18,24,0.9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border-soft); display:flex; align-items:center; justify-content:space-between; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:0.2px; }
+    .brand img { width:28px; height:28px; border-radius:6px; object-fit:cover; border:1px solid var(--border); background:#111; }
     .nav a { margin-left:14px; font-size:14px; }
-    .hero { padding: 56px 24px; text-align:center; background: linear-gradient(180deg, #121621 0%, #0f1115 60%); }
+    .hero { padding: 56px 24px; text-align:center; background: linear-gradient(180deg, #121621 0%, var(--bg) 60%); }
     .hero h1 { margin:0; font-size: 32px; }
-    .hero p { color:#a8b0c0; max-width: 760px; margin: 10px auto 0 auto; line-height:1.8; }
-    .cta { margin-top:18px; }
-    .btn { display:inline-block; background:#2a6bff; color:#fff; padding:10px 16px; border-radius:8px; font-weight:600; }
-    .btn.alt { background:#2a3344; color:#eaeaf1; }
+    .hero p { color:var(--muted); max-width: 760px; margin: 10px auto 0 auto; line-height:1.8; }
+    .cta { margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .btn { display:inline-block; background:var(--primary); color:#fff; padding:10px 16px; border-radius:8px; font-weight:600; }
+    .btn.alt { background:var(--primary-weak); color:var(--text); }
     .section { padding: 36px 24px; max-width: 1080px; margin: 0 auto; }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
-    .card { background:#151a24; border:1px solid #232a3a; border-radius:12px; padding:16px; }
-    .muted { color:#9aa3b2; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; }
+    .muted { color:var(--muted); }
     .list li { margin: 6px 0; }
-    .pkg { background:#121722; border:1px dashed #2b3348; padding:10px; border-radius:10px; margin:8px 0; }
-    .foot { text-align:center; color:#7f8896; padding: 28px 24px; border-top: 1px solid #1f2430; }
-    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+    .pkg { background:#121722; border:1px dashed var(--border); padding:10px; border-radius:10px; margin:8px 0; }
+    .foot { text-align:center; color:#7f8896; padding: 28px 24px; border-top: 1px solid var(--border-soft); }
+
+    .setup { position:fixed; right:16px; bottom:16px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px; width:300px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .setup h4 { margin:0 0 6px 0; }
+    .setup label { display:block; font-size:12px; color:var(--muted); margin-top:6px; }
+    .setup input[type="text"], .setup input[type="url"], .setup input[type="color"] { width:100%; background:#11151f; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; }
+    .setup .row { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    .setup .btns { display:flex; gap:8px; margin-top:8px; }
+    .hide { display:none; }
+
+    @media (max-width: 960px) {
+      .grid { grid-template-columns: 1fr; }
+      .setup { width: calc(100% - 32px); left:16px; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <div class="brand">อ.โทนี่สะท้อนกรรม</div>
+    <div class="brand">
+      <img id="logo" alt="logo">
+      <span id="brandName">อ.โทนี่สะท้อนกรรม</span>
+    </div>
     <div class="nav">
       <a href="#features">จุดเด่น</a>
       <a href="#pricing">แพ็กเกจ</a>
@@ -38,11 +65,12 @@
   </header>
 
   <div class="hero">
-    <h1>แพลตฟอร์มดูดวงพรีเมียม ครบทุกศาสตร์ พร้อมระบบเครดิต</h1>
-    <p>รองรับโหราศาสตร์ ไพ่ยิปซี ลูกเต๋า เซียมซี ไพ่ป๊อก วิเคราะห์ลายมือ/โหงวเฮ้ง/ความฝัน รวมถึงตัวเลข—เบอร์โทร/ทะเบียนรถ/ชื่อ-นามสกุล ด้วย AI (OpenAI/Gemini) และ Vision Pipeline พร้อมระบบสิทธิ์แบบเครดิต</p>
+    <h1 id="heroTitle">แพลตฟอร์มดูดวงพรีเมียม ครบทุกศาสตร์ พร้อมระบบเครดิต</h1>
+    <p id="heroDesc">รองรับโหราศาสตร์ ไพ่ยิปซี ลูกเต๋า เซียมซี ไพ่ป๊อก วิเคราะห์ลายมือ/โหงวเฮ้ง/ความฝัน รวมถึงตัวเลข—เบอร์โทร/ทะเบียนรถ/ชื่อ-นามสกุล ด้วย AI (OpenAI/Gemini) และ Vision Pipeline พร้อมระบบสิทธิ์แบบเครดิต</p>
     <div class="cta" id="get-started">
-      <a class="btn" href="/tony" target="_blank" rel="noopener">เริ่มใช้งานทันที</a>
-      <a class="btn alt" href="/tony#topup" target="_blank" rel="noopener">เติมสิทธิ์</a>
+      <a class="btn" id="linkApp" target="_blank" rel="noopener">เริ่มใช้งานทันที</a>
+      <a class="btn alt" id="linkTopup" target="_blank" rel="noopener">เติมสิทธิ์</a>
+      <a class="btn alt" id="linkAdmin" target="_blank" rel="noopener">หลังบ้าน</a>
     </div>
   </div>
 
@@ -117,7 +145,114 @@
   </div>
 
   <div class="foot">
-    © อ.โทนี่สะท้อนกรรม — สงวนลิขสิทธิ์
+    © <span id="brandFoot">อ.โทนี่สะท้อนกรรม</span> — สงวนลิขสิทธิ์
   </div>
+
+  <!-- Quick Config Panel -->
+  <div class="setup" id="setupBox">
+    <h4>ตั้งค่าแบรนด์/ลิงก์อย่างรวดเร็ว</h4>
+    <label>Backend Base URL (เช่น https://yourdomain.com)</label>
+    <input id="backend" type="url" placeholder="https://yourdomain.com">
+    <div class="row">
+      <div>
+        <label>Brand Name</label>
+        <input id="bname" type="text" placeholder="อ.โทนี่สะท้อนกรรม">
+      </div>
+      <div>
+        <label>Primary Color</label>
+        <input id="color" type="color" value="#2a6bff">
+      </div>
+    </div>
+    <label>Logo URL (รูป 1:1)</label>
+    <input id="logoUrl" type="url" placeholder="https://.../logo.png">
+    <div class="btns">
+      <button class="btn" id="apply">Apply</button>
+      <button class="btn alt" id="reset">Reset</button>
+      <button class="btn alt" id="hide">Hide</button>
+    </div>
+    <div class="muted" style="margin-top:6px;">Tip: ใส่พารามิเตอร์ ?backend=https://yourdomain.com&brand=ชื่อ&logo=URL ได้เช่นกัน</div>
+  </div>
+
+  <script>
+    function qs(name) {
+      const p = new URLSearchParams(location.search);
+      return p.get(name) || "";
+    }
+    function setLinks(base) {
+      const app = document.getElementById('linkApp');
+      const top = document.getElementById('linkTopup');
+      const adm = document.getElementById('linkAdmin');
+      const norm = (u) => u.replace(/\/+$/, "");
+      const b = norm(base || "");
+      if (b) {
+        app.href = b + "/tony";
+        top.href = b + "/tony#topup";
+        adm.href = b + "/admin";
+      } else {
+        app.href = "/tony";
+        top.href = "/tony#topup";
+        adm.href = "/admin";
+      }
+    }
+    function applyTheme(color, brand, logo) {
+      if (color) document.documentElement.style.setProperty('--primary', color);
+      if (brand) {
+        document.getElementById('brandName').textContent = brand;
+        document.getElementById('brandFoot').textContent = brand;
+        document.title = brand + " — เว็บไซต์ทางการ";
+      }
+      const lg = document.getElementById('logo');
+      if (logo) { lg.src = logo; lg.classList.remove('hide'); }
+      else { lg.src = ""; lg.classList.add('hide'); }
+    }
+    function loadState() {
+      return {
+        backend: localStorage.getItem('tony_backend') || qs('backend'),
+        brand: localStorage.getItem('tony_brand') || qs('brand'),
+        color: localStorage.getItem('tony_color') || qs('color'),
+        logo: localStorage.getItem('tony_logo') || qs('logo'),
+      };
+    }
+    function saveState(s) {
+      if (s.backend != null) localStorage.setItem('tony_backend', s.backend);
+      if (s.brand != null) localStorage.setItem('tony_brand', s.brand);
+      if (s.color != null) localStorage.setItem('tony_color', s.color);
+      if (s.logo != null) localStorage.setItem('tony_logo', s.logo);
+    }
+
+    // Initialize
+    (function init() {
+      const s = loadState();
+      // preload inputs
+      document.getElementById('backend').value = s.backend || "";
+      document.getElementById('bname').value = s.brand || "อ.โทนี่สะท้อนกรรม";
+      document.getElementById('color').value = s.color || "#2a6bff";
+      document.getElementById('logoUrl').value = s.logo || "";
+
+      setLinks(s.backend);
+      applyTheme(s.color, s.brand, s.logo);
+
+      document.getElementById('apply').onclick = () => {
+        const backend = document.getElementById('backend').value.trim();
+        const brand = document.getElementById('bname').value.trim();
+        const color = document.getElementById('color').value;
+        const logo = document.getElementById('logoUrl').value.trim();
+        saveState({backend, brand, color, logo});
+        setLinks(backend);
+        applyTheme(color, brand, logo);
+        alert('Applied. ลิงก์และธีมถูกอัปเดตแล้ว');
+      };
+      document.getElementById('reset').onclick = () => {
+        localStorage.removeItem('tony_backend');
+        localStorage.removeItem('tony_brand');
+        localStorage.removeItem('tony_color');
+        localStorage.removeItem('tony_logo');
+        location.reload();
+      };
+      document.getElementById('hide').onclick = () => {
+        document.getElementById('setupBox').style.display = 'none';
+      };
+    })();
+  </script>
 </body>
 </html>
