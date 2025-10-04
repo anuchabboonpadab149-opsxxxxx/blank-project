@@ -2,7 +2,7 @@ import json
 import os
 from typing import Generator
 
-from flask import Flask, Response, jsonify, render_template, render_template_string, send_from_directory, request
+from flask import Flask, Response, jsonify, render_template, render_template_string, send_from_directory, request, session, redirect, url_for
 
 import realtime_bus as bus
 import node_registry as nreg
@@ -13,6 +13,8 @@ import workflow_store as wstore
 
 # Support PaaS environments (Heroku/Render/Railway) that pass PORT
 WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
+AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "1").lower() in {"1", "true", "yes"}
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 
 # Minimal inline template to avoid external files
 INDEX_HTML = """
@@ -55,6 +57,9 @@ INDEX_HTML = """
       <a href="/nodes">Nodes</a>
       <a href="/credentials">Credentials</a>
       <a href="/workflows">Workflows</a>
+      <a href="/qr">QR</a>
+      <span style="margin-left:8px;color:#888;">{{ 'เข้าสู่ระบบแล้ว: ' + (user or '') if user else '' }}</span>
+      {% if user %}<a href="/logout" style="margin-left:12px;">Logout</a>{% else %}<a href="/login" style="margin-left:12px;">Login</a>{% endif %}
     </nav>
   </header>
   <div class="wrap">
@@ -378,6 +383,17 @@ NODES_HTML = """
 """
 
 app = Flask(__name__)
+app.secret_key = SECRET_KEY
+
+def current_user():
+    return session.get("user")
+
+def require_login_api():
+    if not AUTH_REQUIRED:
+        return None
+    if current_user():
+        return None
+    return jsonify({"error": "login required"}), 401
 
 # CORS: allow cross-origin calls from static dashboards (e.g., cosine.page)
 @app.after_request
@@ -396,6 +412,48 @@ def _add_cors(resp):
 def _options_probe():
     return ("", 204)
 
+# Authentication pages
+@app.get("/login")
+def login_page():
+    return render_template("login.html")
+
+@app.post("/login")
+def login_post():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        # If traditional form, fallback to form fields
+        username = payload.get("username") or request.form.get("username") or ""
+        password = payload.get("password") or request.form.get("password") or ""
+        from users_store import authenticate
+        if authenticate(username, password):
+            session["user"] = username
+            return jsonify({"ok": True, "user": username})
+        return jsonify({"error": "invalid credentials"}), 401
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/signup")
+def signup_page():
+    return render_template("signup.html")
+
+@app.post("/signup")
+def signup_post():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        username = (payload.get("username") or request.form.get("username") or "").strip()
+        password = (payload.get("password") or request.form.get("password") or "").strip()
+        from users_store import create_user
+        user = create_user(username, password)
+        session["user"] = username
+        return jsonify({"ok": True, "user": user.get("username")})
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.get("/logout")
+def logout)
+
 
 @app.get("/")
 def index():
@@ -406,9 +464,9 @@ def index():
         pass
     # Prefer template file if available; fallback to inline HTML.
     try:
-        return render_template("index.html")
+        return render_template("index.html", user=current_user())
     except Exception:
-        return render_template_string(INDEX_HTML)
+        return render_template_string(INDEX_HTML, user=current_user())
 
 
 @app.get("/about")
@@ -433,7 +491,7 @@ def credentials_page():
     except Exception:
         pass
     try:
-        return render_template("credentials.html")
+        return render_template("credentials.html", user=current_user())
     except Exception:
         # Minimal fallback if template missing
         return "<html><body><h1>Credentials</h1><p>Use the API at /api/credentials to GET/POST values.</p></body></html>"
@@ -446,7 +504,7 @@ def workflows_page():
     except Exception:
         pass
     try:
-        return render_template("workflows.html")
+        return render_template("workflows.html", user=current_user())
     except Exception:
         return "<html><body><h1>Workflows</h1><p>Use the API at /api/workflows to view summary.</p></body></html>"
 
@@ -521,6 +579,9 @@ def api_workflows_summary():
 
 @app.post("/api/workflows/reset")
 def api_workflows_reset():
+    guarded = require_login_api()
+    if guarded:
+        return guarded
     try:
         wstore.reset()
         return jsonify({"ok": True})
@@ -549,13 +610,15 @@ def api_nodes_list():
 
 @app.post("/api/nodes/register")
 def api_nodes_register():
+    guarded = require_login_api()
+    if guarded:
+        return guarded
     try:
         payload = request.get_json(force=True, silent=True) or {}
         name = str(payload.get("name", "")).strip()
         url = str(payload.get("url", "")).strip()
         if not name or not url:
-            return jsonify({"error": "name and url are required"}), 400
-        node = nreg.register(name=name, url=url, meta={"user": "web"})
+            return jsonify({"error": "name and url are required"}),})
         try:
             bus.publish({"type": "node", "action": "register", "node": {"id": node["id"], "name": node["name"], "url": node["url"]}})
         except Exception:
@@ -600,6 +663,9 @@ def api_credentials_get():
 
 @app.post("/api/credentials")
 def api_credentials_post():
+    guarded = require_login_api()
+    if guarded:
+        return guarded
     try:
         payload = request.get_json(force=True, silent=True) or {}
         masked = credstore.update(payload)
@@ -610,7 +676,7 @@ def api_credentials_post():
             pass
         return jsonify({"ok": True, "credentials": masked})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return
 
 
 @app.get("/api/circuit")
@@ -675,6 +741,9 @@ def api_set_config():
 
 @app.post("/api/reload-schedule")
 def api_reload_schedule():
+    guarded = require_login_api()
+    if guarded:
+        return guarded
     try:
         import config_store
         import scheduler_control
@@ -685,11 +754,14 @@ def api_reload_schedule():
         )
         return jsonify({"ok": bool(ok)})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}),
 
 
 @app.post("/api/post-now")
 def api_post_now():
+    guarded = require_login_api()
+    if guarded:
+        return guarded
     try:
         import scheduler_control
         ok = scheduler_control.trigger_post_now()
@@ -723,11 +795,12 @@ def api_tweets_list():
 
 @app.post("/api/tweets")
 def api_tweets_append():
+    guarded = require_login_api()
+    if guarded:
+        return guarded
     try:
         payload = request.get_json(force=True, silent=True) or {}
-        line = str(payload.get("line", "")).strip()
-        if not line:
-            return jsonify({"error": "line is required"}), 400
+        line = str(payload.getrror": "line is required"}), 400
         from promote_ayutthaya import Config
         path = None
         try:

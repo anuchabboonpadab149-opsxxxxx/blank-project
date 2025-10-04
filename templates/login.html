@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>เข้าสู่ระบบ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', Arial, sans-serif; margin:0; padding:0; background:#111; color:#eee; }
+    a { color:#85d0ff; text-decoration:none; }
+    .wrap { max-width: 520px; margin: 40px auto; padding: 16px; }
+    .card { background:#181818; border:1px solid #2a2a2a; border-radius:10px; padding:16px; }
+    label { display:block; font-size: 12px; color:#bbb; margin-top:8px; }
+    input[type="text"], input[type="password"] { width:100%; background:#121212; border:1px solid #2a2a2a; color:#eaeaea; border-radius:6px; padding:8px; }
+    .btn { display:inline-block; background:#2a6bff; color:#fff; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; margin-top:12px; }
+    .msg { font-size: 12px; color:#9ad; margin-top:8px; min-height:16px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2 style="margin:0 0 12px 0;">เข้าสู่ระบบ</h2>
+      <form id="f" method="post" action="/login" onsubmit="return false;">
+        <label>ชื่อผู้ใช้</label>
+        <input id="username" name="username" type="text" placeholder="username" required />
+        <label>รหัสผ่าน</label>
+        <input id="password" name="password" type="password" placeholder="password" required />
+        <button class="btn" id="btnLogin">เข้าสู่ระบบ</button>
+        <div class="msg" id="msg"></div>
+      </form>
+      <div style="margin-top:10px;font-size:13px;color:#aaa;">ยังไม่มีบัญชี? <a href="/signup">สมัครสมาชิก</a></div>
+      <div style="margin-top:10px;"><a href="/">กลับหน้าแรก</a></div>
+    </div>
+  </div>
+  <script>
+    document.getElementById('btnLogin').onclick = async () => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const msg = document.getElementById('msg');
+      msg.textContent = '';
+      const r = await fetch('/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password})});
+      if (r.ok) {
+        msg.textContent = 'เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...';
+        setTimeout(() => { window.location.href = '/'; }, 500);
+      } else {
+        const data = await r.json().catch(()=>({}));
+        msg.textContent = (data && data.error) ? data.error : 'เข้าสู่ระบบไม่สำเร็จ';
+      }
+    };
+  </script>
+</body>
+</html>
