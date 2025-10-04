@@ -13,17 +13,3 @@ else
   echo "Starting once"
   exec python3 cli.py --mode once
 fi
-  if [ -n "${POST_CRON_SPEC}" ]; then
-    ARGS+=("--post-cron" "${POST_CRON_SPEC}")
-  fi
-  if [ -n "${COLLECT_INTERVAL_MIN}" ]; then
-    ARGS+=("--collect-interval-min" "${COLLECT_INTERVAL_MIN}")
-  fi
-  if [ -n "${COLLECT_CRON_SPEC}" ]; then
-    ARGS+=("--collect-cron" "${COLLECT_CRON_SPEC}")
-  fi
-  exec python3 "${ARGS[@]}"
-else
-  echo "Starting once"
-  exec python3 cli.py --mode once
-fi

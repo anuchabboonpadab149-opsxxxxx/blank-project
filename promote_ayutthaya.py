@@ -244,26 +244,59 @@ def _save_json(path: str, data: Dict[str, Any]) -> None:
 
 
 def load_tweets(path: str, cfg: Config = None) -> List[str]:
-    # Content generator takes precedence if enabled
-    if cfg and cfg.GENERATE_CONTENT:
+    # Runtime overrides via config_store
+    mode_override = None
+    sender_override = None
+    import_url = None
+    import_fmt = None
+    path_override = None
+    try:
+        import config_store
+        mode_override = config_store.get("content_mode")
+        sender_override = config_store.get("sender_name")
+        import_url = config_store.get("import_source_url")
+        import_fmt = config_store.get("import_format")
+        path_override = config_store.get("tweets_file")
+    except Exception:
+        pass
+
+    # Determine mode: generate | import | file
+    mode = None
+    if isinstance(mode_override, str) and mode_override:
+        mode = mode_override.strip().lower()
+    elif cfg and cfg.GENERATE_CONTENT:
+        mode = "generate"
+    elif cfg and cfg.IMPORT_SOURCE_URL:
+        mode = "import"
+    else:
+        mode = "file"
+
+    if mode == "generate":
         try:
             from content_generator import generate_caption
-            text = generate_caption(sender_name=cfg.SENDER_NAME)
+            sender = sender_override or (cfg.SENDER_NAME if cfg else "Bee&Bell")
+            text = generate_caption(sender_name=sender)
             return [text]
         except Exception as e:
             log.error(f"Content generator failed: {e}. Falling back to import/file.", exc_info=True)
-    # If external import source is configured, use it.
-    if cfg and cfg.IMPORT_SOURCE_URL:
+
+    if mode == "import":
         try:
             from importer import fetch_texts_from_url
-            texts = fetch_texts_from_url(cfg.IMPORT_SOURCE_URL, cfg.IMPORT_FORMAT)
-            return texts
+            url = (import_url or (cfg.IMPORT_SOURCE_URL if cfg else "")).strip()
+            fmt = import_fmt or (cfg.IMPORT_FORMAT if cfg else "lines")
+            if url:
+                texts = fetch_texts_from_url(url, fmt)
+                return texts
         except Exception as e:
             log.error(f"External import failed: {e}. Falling back to file '{path}'", exc_info=True)
+
+    # default: file
+    file_path = path_override or path
     tweets: List[str] = []
-    if not os.path.exists(path):
+    if not os.path.exists(file_path):
         return tweets
-    with open(path, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
             t = line.strip()
             if t:
@@ -335,8 +368,7 @@ def post_one_from_file(cfg: Config) -> Dict[str, Any]:
         tc_id = add_geo_targeting(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, location_id)
 
     promoted_id = promote_tweet(_auth, cfg.ADS_ACCOUNT_ID, line_item_id, tweet_id)
-    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": t_codeexnewt</}
-</}
+    return {"tweet_id": tweet_id, "campaign_id": campaign_id, "line_item_id": line_item_id, "targeting_criteria_id": tc_id, "promoted_tweet_id": promoted_id, "location": loc_meta, "text": text}
 
 
 def collect_metrics(cfg: Config, max_items: int = 50) -> Dict[str, Any]:

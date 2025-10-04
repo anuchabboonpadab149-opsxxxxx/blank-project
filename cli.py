@@ -3,6 +3,7 @@ import sys
 import argparse
 import logging
 import threading
+import time
 
 from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -12,6 +13,18 @@ import pytz
 
 from promote_ayutthaya import Config, post_one_from_file, collect_metrics, collect_ads_analytics
 from social_dispatcher import distribute_once
+
+# Optional workflow tracking
+try:
+    import workflow_store as wstore
+except Exception:
+    wstore = None  # type: ignore
+
+# Realtime event bus
+try:
+    import realtime_bus as bus
+except Exception:
+    bus = None  # type: ignore
 
 log = logging.getLogger("promote_cli")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -30,8 +43,33 @@ def parse_args():
     return parser.parse_args()
 
 
+def _bool_env(name: str, default: bool = False) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return str(v).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _publish_event(event: dict) -> None:
+    try:
+        if bus:
+            bus.publish(event)
+    except Exception:
+        pass
+
+
 def main():
     load_dotenv()
+    # Apply stored credentials (if credentials.json exists) to environment at startup
+    try:
+        import credentials_store as cstore
+        creds = cstore.get()
+        if isinstance(creds, dict) and creds:
+            for k, v in creds.items():
+                os.environ[str(k)] = str(v)
+            log.info("Applied credentials from credentials.json to environment.")
+    except Exception as e:
+        log.debug(f"No credentials store applied: {e}")
     args = parse_args()
 
     mode = args.mode or os.getenv("RUN_MODE", "once").strip()
@@ -52,15 +90,18 @@ def main():
         if distribute_all:
             res = distribute_once()
             log.info(f"Distributed to providers: {res}")
+            _publish_event({"type": "post", "ts": time.time(), "text": (res.get("text") if isinstance(res, dict) else None), "providers": (res.get("providers") if isinstance(res, dict) else None)})
         else:
             cfg = Config()
             res = post_one_from_file(cfg)
             log.info(f"Posted and promoted on Twitter: {res}")
+            _publish_event({"type": "post", "ts": time.time(), "text": res.get("text") if isinstance(res, dict) else None, "providers": [{"provider": "twitter", "status": "ok"}]})
         cfg = Config()
         met = collect_metrics(cfg)
         log.info(f"Collected organic metrics: {met}")
         ads = collect_ads_analytics(cfg)
         log.info(f"Collected ads analytics: {ads}")
+        _publish_event({"type": "collect", "ts": time.time(), "organic_count": (met.get("count") if isinstance(met, dict) else None), "ads_status": (ads.get("status") if isinstance(ads, dict) else None)})
         return
 
     scheduler = BlockingScheduler(timezone=pytz.timezone(tz))
@@ -72,7 +113,10 @@ def main():
         if not post_lock.acquire(blocking=False):
             log.info("Post job already running; skipping.")
             return
+        wid = None
         try:
+            if wstore:
+                wid = wstore.start("post", meta={})
             if distribute_all:
                 res = distribute_once()
                 log.info(f"Post job distributed: {res}")
@@ -80,8 +124,21 @@ def main():
                 cfg = Config()
                 res = post_one_from_file(cfg)
                 log.info(f"Post job (Twitter only) result: {res}")
+            # Publish event
+            try:
+                text = res.get("text") if isinstance(res, dict) else None
+                providers = res.get("providers") if isinstance(res, dict) else None
+                _publish_event({"type": "post", "ts": time.time(), "text": text, "providers": providers})
+            except Exception:
+                pass
+            if wstore and wid:
+                # record providers summary if available
+                meta = {"providers": (res.get("providers") if isinstance(res, dict) else None)}
+                wstore.end(wid, result=meta)
         except Exception as e:
             log.error(f"Post job failed: {e}", exc_info=True)
+            if wstore and wid:
+                wstore.fail(wid, error=str(e))
         finally:
             post_lock.release()
 
@@ -89,18 +146,71 @@ def main():
         if not collect_lock.acquire(blocking=False):
             log.info("Collect job already running; skipping.")
             return
+        wid = None
         try:
+            if wstore:
+                wid = wstore.start("collect", meta={})
             cfg = Config()
             met = collect_metrics(cfg)
             log.info(f"Collect organic metrics result: {met}")
             ads = collect_ads_analytics(cfg)
             log.info(f"Collect ads analytics result: {ads}")
+            # Publish collect event
+            try:
+                _publish_event({"type": "collect", "ts": time.time(), "organic_count": (met.get("count") if isinstance(met, dict) else None), "ads_status": (ads.get("status") if isinstance(ads, dict) else None)})
+            except Exception:
+                pass
+            if wstore and wid:
+                wstore.end(wid, result={"organic": met, "ads": ads})
         except Exception as e:
             log.error(f"Collect job failed: {e}", exc_info=True)
+            if wstore and wid:
+                wstore.fail(wid, error=str(e))
         finally:
             collect_lock.release()
 
     tzinfo = pytz.timezone(tz)
+
+    # Register scheduler for runtime control (web dashboard)
+    try:
+        import scheduler_control
+        scheduler_control.register_scheduler(scheduler, tzinfo, post_job_fn=post_job, collect_job_fn=collect_job)
+    except Exception as e:
+        log.warning(f"Scheduler control not available: {e}")
+
+    # Optionally start web dashboard
+    if _bool_env("WEB_DASHBOARD", True):
+        def _web():
+            try:
+                from web_dashboard import start_web
+                start_web()
+            except Exception as e:
+                log.error(f"Web dashboard failed: {e}", exc_info=True)
+        th = threading.Thread(target=_web, daemon=True, name="web-dashboard")
+        th.start()
+        log.info("Web dashboard started in background thread.")
+
+    # Self-register node and send heartbeats (autonomous)
+    def _node_heartbeat():
+        try:
+            import socket
+            import node_registry as nreg
+            name = os.getenv("NODE_NAME") or f"node-{socket.gethostname()}"
+            public_url = os.getenv("PUBLIC_URL") or f"http://localhost:{os.getenv('WEB_PORT', '8000')}"
+            node = nreg.register(name=name, url=public_url, meta={"auto": True})
+            nid = node["id"]
+            log.info(f"Registered node: {nid} ({name})")
+            while True:
+                try:
+                    nreg.heartbeat(nid, metrics={})
+                except Exception as e:
+                    log.warning(f"Heartbeat error: {e}")
+                # default 10s heartbeat
+                time.sleep(int(os.getenv("NODE_HEARTBEAT_SECONDS", "10")))
+        except Exception as e:
+            log.warning(f"Node self-register disabled: {e}")
+
+    threading.Thread(target=_node_heartbeat, daemon=True, name="node-heartbeat").start()
 
     added = 0
 
