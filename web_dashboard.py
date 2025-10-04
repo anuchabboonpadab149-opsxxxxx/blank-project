@@ -3,7 +3,6 @@ import os
 
 from flask import Flask, jsonify, render_template, request, redirect, url_for
 
-import realtime_bus as bus
 import metrics_store as mstore
 
 # Support PaaS environments (Heroku/Render/Railway) that pass PORT
@@ -61,6 +60,38 @@ def fortune_post():
     seed = int(hashlib.sha256(seed_str.encode("utf-8")).hexdigest(), 16) % (10**8)
     rnd = random.Random(seed)
 
+    # Compute zodiac and element (Western)
+    def zodiac_and_element(birth_str: str):
+        try:
+            y,m,d = [int(x) for x in birth_str.split("-")]
+            dt = datetime.date(y,m,d)
+        except Exception:
+            return None, None
+        Z = [
+            ("มังกร", (1,1), (1,19), "ธาตุดิน"),
+            ("กุมภ์", (1,20), (2,18), "ธาตุลม"),
+            ("มีน", (2,19), (3,20), "ธาตุน้ำ"),
+            ("เมษ", (3,21), (4,19), "ธาตุไฟ"),
+            ("พฤษภ", (4,20), (5,20), "ธาตุดิน"),
+            ("เมถุน", (5,21), (6,20), "ธาตุลม"),
+            ("กรกฎ", (6,21), (7,22), "ธาตุน้ำ"),
+            ("สิงห์", (7,23), (8,22), "ธาตุไฟ"),
+            ("กันย์", (8,23), (9,22), "ธาตุดิน"),
+            ("ตุลย์", (9,23), (10,22), "ธาตุลม"),
+            ("พิจิก", (10,23), (11,21), "ธาตุน้ำ"),
+            ("ธนู", (11,22), (12,21), "ธาตุไฟ"),
+            ("มังกร", (12,22), (12,31), "ธาตุดิน"),
+        ]
+        mday = (dt.month, dt.day)
+        for name, (sm,sd), (em,ed), elem in Z:
+            start = (sm, sd)
+            end = (em, ed)
+            if start <= mday <= end:
+                return name, elem
+        return None, None
+
+    zodiac, element = zodiac_and_element(birth)
+
     fortunes = {
         "ภาพรวม": [
             "วันนี้พลังงานดี มีโอกาสใหม่เข้ามา",
@@ -111,26 +142,75 @@ def fortune_post():
             "มีโอกาสได้รับคำแนะนำดีจากผู้รู้/ครู",
             "แบ่งเวลาพักระหว่างเรียน จะช่วยเพิ่มประสิทธิภาพ",
         ],
+        "โชคลาภ": [
+            "มีดวงได้ของที่อยากได้ในราคาดี",
+            "เหมาะกับการเสี่ยงเล็ก ๆ อย่างมีสติ",
+            "เจรจาต่อรองได้ผลลัพธ์ที่พอใจ",
+            "ให้ความสำคัญกับความโปร่งใส โชคจะเข้าหา",
+            "อย่าฝืนดวงเกินไป รับผิดชอบความเสี่ยง",
+        ],
+        "ครอบครัว": [
+            "บรรยากาศอบอุ่น เข้าใจกันดี",
+            "มีเวลาคุณภาพร่วมกันมากขึ้น",
+            "เปิดใจคุย ทำความเข้าใจมุมมองกันและกัน",
+            "สนับสนุนกันจะเกิดพลังบวก",
+            "ดูแลสุขภาพผู้ใหญ่ในบ้านเป็นพิเศษ",
+        ],
+        "พูดคุย": [
+            "สื่อสารชัดเจน จะลดความเข้าใจผิด",
+            "เหมาะกับการเจรจาข้อตกลง",
+            "ฟังมากขึ้น จะเห็นโอกาสซ่อนอยู่",
+            "ใช้คำพูดอ่อนโยน ผลลัพธ์จะดี",
+            "ตั้งคำถามให้ตรงจุด ประเด็นจะเคลียร์",
+        ],
     }
+
+    # Element tips and auspicious colors by element
+    element_tips = {
+        "ธาตุไฟ": ["ใช้ความกล้าอย่างมีเหตุผล", "ให้พลังกับโครงการใหม่", "ลดความเร่งรีบ เปิดพื้นที่ให้ไอเดีย"],
+        "ธาตุดิน": ["วางพื้นฐานให้มั่นคง", "จัดระบบ/วางแผนระยะยาว", "ใส่ใจรายละเอียดเล็ก ๆ"],
+        "ธาตุลม": ["เปิดการสื่อสาร/เครือข่าย", "ยืดหยุ่นต่อการเปลี่ยนแปลง", "ลองแนวทางใหม่ ๆ"],
+        "ธาตุน้ำ": ["รับฟังความรู้สึกภายใน", "พักและเติมพลังใจ", "เชื่อมโยงกับคนรอบข้าง"],
+    }
+    element_colors = {
+        "ธาตุไฟ": ["แดง","ส้ม","ทอง"],
+        "ธาตุดิน": ["น้ำตาล","ทอง","เขียวเข้ม"],
+        "ธาตุลม": ["ฟ้า","น้ำเงิน","ขาว"],
+        "ธาตุน้ำ": ["น้ำเงิน","เขียว","ม่วง"],
+    }
+
     chosen_list = fortunes.get(topic, fortunes["ภาพรวม"])
-    msg = rnd.choice(chosen_list)
-    lucky_color = rnd.choice(["น้ำเงิน","เขียว","ทอง","ขาว","ม่วง","ชมพู","ดำ","แดง"])
+    base_msg = rnd.choice(chosen_list)
+
+    elem_msg = None
+    if element and element in element_tips:
+        elem_msg = rnd.choice(element_tips[element])
+
+    # Lucky color: prefer element colors if available
+    if element and element in element_colors:
+        lucky_color = rnd.choice(element_colors[element])
+    else:
+        lucky_color = rnd.choice(["น้ำเงิน","เขียว","ทอง","ขาว","ม่วง","ชมพู","ดำ","แดง"])
     lucky_number = rnd.randint(1, 99)
+
+    # Compose final message
+    full_msg = base_msg
+    if elem_msg:
+        full_msg += " · " + elem_msg
+    if zodiac:
+        full_msg += f" (ราศี{zodiac})"
 
     result = {
         "name": name or "คุณ",
         "birth": birth,
         "topic": topic,
-        "message": msg,
+        "message": full_msg,
+        "zodiac": zodiac,
+        "element": element,
         "lucky_color": lucky_color,
         "lucky_number": lucky_number,
         "date": today,
     }
-
-    try:
-        bus.publish({"type": "fortune", "ts": int(datetime.datetime.now().timestamp()), "name": name or "", "topic": topic, "message": msg})
-    except Exception:
-        pass
 
     return jsonify(result)
 

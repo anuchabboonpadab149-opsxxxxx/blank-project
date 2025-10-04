@@ -14,14 +14,14 @@
       --accent: #3a8cff;
       --accent2: #f6b06e;
     }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background: var(--bg); color: var(--text); }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background: var(--bg); color: var(--text); transition: background 0.2s ease; }
     a { color: var(--accent); text-decoration:none; }
     header { padding: 16px 24px; background: #0e1526; border-bottom:1px solid var(--border); display:flex; align-items:center; gap: 16px; }
     h1 { margin:0; font-size:22px; letter-spacing:0.2px; }
-    .wrap { padding: 16px 24px; }
+    .wrap { padding: 16px 24px; display:grid; grid-template-columns: 1fr 320px; gap:16px; }
     .card { background: var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; max-width:720px; box-shadow: 0 10px 24px rgba(0,0,0,0.25); }
     label { display:block; font-size:12px; color: var(--muted); margin-top:10px; }
-    input[type="text"], input[type="date"], select {
+    input[type="text"], input[type="date"], select, input[type="color"] {
       width:100%; background:#0a1324; border:1px solid var(--border); color: var(--text);
       border-radius:8px; padding:10px; outline:none;
     }
@@ -31,6 +31,8 @@
     .nav a { margin-right: 12px; color: var(--muted); }
     .chip { display:inline-block; padding:2px 8px; background:#0f1a2c; border:1px solid var(--border); border-radius:999px; font-size:12px; color: var(--muted); margin-right:6px; }
     .accent2 { color: var(--accent2); }
+    .side { background: var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; }
+    @media (max-width: 920px) { .wrap { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -56,12 +58,57 @@
         <option>สุขภาพ</option>
         <option>การเดินทาง</option>
         <option>การศึกษา</option>
+        <option>โชคลาภ</option>
+        <option>ครอบครัว</option>
+        <option>พูดคุย</option>
       </select>
       <button class="btn" id="btn">ดูดวง</button>
       <div class="result" id="res" style="display:none;"></div>
     </div>
+    <div class="side">
+      <div style="font-weight:600; margin-bottom:8px;">ปรับธีม/สี</div>
+      <label>ธีม</label>
+      <select id="theme">
+        <option value="minimal">มินิมอล</option>
+        <option value="pastel">พาสเทล</option>
+        <option value="mongkol">มงคล</option>
+      </select>
+      <label>สีหลัก (accent)</label>
+      <input id="accent" type="color" value="#3a8cff" />
+      <label>สีรอง (accent2)</label>
+      <input id="accent2" type="color" value="#f6b06e" />
+      <button class="btn" id="applyTheme">ปรับธีม</button>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">เคล็ดลับ: เลือกธีมและสีตามแบรนด์ของคุณ เพื่อภาพรวมที่กลมกลืน</div>
+    </div>
   </div>
   <script>
+    const themeSel = document.getElementById('theme');
+    const accentInput = document.getElementById('accent');
+    const accent2Input = document.getElementById('accent2');
+    document.getElementById('applyTheme').onclick = () => {
+      const t = themeSel.value;
+      const acc = accentInput.value;
+      const acc2 = accent2Input.value;
+      // Preset themes
+      if (t === 'minimal') {
+        setVars('#0b1020','#111a2b','#1f2a3d','#e6eaf2','#9fb3d0', acc || '#3a8cff', acc2 || '#f6b06e');
+      } else if (t === 'pastel') {
+        setVars('#1a1f2b','#222a3a','#33425a','#f2f4f8','#b5c6e0', acc || '#a78bfa', acc2 || '#f472b6');
+      } else if (t === 'mongkol') {
+        setVars('#0f1218','#141a22','#243041','#f7f7f2','#c9c9ab', acc || '#d4af37', acc2 || '#9b59b6');
+      }
+    };
+    function setVars(bg, card, border, text, muted, accent, accent2) {
+      const r = document.documentElement;
+      r.style.setProperty('--bg', bg);
+      r.style.setProperty('--card', card);
+      r.style.setProperty('--border', border);
+      r.style.setProperty('--text', text);
+      r.style.setProperty('--muted', muted);
+      r.style.setProperty('--accent', accent);
+      r.style.setProperty('--accent2', accent2);
+    }
+
     document.getElementById('btn').onclick = async () => {
       const name = document.getElementById('name').value.trim();
       const birth = document.getElementById('birth').value.trim();
@@ -75,6 +122,8 @@
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <div class="chip">วันที่ ${data.date}</div>
             <div class="chip">หัวข้อ ${data.topic}</div>
+            ${data.zodiac ? `<div class="chip">ราศี ${data.zodiac}</div>` : ``}
+            ${data.element ? `<div class="chip">${data.element}</div>` : ``}
           </div>
           <div>สวัสดี <b>${data.name}</b></div>
           <div style="margin-top:6px;">คำทำนาย: <span class="accent2">${data.message}</span></div>
