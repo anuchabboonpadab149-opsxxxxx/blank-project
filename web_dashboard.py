@@ -1,13 +1,11 @@
 import json
 import os
-import time
-import threading
-import socket
-from typing import Generator, List, Dict
+from typing import Generator
 
 from flask import Flask, Response, jsonify, render_template, render_template_string, send_from_directory, request
 
 import realtime_bus as bus
+import node_registry as nreg
 
 # Support PaaS environments (Heroku/Render/Railway) that pass PORT
 WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
@@ -22,8 +20,9 @@ INDEX_HTML = """
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin: 0; padding: 0; background: #111; color: #eee; }
-    header { padding: 16px 24px; background: #181818; position: sticky; top: 0; border-bottom: 1px solid #2a2a2a; }
+    header { padding: 16px 24px; background: #181818; position: sticky; top: 0; border-bottom: 1px solid #2a2a2a; display:flex; align-items:center; gap:16px; }
     h1 { margin: 0; font-size: 20px; }
+    nav a { color:#85d0ff; text-decoration:none; margin-right:10px; font-size:14px; }
     .stats { display: flex; gap: 16px; margin-top: 8px; font-size: 14px; color: #bbb; }
     .wrap { padding: 16px 24px; }
     .grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; }
@@ -46,15 +45,20 @@ INDEX_HTML = """
 <body>
   <header>
     <h1>Real-time Content Export Dashboard</h1>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/nodes">Nodes</a>
+    </nav>
+  </header>
+  <div class="wrap">
     <div class="stats">
       <div>Status: <span id="status">Connecting...</span></div>
       <div>Total events: <span id="count">0</span></div>
       <div>Last update: <span id="last">-</span></div>
       <div>Providers: <span id="providers"></span></div>
     </div>
-  </header>
-  <div class="wrap">
-    <div class="grid">
+    <div class="grid" style="margin-top:12px;">
       <div class="panel" id="events"></div>
       <div class="panel">
         <div style="font-weight: 600; margin-bottom: 6px;">Latest Media</div>
@@ -78,6 +82,23 @@ INDEX_HTML = """
           <option value="file">file</option>
           <option value="import">import</option>
         </select>
+        <label>Import source URL</label>
+        <input id="importUrl" type="text" placeholder="https://example.com/posts.txt" />
+        <label>Import format</label>
+        <select id="importFormat">
+          <option value="lines">lines</option>
+          <option value="json">json</option>
+        </select>
+        <label>Hashtags (comma-separated)</label>
+        <input id="hashtagsBase" type="text" placeholder="#จัสมิน,#ความรัก,..." />
+        <label>Openers (one per line)</label>
+        <textarea id="openers"></textarea>
+        <label>Core love lines (one per line)</label>
+        <textarea id="coreLove"></textarea>
+        <label>Playful addons (one per line)</label>
+        <textarea id="playfulAddons"></textarea>
+        <label>Light spicy (one per line)</label>
+        <textarea id="lightSpicy"></textarea>
         <div style="margin-top:6px;">
           <button class="btn" id="saveCfg">Save</button>
           <button class="btn alt" id="reloadSch">Reload schedule</button>
@@ -99,6 +120,83 @@ INDEX_HTML = """
     const lastEl = document.getElementById('last');
     const providersEl = document.getElementById('providers');
     const latestMediaEl = document.getElementById('latest-media');
+
+    const postIntervalInput = document.getElementById('postInterval');
+    const collectIntervalInput = document.getElementById('collectInterval');
+    const providersInput = document.getElementById('providersInput');
+    const senderInput = document.getElementById('senderName');
+    const ttsLangInput = document.getElementById('ttsLang');
+    const contentModeSel = document.getElementById('contentMode');
+    const importUrlInput = document.getElementById('importUrl');
+    const importFmtSel = document.getElementById('importFormat');
+    const hashtagsBaseInput = document.getElementById('hashtagsBase');
+    const openersInput = document.getElementById('openers');
+    const coreLoveInput = document.getElementById('coreLove');
+    const playfulAddonsInput = document.getElementById('playfulAddons');
+    const lightSpicyInput = document.getElementById('lightSpicy');
+    const msgEl = document.getElementById('msg');
+
+    document.getElementById('saveCfg').onclick = async () => {
+      const payload = {
+        post_interval_seconds: Number(postIntervalInput.value) || null,
+        collect_interval_minutes: Number(collectIntervalInput.value) || null,
+        providers: providersInput.value ? providersInput.value.split(',').map(x => x.trim()).filter(Boolean) : null,
+        sender_name: senderInput.value || null,
+        tts_lang: ttsLangInput.value || 'th',
+        content_mode: contentModeSel.value || null,
+        import_source_url: importUrlInput.value || null,
+        import_format: importFmtSel.value || 'lines',
+        hashtags_base: hashtagsBaseInput.value ? hashtagsBaseInput.value.split(',').map(x => x.trim()).filter(Boolean) : null,
+        openers: openersInput.value ? openersInput.value.split('\\n').map(x => x.trim()).filter(Boolean) : null,
+        core_love: coreLoveInput.value ? coreLoveInput.value.split('\\n').map(x => x.trim()).filter(Boolean) : null,
+        playful_addons: playfulAddonsInput.value ? playfulAddonsInput.value.split('\\n').map(x => x.trim()).filter(Boolean) : null,
+        light_spicy: lightSpicyInput.value ? lightSpicyInput.value.split('\\n').map(x => x.trim()).filter(Boolean) : null,
+      };
+      const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const data = await r.json();
+      msgEl.textContent = 'Saved.';
+      setTimeout(() => msgEl.textContent = '', 1500);
+    };
+
+    document.getElementById('reloadSch').onclick = async () => {
+      await fetch('/api/reload-schedule', {method:'POST'});
+      msgEl.textContent = 'Scheduler reloaded.';
+      setTimeout(() => msgEl.textContent = '', 1500);
+    };
+
+    document.getElementById('postNow').onclick = async () => {
+      await fetch('/api/post-now', {method:'POST'});
+      msgEl.textContent = 'Posting initiated.';
+      setTimeout(() => msgEl.textContent = '', 1500);
+    };
+
+    document.getElementById('addLine').onclick = async () => {
+      const line = document.getElementById('newLine').value.trim();
+      if (!line) return;
+      const r = await fetch('/api/tweets', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({line})});
+      const data = await r.json();
+      document.getElementById('newLine').value = '';
+      msgEl.textContent = 'Appended.';
+      setTimeout(() => msgEl.textContent = '', 1500);
+    };
+
+    async function loadConfig() {
+      const r = await fetch('/api/config');
+      const cfg = await r.json();
+      if (cfg.post_interval_seconds != null) postIntervalInput.value = cfg.post_interval_seconds;
+      if (cfg.collect_interval_minutes != null) collectIntervalInput.value = cfg.collect_interval_minutes;
+      if (Array.isArray(cfg.providers)) providersInput.value = cfg.providers.join(',');
+      if (cfg.sender_name) senderInput.value = cfg.sender_name;
+      if (cfg.tts_lang) ttsLangInput.value = cfg.tts_lang;
+      if (cfg.content_mode) contentModeSel.value = cfg.content_mode;
+      if (cfg.import_source_url) importUrlInput.value = cfg.import_source_url;
+      if (cfg.import_format) importFmtSel.value = cfg.import_format;
+      if (Array.isArray(cfg.hashtags_base)) hashtagsBaseInput.value = cfg.hashtags_base.join(',');
+      if (Array.isArray(cfg.openers)) openersInput.value = cfg.openers.join('\\n');
+      if (Array.isArray(cfg.core_love)) coreLoveInput.value = cfg.core_love.join('\\n');
+      if (Array.isArray(cfg.playful_addons)) playfulAddonsInput.value = cfg.playful_addons.join('\\n');
+      if (Array.isArray(cfg.light_spicy)) lightSpicyInput.value = cfg.light_spicy.join('\\n');
+    }
 
     let count = 0;
     function fmtTs(ts) {
@@ -167,7 +265,93 @@ INDEX_HTML = """
     fetch('/api/recent').then(r => r.json()).then(list => {
       list.forEach(addEvent);
       connect();
+      loadConfig();
     });
+  </script>
+</body>
+</html>
+"""
+
+NODES_HTML = """
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>Nodes — จัสมินชอบกินแซลมอน</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans', 'Helvetica Neue', Arial, 'Noto Color Emoji', 'Noto Emoji', sans-serif; margin:0; padding:0; background:#111; color:#eee; }
+    a { color:#85d0ff; text-decoration:none; }
+    header { padding: 16px 24px; background:#181818; border-bottom:1px solid #2a2a2a; display:flex; align-items:center; gap: 16px; }
+    h1 { margin:0; font-size:20px; }
+    .wrap { padding: 16px 24px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #2a2a2a; font-size: 14px; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; }
+    .ok { background:#16391f; color:#a7f3d0; }
+    .off { background:#3a1e1e; color:#fecaca; }
+    .small { color:#aaa; font-size:12px; }
+    .grid { display:grid; grid-template-columns: 1fr 360px; gap:16px; }
+    .panel { background:#181818; border:1px solid #2a2a2a; border-radius:10px; padding:12px; }
+    input[type="text"] { width:100%; background:#121212; border:1px solid #2a2a2a; color:#eaeaea; border-radius:6px; padding:6px 8px; }
+    .btn { display:inline-block; background:#2a6bff; color:#fff; border:0; padding:6px 10px; border-radius:6px; cursor:pointer; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Nodes — จัสมินชอบกินแซลมอน</h1>
+    <a href="/">กลับสู่แดชบอร์ด</a>
+    <a href="/about">About</a>
+  </header>
+  <div class="wrap">
+    <div class="grid">
+      <div class="panel">
+        <div style="font-weight: 600; margin-bottom: 8px;">รายการโหนด</div>
+        <table id="tbl">
+          <thead><tr><th>ชื่อ</th><th>URL</th><th>สถานะ</th><th>last_seen</th><th>beats</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="small">รีเฟรชอัตโนมัติทุก 5 วินาที</div>
+      </div>
+      <div class="panel">
+        <div style="font-weight: 600; margin-bottom: 8px;">ลงทะเบียนโหนด (manual)</div>
+        <label>ชื่อโหนด</label>
+        <input id="name" type="text" placeholder="node-01" />
+        <label>URL</label>
+        <input id="url" type="text" placeholder="https://node-01.example.com" />
+        <button class="btn" id="btnReg">Register</button>
+        <div id="msg" class="small" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    async function load() {
+      const res = await fetch('/api/nodes');
+      const list = await res.json();
+      const tb = document.querySelector('#tbl tbody');
+      tb.innerHTML = '';
+      for (const n of list) {
+        const tr = document.createElement('tr');
+        const st = n.status === 'online' ? '<span class="badge ok">online</span>' : '<span class="badge off">offline</span>';
+        const d = new Date((n.last_seen || 0) * 1000).toLocaleString();
+        tr.innerHTML = '<td>'+ (n.name||'') +'</td><td>'+ (n.url||'') +'</td><td>'+ st +'</td><td>'+ d +'</td><td>'+ (n.beats||0) +'</td>';
+        tb.appendChild(tr);
+      }
+    }
+    setInterval(load, 5000);
+    load();
+
+    document.getElementById('btnReg').onclick = async () => {
+      const name = document.getElementById('name').value.trim();
+      const url = document.getElementById('url').value.trim();
+      if (!name || !url) return;
+      const r = await fetch('/api/nodes/register', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, url})});
+      const data = await r.json();
+      const msg = document.getElementById('msg');
+      if (data.id) { msg.textContent = 'ลงทะเบียนสำเร็จ: ' + data.id; } else { msg.textContent = JSON.stringify(data); }
+      load();
+      setTimeout(() => msg.textContent = '', 2000);
+    };
   </script>
 </body>
 </html>
@@ -190,63 +374,9 @@ def about():
     return render_template("about.html")
 
 
-def _list_media(limit: int = 24) -> List[Dict]:
-    base = "outputs"
-    imgs_dir = os.path.join(base, "images")
-    vids_dir = os.path.join(base, "video")
-    items: List[Dict] = []
-    try:
-        for p in (os.listdir(imgs_dir) if os.path.exists(imgs_dir) else []):
-            full = os.path.join(imgs_dir, p)
-            if os.path.isfile(full):
-                items.append({"type": "image", "name": p, "path": f"images/{p}", "ts": os.path.getmtime(full)})
-    except Exception:
-        pass
-    try:
-        for p in (os.listdir(vids_dir) if os.path.exists(vids_dir) else []):
-            full = os.path.join(vids_dir, p)
-            if os.path.isfile(full):
-                items.append({"type": "video", "name": p, "path": f"video/{p}", "ts": os.path.getmtime(full)})
-    except Exception:
-        pass
-    items.sort(key=lambda x: x["ts"], reverse=True)
-    return items[:limit]
-
-
-@app.get("/gallery")
-def gallery():
-    media = _list_media(48)
-    return render_template("gallery.html", media=media)
-
-
-@app.get("/status")
-def status_page():
-    try:
-        import config_store
-        cfg = config_store.get_config()
-    except Exception:
-        cfg = {}
-    recent = bus.recent(20)
-    return render_template("status.html", cfg=cfg, recent=recent)
-
-
 @app.get("/nodes")
 def nodes_page():
-    try:
-        import node_registry as nr
-        nodes = nr.list_nodes()
-    except Exception:
-        nodes = []
-    return render_template("nodes.html", nodes=nodes)
-
-
-@app.get("/api/nodes")
-def api_nodes():
-    try:
-        import node_registry as nr
-        return jsonify(nr.list_nodes())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return render_template_string(NODES_HTML)
 
 
 @app.get("/api/recent")
@@ -273,17 +403,57 @@ def api_latest():
     return jsonify(latest_post or latest_any)
 
 
+@app.get("/api/nodes")
+def api_nodes_list():
+    return jsonify(nreg.list_nodes())
+
+
+@app.post("/api/nodes/register")
+def api_nodes_register():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        name = str(payload.get("name", "")).strip()
+        url = str(payload.get("url", "")).strip()
+        if not name or not url:
+            return jsonify({"error": "name and url are required"}), 400
+        node = nreg.register(name=name, url=url, meta={"user": "web"})
+        try:
+            bus.publish({"type": "node", "action": "register", "node": {"id": node["id"], "name": node["name"], "url": node["url"]}})
+        except Exception:
+            pass
+        return jsonify(node)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/nodes/heartbeat")
+def api_nodes_heartbeat():
+    try:
+        payload = request.get_json(force=True, silent=True) or {}
+        node_id = str(payload.get("id", "")).strip()
+        metrics = payload.get("metrics") or {}
+        if not node_id:
+            return jsonify({"error": "id is required"}), 400
+        node = nreg.heartbeat(node_id, metrics=metrics)
+        try:
+            bus.publish({"type": "node", "action": "heartbeat", "node": {"id": node["id"], "name": node["name"]}, "metrics": metrics})
+        except Exception:
+            pass
+        return jsonify(node)
+    except KeyError:
+        return jsonify({"error": "node not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/api/nodes/summary")
+def api_nodes_summary():
+    return jsonify(nreg.summary())
+
+
 @app.get("/healthz")
 def healthz():
     return jsonify({"ok": True})
-
-
-@app.get("/events")
-def events() -> Response:
-    def gen() -> Generator[str, None, None]:
-        for ev in bus.stream():
-            yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
-    return Response(gen(), mimetype="text/event-stream")
 
 
 @app.get("/media/<path:subpath>")
@@ -396,29 +566,5 @@ def api_tweets_append():
         return jsonify({"error": str(e)}), 500
 
 
-def _start_node_heartbeat():
-    try:
-        import node_registry as nr
-    except Exception:
-        return
-    node_id = nr.node_id_default()
-    try:
-        nr.register(node_id, role="web+worker", extra={"host": socket.gethostname()})
-    except Exception:
-        pass
-
-    def loop():
-        while True:
-            try:
-                nr.heartbeat(node_id)
-            except Exception:
-                pass
-            time.sleep(10)
-
-    t = threading.Thread(target=loop, name="node-heartbeat", daemon=True)
-    t.start()
-
-
 def start_web():
-    _start_node_heartbeat()
     app.run(host="0.0.0.0", port=WEB_PORT, debug=False, threaded=True)
