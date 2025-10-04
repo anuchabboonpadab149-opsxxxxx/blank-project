@@ -535,6 +535,49 @@ def api_latest():
             break
     return jsonify(latest_post or latest_any)
 
+# Pages: status and gallery
+@app.get("/status")
+def status_page():
+    try:
+        mstore.pageview("status")
+    except Exception:
+        pass
+    try:
+        import config_store
+        cfg = config_store.get_config()
+    except Exception:
+        cfg = {}
+    recent = []
+    try:
+        recent = bus.recent(50)
+    except Exception:
+        recent = []
+    return render_template("status.html", cfg=cfg, recent=recent, user=current_user())
+
+@app.get("/gallery")
+def gallery_page():
+    try:
+        mstore.pageview("gallery")
+    except Exception:
+        pass
+    media = []
+    base = "outputs"
+    try:
+        for root, dirs, files in os.walk(base):
+            for fname in files:
+                rel = os.path.relpath(os.path.join(root, fname), base)
+                lower = fname.lower()
+                if lower.endswith((".jpg", ".jpeg", ".png", ".webp")):
+                    media.append({"type": "image", "path": rel, "name": fname})
+                elif lower.endswith((".mp4", ".mov", ".mkv", ".webm")):
+                    media.append({"type": "video", "path": rel, "name": fname})
+        # show newest first by filename (optional better: by mtime)
+        media.sort(key=lambda m: m.get("name") or "", reverse=True)
+        media = media[:60]
+    except Exception:
+        media = []
+    return render_template("gallery.html", media=media, user=current_user())
+
 
 @app.get("/events")
 def events() -> Response:
